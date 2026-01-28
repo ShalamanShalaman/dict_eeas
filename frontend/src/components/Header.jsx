@@ -2,7 +2,7 @@ export default function Header({ role, setRole }) {
   return (
     <header className="h-16 bg-white border-b flex items-center justify-between px-6">
 
-      <h1 className="font-semibold capitalize">{role} Dashboard</h1>
+      <h1 className="font-semibold capitalize">Employee Attendance and Accomplishment System</h1>
 
       <div className="hidden md:flex bg-slate-100 p-1 rounded-lg">
         {["employee", "reviewer", "admin"].map(r => (
