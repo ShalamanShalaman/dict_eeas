@@ -15,7 +15,7 @@ export default function Sidebar({ role, activePage, onNavigate }) {
         <img
           src="/images/dict-logo.png"
           alt="DICT Logo"
-          className="h-8 w-auto"
+          className="h-12 w-auto"
         />
       </div>
 
