@@ -1,233 +1,283 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Form State
+  const [editingUser, setEditingUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [formData, setFormData] = useState({
-    first_name: '',
-    middle_name: '',
-    last_name: '',
-    email: '',
-    role: 'employee', // Default to lowercase to match your menus logic
-    contact_no: ''
+    user_id: "",
+    first_name: "",
+    middle_name: "",
+    last_name: "",
+    email: "",
+    role: "employee",
+    contact_no: ""
   });
 
-  const API_URL = 'http://127.0.0.1:5000/api';
+  const API_URL = "http://127.0.0.1:5000/api";
 
-  // 1. Fetch Users on Load
   useEffect(() => {
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/admin/users`);
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
-      }
+      const res = await fetch(`${API_URL}/admin/users`);
+      const data = await res.json();
+      setUsers(data);
     } catch (error) {
-      console.error("Failed to fetch users", error);
+      console.error(error);
+      alert("Failed to fetch users");
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Handle Create User
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_URL}/admin/create-user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      const endpoint = editingUser
+        ? `${API_URL}/admin/edit-user/${editingUser.public_id}`
+        : `${API_URL}/admin/create-user`;
+      const method = editingUser ? "PUT" : "POST";
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
       });
 
-      if (response.ok) {
-        alert("User created successfully! Credentials sent to email."); // Replace with toast if available
+      const result = await res.json();
+      if (res.ok) {
+        alert(result.message);
         setIsModalOpen(false);
-        setFormData({ first_name: '', middle_name: '', last_name: '', email: '', role: 'employee', contact_no: '' });
-        fetchUsers(); // Refresh list
+        setEditingUser(null);
+        setFormData({
+          user_id: "",
+          first_name: "",
+          middle_name: "",
+          last_name: "",
+          email: "",
+          role: "employee",
+          contact_no: ""
+        });
+        fetchUsers();
       } else {
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
+        alert(result.error);
       }
     } catch (error) {
-      console.error("Error creating user", error);
+      console.error(error);
+      alert("Server error");
     }
   };
 
-  // Helper for status badge colors
-  const getStatusBadge = (isActive) => {
-    return isActive 
-      ? <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">Active</span>
-      : <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-full">Inactive</span>;
+  const handleEdit = (user) => {
+    setEditingUser(user);
+    setFormData({
+      user_id: user.user_id,
+      first_name: user.first_name,
+      middle_name: user.middle_name || "",
+      last_name: user.last_name,
+      email: user.email,
+      role: user.role,
+      contact_no: user.contact_no || ""
+    });
+    setIsModalOpen(true);
   };
+
+  const handleDelete = async (user) => {
+    if (!window.confirm(`Are you sure you want to delete ${user.full_name}?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/delete-user/${user.public_id}`, {
+        method: "DELETE"
+      });
+      const result = await res.json();
+      alert(result.message);
+      fetchUsers();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete user");
+    }
+  };
+
+  // Pagination
+  const itemsPerPage = 10;
+  const filteredUsers = users.filter((u) =>
+    u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="space-y-6">
-      
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">User Management</h2>
-          <p className="text-sm text-slate-500">Manage access and account details.</p>
-        </div>
-        <button 
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">User Management</h2>
+        <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
         >
-          <span>+ Add User</span>
+          + Add User
         </button>
       </div>
 
-      {/* Users Table */}
+      {/* Search */}
+      <input
+        type="text"
+        placeholder="Search users..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="border rounded px-3 py-2 w-full max-w-sm"
+      />
+
+      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 font-semibold uppercase text-xs">
-              <tr>
-                <th className="px-6 py-4">Full Name</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Email / Contact</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Joined</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan="5" className="px-6 py-8 text-center">Loading users...</td></tr>
-              ) : users.length === 0 ? (
-                <tr><td colSpan="5" className="px-6 py-8 text-center">No users found.</td></tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.public_id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">
-                      {user.full_name}
-                      <div className="text-xs text-slate-400 font-normal">ID: {user.public_id.split('-')[0]}...</div>
-                    </td>
-                    <td className="px-6 py-4 capitalize">
-                      <span className="px-2 py-1 bg-slate-100 rounded text-xs border border-slate-200">
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span>{user.email}</span>
-                        <span className="text-xs text-slate-400">{user.contact_no || 'No contact'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {getStatusBadge(user.is_active)}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-500">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <table className="w-full text-left text-sm text-slate-600">
+          <thead className="bg-slate-50 border-b border-slate-200 text-slate-800 font-semibold uppercase text-xs">
+            <tr>
+              <th className="px-6 py-4">ID</th>
+              <th className="px-6 py-4">Full Name</th>
+              <th className="px-6 py-4">Role</th>
+              <th className="px-6 py-4">Email</th>
+              <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              <tr><td colSpan="6" className="px-6 py-8 text-center">Loading users...</td></tr>
+            ) : paginatedUsers.length === 0 ? (
+              <tr><td colSpan="6" className="px-6 py-8 text-center">No users found.</td></tr>
+            ) : (
+              paginatedUsers.map((user) => (
+                <tr key={user.public_id} className="hover:bg-slate-50">
+                  <td className="px-6 py-4">{user.user_id}</td>
+                  <td className="px-6 py-4">{user.full_name}</td>
+                  <td className="px-6 py-4">{user.role}</td>
+                  <td className="px-6 py-4">{user.email}</td>
+                  <td className="px-6 py-4">
+                    {user.is_active 
+                      ? <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">Active</span>
+                      : <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-full">Inactive</span>
+                    }
+                  </td>
+                  <td className="px-6 py-4 space-x-2">
+                    <button onClick={() => handleEdit(user)} className="text-blue-600 hover:underline">Edit</button>
+                    <button onClick={() => handleDelete(user)} className="text-red-600 hover:underline">Delete</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Create User Modal */}
+      {/* Pagination */}
+      <div className="flex justify-center items-center gap-2">
+        {Array.from({ length: totalPages }, (_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrentPage(i + 1)}
+            className={`px-3 py-1 rounded ${currentPage === i + 1 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          >
+            {i + 1}
+          </button>
+        ))}
+      </div>
+
+      {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800">Create New Account</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                ✕
-              </button>
+              <h3 className="font-bold">{editingUser ? "Edit User" : "Create User"}</h3>
+              <button onClick={() => { setIsModalOpen(false); setEditingUser(null); }} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
-            
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">First Name</label>
-                  <input 
-                    required 
-                    type="text" 
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600">User ID</label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    value={formData.user_id}
+                    onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600">First Name</label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
                     value={formData.first_name}
-                    onChange={(e) => setFormData({...formData, first_name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                   />
                 </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Middle Name</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600">Middle Name</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
                     value={formData.middle_name}
-                    onChange={(e) => setFormData({...formData, middle_name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Last Name</label>
-                  <input 
-                    required 
-                    type="text" 
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600">Last Name</label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
                     value={formData.last_name}
-                    onChange={(e) => setFormData({...formData, last_name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                   />
                 </div>
-              </div>
-
-              {/* Contact Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Email Address</label>
-                  <input 
-                    required 
-                    type="email" 
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600">Email</label>
+                  <input
+                    required
+                    type="email"
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
                 </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Role</label>
-                  <select 
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600">Role</label>
+                  <select
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
                     value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                   >
                     <option value="employee">Employee</option>
                     <option value="reviewer">Reviewer</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Contact No.</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600">Contact No</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
                     value={formData.contact_no}
-                    onChange={(e) => setFormData({...formData, contact_no: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, contact_no: e.target.value })}
                   />
                 </div>
               </div>
-
-              <div className="pt-4 flex justify-end gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm"
-                >
-                  Create Account
-                </button>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingUser(null); }} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">{editingUser ? "Save Changes" : "Create User"}</button>
               </div>
             </form>
           </div>
