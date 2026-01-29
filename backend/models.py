@@ -5,27 +5,44 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+class OfficeLocation(db.Model):
+    __tablename__ = "office_locations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    location = db.Column(db.String(100), nullable=False)
+    manager = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    users = db.relationship("User", backref="office_location", lazy=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "location": self.location,
+            "manager": self.manager
+        }
+
+
 class User(db.Model):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(50), unique=True, nullable=False)
     public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    user_id = db.Column(db.String(20), unique=True, nullable=False)  # Admin-assigned login ID
-
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='employee')
-
     first_name = db.Column(db.String(50), nullable=False)
     middle_name = db.Column(db.String(50), nullable=True)
     last_name = db.Column(db.String(50), nullable=False)
     contact_no = db.Column(db.String(20), nullable=True)
-
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     force_change_password = db.Column(db.Boolean, default=True, nullable=False)
-    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
+
+    # Foreign key to office location
+    office_location_id = db.Column(db.Integer, db.ForeignKey("office_locations.id"), nullable=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -45,6 +62,6 @@ class User(db.Model):
             'last_name': self.last_name,
             'contact_no': self.contact_no,
             'is_active': self.is_active,
-            'force_change_password': self.force_change_password,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'office_location_id': self.office_location_id,
+            'created_at': self.created_at.isoformat()
         }
