@@ -5,19 +5,17 @@ const menus = {
 };
 
 export default function Sidebar({ role, activePage, onNavigate }) {
-  // Fallback in case role is not found in menus
   const currentMenu = menus[role] || menus.employee;
 
   return (
-    <aside className="w-64 bg-white border-r hidden md:flex flex-col">
-      
-      {/* Header with image */}
-      <div className="h-16 flex items-center px-6 border-b">
-         {/* Replace with your actual image path */}
-        <img 
-          src="/images/dict-logo.png" 
-          alt="DICT Logo" 
-          className="h-8 w-auto" // Adjusted height for better fit
+    <aside className="w-64 hidden md:flex flex-col bg-[rgb(28,26,136)]">
+
+      {/* Logo header – removed bottom border */}
+      <div className="h-16 flex items-center px-6">
+        <img
+          src="/images/dict-logo.png"
+          alt="DICT Logo"
+          className="h-8 w-auto"
         />
       </div>
 
@@ -25,15 +23,18 @@ export default function Sidebar({ role, activePage, onNavigate }) {
       <nav className="flex-1 py-4 space-y-1">
         {currentMenu.map((item, i) => {
           const isActive = activePage === item;
+
           return (
             <button
               key={i}
               onClick={() => onNavigate(item)}
-              className={`w-full text-left block px-6 py-3 text-sm transition-colors ${
-                isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium border-r-4 border-blue-600" 
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`w-full text-left px-6 py-3 text-sm transition-all duration-200
+                ${
+                  isActive
+                    ? "bg-white/15 text-white font-semibold border-l-4 border-yellow-400"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                }
+              `}
             >
               {item}
             </button>
@@ -42,7 +43,7 @@ export default function Sidebar({ role, activePage, onNavigate }) {
       </nav>
 
       {/* Role display */}
-      <div className="p-4 border-t text-xs font-semibold text-slate-400 tracking-wider uppercase">
+      <div className="p-4 text-xs font-semibold text-white/60 tracking-wider uppercase">
         {role} Panel
       </div>
 

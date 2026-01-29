@@ -2,7 +2,7 @@ export default function Header({ role, setRole }) {
   return (
     <header
       className="h-16 border-b flex items-center justify-between px-6"
-      style={{ backgroundColor: "rgb(28,26,136)" }} // blue background
+      style={{ backgroundColor: "rgb(20, 17, 189)" }} // blue background
     >
 
       <h1 className="font-semibold capitalize text-white">
