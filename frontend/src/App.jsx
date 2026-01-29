@@ -8,35 +8,37 @@ import AdminDashboard from "./views/AdminDashboard"
 
 export default function App() {
   const [role, setRole] = useState("admin")
-  const [activePage, setActivePage] = useState("User Management") // Default to User Management for testing
+  const [activePage, setActivePage] = useState("Dashboard")
 
   const renderView = () => {
-    // 1. Check for Specific Pages first
+
+    // pages shared across roles
     if (activePage === "User Management") {
-       return <UserManagement />
+      return <UserManagement />
     }
 
-    // 2. Default Dashboard Views based on Role
-    if (activePage === "Dashboard") {
-      if (role === "employee") return <EmployeeDashboard />
-      if (role === "reviewer") return <ReviewerDashboard />
-      if (role === "admin") return <AdminDashboard />
+    // dashboards handle sub-pages
+    if (role === "employee") {
+      return <EmployeeDashboard selectedMenu={activePage} />
     }
-    
-    // 3. Fallback
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-        <p className="text-lg">Page "{activePage}" is under construction.</p>
-      </div>
-    )
+
+    if (role === "reviewer") {
+      return <ReviewerDashboard selectedMenu={activePage} />
+    }
+
+    if (role === "admin") {
+      return <AdminDashboard selectedMenu={activePage} />
+    }
+
+    return null
   }
 
   return (
     <DashboardLayout 
-      role={role} 
-      setRole={setRole} 
-      activePage={activePage}       
-      setActivePage={setActivePage} 
+      role={role}
+      setRole={setRole}
+      activePage={activePage}
+      setActivePage={setActivePage}
     >
       {renderView()}
     </DashboardLayout>

@@ -1,0 +1,657 @@
+<!--<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Text Extractor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 900px;
+      width: 100%;
+      padding: 50px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 2.5em;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 40px;
+      font-size: 1.1em;
+    }
+
+    .upload-section {
+      background: #f8f9fa;
+      border: 3px dashed #667eea;
+      border-radius: 10px;
+      padding: 50px 30px;
+      text-align: center;
+      margin-bottom: 30px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .upload-section:hover {
+      border-color: #764ba2;
+      background: #f0f1ff;
+      transform: scale(1.02);
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      display: none;
+    }
+
+    .file-label {
+      display: inline-block;
+      padding: 15px 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1.05em;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .file-label:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .upload-icon {
+      font-size: 3em;
+      margin-bottom: 15px;
+      display: block;
+    }
+
+    .file-name {
+      margin-top: 20px;
+      color: #28a745;
+      font-size: 1em;
+      font-weight: 500;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 14px 50px;
+      font-size: 1em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .btn-submit {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-submit:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .btn-clear {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-clear:hover {
+      background: #d0d0d0;
+      transform: translateY(-2px);
+    }
+
+    .result-section {
+      margin-top: 40px;
+      padding-top: 30px;
+      border-top: 2px solid #eee;
+    }
+
+    .result-section h2 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.8em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .result-content {
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 25px;
+      max-height: 600px;
+      overflow-y: auto;
+      line-height: 1.7;
+      color: #333;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95em;
+    }
+
+    .result-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .result-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    .result-content::-webkit-scrollbar-thumb {
+      background: #667eea;
+      border-radius: 10px;
+    }
+
+    .result-content::-webkit-scrollbar-thumb:hover {
+      background: #764ba2;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #999;
+      padding: 60px 20px;
+    }
+
+    .empty-state-icon {
+      font-size: 4em;
+      margin-bottom: 20px;
+      opacity: 0.6;
+    }
+
+    .copy-button {
+      background: #667eea;
+      color: white;
+      padding: 8px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9em;
+      margin-top: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .copy-button:hover {
+      background: #764ba2;
+    }
+
+    .employee-selector {
+      margin-bottom: 30px;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .employee-selector label {
+      font-weight: 600;
+      color: #333;
+      font-size: 1.05em;
+    }
+
+    .employee-selector select {
+      padding: 10px 15px;
+      border: 2px solid #667eea;
+      border-radius: 5px;
+      font-size: 1em;
+      background-color: white;
+      color: #333;
+      cursor: pointer;
+      min-width: 250px;
+      transition: all 0.3s ease;
+    }
+
+    .employee-selector select:hover {
+      border-color: #764ba2;
+    }
+
+    .employee-selector select:focus {
+      outline: none;
+      border-color: #764ba2;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .employee-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: 0;
+    }
+
+    .employee-header h3 {
+      margin: 0;
+      font-size: 1.5em;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 0 0 8px 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .data-table input {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 8px;
+      text-align: center;
+      font-family: inherit;
+      font-size: 0.95em;
+      color: inherit;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .data-table input:hover {
+        background-color: #f0f0f0;
+    }
+
+    .data-table input:focus {
+      border: 1px solid #667eea;
+      background: #fff;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    }
+
+    .data-table thead {
+      background: #f8f9fa;
+      border-bottom: 2px solid #ddd;
+    }
+
+    .data-table th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-right: 1px solid #eee;
+    }
+
+    .data-table th:last-child {
+      border-right: none;
+    }
+
+    .data-table td {
+      padding: 0; 
+      border-bottom: 1px solid #eee;
+      color: #555;
+      border-right: 1px solid #eee;
+      text-align: center;
+    }
+
+    .data-table td:first-child {
+        padding: 12px 15px;
+    }
+
+    .data-table td:last-child {
+      border-right: none;
+    }
+
+    .data-table tbody tr:hover {
+      background: #f8f9fa;
+    }
+
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .employees-summary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+
+    .employees-summary h3 {
+      margin: 0 0 20px 0;
+      font-size: 1.5em;
+    }
+
+    .employee-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .employee-card {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .employee-card:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-2px);
+    }
+
+    .employee-name {
+      font-weight: 600;
+      font-size: 1.1em;
+      margin-bottom: 8px;
+    }
+
+    .employee-info {
+      font-size: 0.9em;
+      opacity: 0.9;
+    }
+
+    .record-count {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.85em;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 30px 20px;
+      }
+
+      h1 {
+        font-size: 2em;
+      }
+
+      .upload-section {
+        padding: 30px 20px;
+      }
+
+      .file-label {
+        padding: 12px 30px;
+        font-size: 1em;
+      }
+
+      .button-group {
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📄 PDF Text Extractor</h1>
+    <p class="subtitle">Extract and view text from your PDF files</p>
+
+    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+      <div class="upload-section" onclick="document.getElementById('pdf_file').click()">
+        <span class="upload-icon">📤</span>
+        <div class="file-input-wrapper">
+          <label for="pdf_file" class="file-label">Choose PDF File</label>
+          <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required onchange="updateFileName()">
+        </div>
+        <div class="file-name" id="fileName"></div>
+      </div>
+
+      <div class="button-group">
+        <button type="submit" class="btn-submit">Extract Text</button>
+        <button type="button" class="btn-clear" onclick="clearForm()">Clear</button>
+      </div>
+    </form>
+
+    {% if error_message %}
+      <div class="result-section" style="border-top: none; margin-top: 20px;">
+        <h2 style="color: #dc3545;">❌ Error</h2>
+        <div class="result-content" style="background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
+          {{ error_message }}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if extracted_text %}
+      <div class="result-section">
+        <h2>✅ Extracted Text</h2>
+        
+        {% if employees %}
+          <div class="employees-summary">
+            <h3>📋 Employees Found: {{ employees|length }}</h3>
+            <div class="employee-list">
+              {% for employee_name in employees | sort %}
+                <div class="employee-card">
+                  <div class="employee-name">{{ employee_name }}</div>
+                  <div class="employee-info">
+                    <span class="record-count">
+                        {{ counts[employee_name] }} days recorded
+                    </span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="employee-selector">
+            <label for="employeeSelect">Select Employee to View Details:</label>
+            <select id="employeeSelect" onchange="displayEmployeeData()">
+              <option value="">-- Choose an Employee --</option>
+              {% for employee_name in employees | sort %}
+                <option value="{{ employee_name }}">{{ employee_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div id="employeeDataContainer" style="display: none; margin-top: 30px;">
+            <div class="employee-header">
+              <h3 id="selectedEmployeeName"></h3>
+            </div>
+            
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 60px;">Day</th>
+                  <th>AM IN</th>
+                  <th>AM OUT</th>
+                  <th>PM IN</th>
+                  <th>PM OUT</th>
+                  <th>Undertime Hrs</th>
+                  <th>Undertime Min</th>
+                </tr>
+              </thead>
+              <tbody id="employeeDataTable">
+              </tbody>
+            </table>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+              <button class="copy-button" onclick="copyToClipboard()">Copy to Clipboard</button>
+              <form id="dtrForm" method="POST" action="/download-dtr" style="display: inline;">
+                <input type="hidden" id="employeeNameInput" name="employee_name">
+                <input type="hidden" id="employeeDataInput" name="employee_data">
+                <button type="submit" class="copy-button" style="background: #28a745; border: none; cursor: pointer;">Download DTR (Excel)</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <p style="color: #999; margin: 20px 0;">No employee data found. Ensure PDF contains employee names in format: LASTNAME, State(#)</p>
+          <div class="result-content">{{ extracted_text }}</div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">📭</div>
+        <p>Upload a PDF file to get started</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <script type="application/json" id="employeeDataJSON">
+    {{ employees | tojson | default('{}') }}
+  </script>
+
+  <script>
+    let employeeData = {};
+    
+    try {
+      const jsonElement = document.getElementById('employeeDataJSON');
+      if (jsonElement) {
+        const rawContent = jsonElement.textContent.trim();
+        if (rawContent.startsWith('{')) {
+          employeeData = JSON.parse(rawContent);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse employee data (likely running in static mode without backend).");
+      employeeData = {};
+    }
+
+    function updateFileName() {
+      const fileInput = document.getElementById('pdf_file');
+      const fileName = document.getElementById('fileName');
+      
+      if (fileInput.files.length > 0) {
+        fileName.textContent = '✓ ' + fileInput.files[0].name;
+      } else {
+        fileName.textContent = '';
+      }
+    }
+
+    function clearForm() {
+      document.getElementById('pdf_file').value = '';
+      document.getElementById('fileName').textContent = '';
+      document.getElementById('uploadForm').reset();
+      window.location.reload();
+    }
+
+    function displayEmployeeData() {
+      const select = document.getElementById('employeeSelect');
+      const selectedEmployee = select.value;
+      const container = document.getElementById('employeeDataContainer');
+      const employeeNameDisplay = document.getElementById('selectedEmployeeName');
+      const dataTable = document.getElementById('employeeDataTable');
+
+      if (!selectedEmployee) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'block';
+      employeeNameDisplay.textContent = selectedEmployee;
+      dataTable.innerHTML = '';
+
+      const data = employeeData[selectedEmployee] || {};
+
+      const sortedDays = Object.keys(data)
+        .filter(k => !isNaN(k) && parseInt(k) > 0)
+        .map(Number)
+        .sort((a, b) => a - b);
+      
+      if (sortedDays.length === 0) {
+        dataTable.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999; padding: 20px;">No attendance records found</td></tr>';
+      } else {
+        sortedDays.forEach(day => {
+          const dayData = data[day];
+          const row = document.createElement('tr');
+          
+          row.innerHTML = `
+            <td>${day}</td>
+            <td><input type="text" value="${dayData.am_in || ''}" onchange="updateData(${day}, 'am_in', this.value)"></td>
+            <td><input type="text" value="${dayData.am_out || ''}" onchange="updateData(${day}, 'am_out', this.value)"></td>
+            <td><input type="text" value="${dayData.pm_in || ''}" onchange="updateData(${day}, 'pm_in', this.value)"></td>
+            <td><input type="text" value="${dayData.pm_out || ''}" onchange="updateData(${day}, 'pm_out', this.value)"></td>
+            <td><input type="text" value="${dayData.undertime_hrs || ''}" onchange="updateData(${day}, 'undertime_hrs', this.value)"></td>
+            <td><input type="text" value="${dayData.undertime_min || ''}" onchange="updateData(${day}, 'undertime_min', this.value)"></td>
+          `;
+          dataTable.appendChild(row);
+        });
+      }
+
+      updateHiddenInputs(selectedEmployee);
+    }
+
+    function updateData(day, field, value) {
+        const select = document.getElementById('employeeSelect');
+        const selectedEmployee = select.value;
+        if (employeeData[selectedEmployee] && employeeData[selectedEmployee][day]) {
+            employeeData[selectedEmployee][day][field] = value;
+            updateHiddenInputs(selectedEmployee);
+        }
+    }
+
+    function updateHiddenInputs(selectedEmployee) {
+        document.getElementById('employeeNameInput').value = selectedEmployee;
+        document.getElementById('employeeDataInput').value = JSON.stringify(employeeData[selectedEmployee] || {});
+    }
+
+    function copyToClipboard() {
+      const select = document.getElementById('employeeSelect');
+      const selectedEmployee = select.value;
+      const data = employeeData[selectedEmployee] || {};
+      
+      let text = `Employee: ${selectedEmployee}\n\nDay\tAM IN\tAM OUT\tPM IN\tPM OUT\tUT HRS\tUT MIN\n`;
+      
+      const sortedDays = Object.keys(data)
+        .filter(k => !isNaN(k) && parseInt(k) > 0)
+        .map(Number)
+        .sort((a, b) => a - b);
+
+      sortedDays.forEach(day => {
+        const dayData = data[day];
+        text += `${day}\t${dayData.am_in || '-'}\t${dayData.am_out || '-'}\t${dayData.pm_in || '-'}\t${dayData.pm_out || '-'}\t${dayData.undertime_hrs || '-'}\t${dayData.undertime_min || '-'}\n`;
+      });
+      
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Employee data copied to clipboard!');
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+      });
+    }
+
+    document.getElementById('uploadForm').addEventListener('reset', function() {
+      document.getElementById('fileName').textContent = '';
+    });
+  </script>
+</body>
+</html>
