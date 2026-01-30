@@ -4,7 +4,9 @@ import secrets, string
 
 account_bp = Blueprint('account', __name__)
 
+# ---------------- HELPER FUNCTIONS ----------------
 def generate_temp_password(length=12):
+    """Generate a random password with letters and digits"""
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
@@ -17,13 +19,16 @@ def create_user():
     if not all(data.get(k) for k in required):
         return jsonify({'error': 'Missing required fields'}), 400
 
+    # Check for duplicate user_id or email
     if User.query.filter_by(user_id=data['user_id']).first():
         return jsonify({'error': 'User ID already exists'}), 409
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'error': 'Email already exists'}), 409
 
+    # Generate a temporary password
     temp_password = generate_temp_password()
 
+    # Create the user
     user = User(
         user_id=data['user_id'],
         email=data['email'],
@@ -39,7 +44,10 @@ def create_user():
 
     db.session.add(user)
     db.session.commit()
-    print("TEMP PASSWORD:", temp_password)
+
+    # Print temp password to console for development/testing
+    print(f"=== New User Created ===\nEmail: {user.email}\nTemporary Password: {temp_password}\n=======================")
+
     return jsonify({'message': 'User created', 'user': user.to_dict()}), 201
 
 
@@ -77,6 +85,23 @@ def delete_user(public_id):
     db.session.commit()
     return jsonify({'message': 'User deleted'})
 
+from werkzeug.security import check_password_hash
+
+@account_bp.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    password = data.get('password')
+
+    if not user_id or not password:
+        return jsonify({'error': 'User ID and password required'}), 400
+
+    user = User.query.filter_by(user_id=user_id).first()
+    if not user or not user.check_password(password):
+        return jsonify({'error': 'Invalid credentials'}), 401
+
+    # You can add token/session handling here later
+    return jsonify({'message': 'Login successful', 'user': user.to_dict()}), 200
 
 # ---------------- OFFICE LOCATIONS ----------------
 @account_bp.route('/api/admin/locations', methods=['GET'])
