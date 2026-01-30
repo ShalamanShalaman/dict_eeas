@@ -1,5 +1,5 @@
 const menus = {
-  employee: ["Dashboard", "Upload Attendance", "My Submissions", "Downloads"],
+  employee: ["Dashboard", "Upload Attendance", "Submissions for Approval", "Submission Status"],
   reviewer: ["Dashboard", "Pending Reviews", "Archive", "My Signature"],
   admin: ["Dashboard", "User Management", "Templates", "System Logs"]
 };

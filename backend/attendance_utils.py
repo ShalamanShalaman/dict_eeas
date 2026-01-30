@@ -97,7 +97,7 @@ def parse_employees_data(text):
     return employees
 
 # ---------- DTR Generation ----------
-def generate_dtr(employee_name, employee_data, template_path='templates_excel/template.xlsx'):
+def generate_dtr(employee_name, employee_data, template_path='templates/template.xlsx'):
     """
     Generates an Excel DTR for a given employee and returns it as a BytesIO object.
     """
@@ -114,7 +114,7 @@ def generate_dtr(employee_name, employee_data, template_path='templates_excel/te
     try:
         wb = load_workbook(template_path)
     except FileNotFoundError:
-        raise FileNotFoundError("Excel template not found. Please check 'templates_excel/template.xlsx'")
+        raise FileNotFoundError("Excel template not found. Please check 'templates/template.xlsx'")
 
     ws = wb.active
 
