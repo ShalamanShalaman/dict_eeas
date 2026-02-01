@@ -5,45 +5,132 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+
+# ---------------- POSITIONS ----------------
+class Position(db.Model):
+    __tablename__ = "positions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    users = db.relationship(
+        "User",
+        backref="position",
+        lazy=True
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "created_at": self.created_at.isoformat()
+        }
+
+
+# ---------------- OFFICE LOCATIONS ----------------
 class OfficeLocation(db.Model):
     __tablename__ = "office_locations"
 
     id = db.Column(db.Integer, primary_key=True)
     location = db.Column(db.String(100), nullable=False)
-    manager = db.Column(db.String(100), nullable=False)
+
+    # Provincial officer (reviewer) assigned to this office
+    reviewer_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=True
+    )
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    users = db.relationship("User", backref="office_location", lazy=True)
+    # Employees assigned to this office
+    employees = db.relationship(
+        "User",
+        foreign_keys="User.office_location_id",
+        backref="office_location",
+        lazy=True
+    )
+
+    # Provincial officer relationship (explicit FK to avoid ambiguity)
+    reviewer = db.relationship(
+        "User",
+        foreign_keys=[reviewer_id],
+        backref="reviewed_offices",
+        lazy=True
+    )
 
     def to_dict(self):
         return {
             "id": self.id,
             "location": self.location,
-            "manager": self.manager
+            "reviewer_id": self.reviewer_id
         }
 
 
+# ---------------- USERS ----------------
 class User(db.Model):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.String(50), unique=True, nullable=False)
-    public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    public_id = db.Column(
+        db.String(36),
+        unique=True,
+        nullable=False,
+        default=lambda: str(uuid.uuid4())
+    )
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='employee')
+
+    role = db.Column(
+        db.String(20),
+        nullable=False,
+        default='employee'
+    )  # admin, reviewer, employee
+
     first_name = db.Column(db.String(50), nullable=False)
     middle_name = db.Column(db.String(50), nullable=True)
     last_name = db.Column(db.String(50), nullable=False)
     contact_no = db.Column(db.String(20), nullable=True)
+
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     force_change_password = db.Column(db.Boolean, default=True, nullable=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
 
-    # Foreign key to office location
-    office_location_id = db.Column(db.Integer, db.ForeignKey("office_locations.id"), nullable=True)
+    # Foreign keys
+    office_location_id = db.Column(
+        db.Integer,
+        db.ForeignKey("office_locations.id"),
+        nullable=True
+    )
 
+    position_id = db.Column(
+        db.Integer,
+        db.ForeignKey("positions.id"),
+        nullable=True
+    )
+
+    # Documents
+    submitted_documents = db.relationship(
+        "Document",
+        foreign_keys="Document.employee_id",
+        backref="employee",
+        lazy=True
+    )
+
+    reviewed_documents = db.relationship(
+        "Document",
+        foreign_keys="Document.reviewer_id",
+        backref="reviewer",
+        lazy=True
+    )
+
+    # Password helpers
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -52,16 +139,74 @@ class User(db.Model):
 
     def to_dict(self):
         return {
-            'public_id': self.public_id,
-            'user_id': self.user_id,
-            'email': self.email,
-            'role': self.role,
-            'full_name': f"{self.first_name} {self.middle_name or ''} {self.last_name}".strip(),
-            'first_name': self.first_name,
-            'middle_name': self.middle_name,
-            'last_name': self.last_name,
-            'contact_no': self.contact_no,
-            'is_active': self.is_active,
-            'office_location_id': self.office_location_id,
-            'created_at': self.created_at.isoformat()
+            "public_id": self.public_id,
+            "user_id": self.user_id,
+            "email": self.email,
+            "role": self.role,
+            "full_name": f"{self.first_name} {self.middle_name or ''} {self.last_name}".strip(),
+            "first_name": self.first_name,
+            "middle_name": self.middle_name,
+            "last_name": self.last_name,
+            "contact_no": self.contact_no,
+            "is_active": self.is_active,
+            "office_location_id": self.office_location_id,
+            "position_id": self.position_id,
+            "created_at": self.created_at.isoformat()
+        }
+
+
+# ---------------- DOCUMENTS (Merged DTR + AR Workflow) ----------------
+class Document(db.Model):
+    __tablename__ = "documents"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    employee_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False
+    )
+
+    reviewer_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=True
+    )
+
+    file_path = db.Column(db.String(255), nullable=False)
+    review_file_path = db.Column(db.String(255), nullable=True)
+
+    status = db.Column(
+        db.String(20),
+        default='draft'
+    )  # draft, submitted, approved, declined
+
+    reviewer_note = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+
+    is_draft = db.Column(db.Boolean, default=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "reviewer_id": self.reviewer_id,
+            "file_path": self.file_path,
+            "review_file_path": self.review_file_path,
+            "status": self.status,
+            "reviewer_note": self.reviewer_note,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
+            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "is_draft": self.is_draft
         }
