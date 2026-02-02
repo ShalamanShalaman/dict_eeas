@@ -137,13 +137,26 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.middle_name or ''} {self.last_name}".strip()
+
     def to_dict(self):
+        # Resolve relationships for frontend auto-population
+        pos_name = self.position.name if self.position else ""
+        off_name = self.office_location.location if self.office_location else ""
+        
+        # Get the Provincial Officer (Reviewer) associated with this user's office
+        provincial_officer = ""
+        if self.office_location and self.office_location.reviewer:
+            provincial_officer = self.office_location.reviewer.full_name
+
         return {
             "public_id": self.public_id,
             "user_id": self.user_id,
             "email": self.email,
             "role": self.role,
-            "full_name": f"{self.first_name} {self.middle_name or ''} {self.last_name}".strip(),
+            "full_name": self.full_name,
             "first_name": self.first_name,
             "middle_name": self.middle_name,
             "last_name": self.last_name,
@@ -151,6 +164,12 @@ class User(db.Model):
             "is_active": self.is_active,
             "office_location_id": self.office_location_id,
             "position_id": self.position_id,
+            
+            # --- Extended Data for Forms ---
+            "position_name": pos_name,
+            "office_name": off_name,
+            "provincial_officer": provincial_officer,
+            
             "created_at": self.created_at.isoformat()
         }
 

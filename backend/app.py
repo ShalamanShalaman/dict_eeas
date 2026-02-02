@@ -1,133 +1,133 @@
-from flask import Flask
-from flask_cors import CORS
 import os
-
-from models import db, User
-from routes import account_bp, document_bp
+from flask import Flask, jsonify
+from flask_cors import CORS
+from models import db, User, Position, OfficeLocation
+# FIXED: Imported the actual blueprints defined in routes.py
+from routes import account_bp, document_bp 
 from attendance_routes import attendance_bp
 
-# -------------------------------------------------
-# APP SETUP
-# -------------------------------------------------
-app = Flask(__name__)
-CORS(app)
 
+def create_app():
+    app = Flask(__name__)
+    CORS(app)
 
-# -------------------------------------------------
-# BASE DIRECTORY
-# -------------------------------------------------
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    # -----------------------------
+    # BASE CONFIG
+    # -----------------------------
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+    app.config["SECRET_KEY"] = "dev-secret-key"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# -------------------------------------------------
-# CONFIGURATION
-# -------------------------------------------------
-app.config['SECRET_KEY'] = 'dev-secret-key'
+    # -----------------------------
+    # FOLDERS
+    # -----------------------------
+    app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "uploads")
+    app.config["GENERATED_FOLDER"] = os.path.join(BASE_DIR, "generated_files")
+    app.config["TEMPLATE_FILES_DIR"] = os.path.join(BASE_DIR, "template_files")
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    os.makedirs(app.config["GENERATED_FOLDER"], exist_ok=True)
+    os.makedirs(app.config["TEMPLATE_FILES_DIR"], exist_ok=True)
 
-# Upload folders
-app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'static', 'uploads')
-app.config['DOCUMENT_UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'static', 'documents')
+    # -----------------------------
+    # TEMPLATE FILE PATHS
+    # -----------------------------
+    app.config["DTR_TEMPLATE"] = os.path.join(
+        app.config["TEMPLATE_FILES_DIR"],
+        "DTR_template.xlsx"
+    )
 
-# Template files (same level as .py files)
-app.config['TEMPLATE_FILES_DIR'] = os.path.join(BASE_DIR, 'template_files')
-app.config['DTR_TEMPLATE_PATH'] = os.path.join(
-    app.config['TEMPLATE_FILES_DIR'],
-    'DTR_template.xlsx'
-)
-app.config['AR_TEMPLATE_PATH'] = os.path.join(
-    app.config['TEMPLATE_FILES_DIR'],
-    'AR_template.docx'
-)
+    app.config["AR_TEMPLATE"] = os.path.join(
+        app.config["TEMPLATE_FILES_DIR"],
+        "AR_template.docx"
+    )
 
+    # -----------------------------
+    # DATABASE INIT
+    # -----------------------------
+    db.init_app(app)
 
-# -------------------------------------------------
-# ENSURE DIRECTORIES EXIST
-# -------------------------------------------------
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['DOCUMENT_UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['TEMPLATE_FILES_DIR'], exist_ok=True)
-
-
-# -------------------------------------------------
-# INITIALIZE EXTENSIONS
-# -------------------------------------------------
-db.init_app(app)
-
-
-# -------------------------------------------------
-# REGISTER BLUEPRINTS
-# -------------------------------------------------
-app.register_blueprint(account_bp)
-app.register_blueprint(document_bp)
-app.register_blueprint(attendance_bp)
-
-
-# -------------------------------------------------
-# HEALTH CHECK
-# -------------------------------------------------
-@app.route("/api/health")
-def health():
-    return {"status": "ok"}
-
-
-# -------------------------------------------------
-# AUTO SEED USERS (DEV ONLY)
-# -------------------------------------------------
-def seed_users():
-    users = [
-        {
-            "user_id": "admin",
-            "email": "admin@test.com",
-            "first_name": "System",
-            "last_name": "Admin",
-            "role": "admin",
-            "password": "admin123"
-        },
-        {
-            "user_id": "reviewer",
-            "email": "reviewer@test.com",
-            "first_name": "Attendance",
-            "last_name": "Reviewer",
-            "role": "reviewer",
-            "password": "review123"
-        },
-        {
-            "user_id": "employee",
-            "email": "employee@test.com",
-            "first_name": "Juan",
-            "last_name": "Dela Cruz",
-            "role": "employee",
-            "password": "employee123"
-        }
-    ]
-
-    for u in users:
-        if not User.query.filter_by(user_id=u["user_id"]).first():
-            user = User(
-                user_id=u["user_id"],
-                email=u["email"],
-                first_name=u["first_name"],
-                last_name=u["last_name"],
-                role=u["role"],
-                force_change_password=False,
-                is_active=True
-            )
-            user.set_password(u["password"])
-            db.session.add(user)
-
-    db.session.commit()
-    print("✅ Default users seeded")
-
-
-# -------------------------------------------------
-# RUN APPLICATION
-# -------------------------------------------------
-if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        seed_users()
+        seed_basic_data()
 
+    # -----------------------------
+    # BLUEPRINTS
+    # -----------------------------
+    # FIXED: Registering the correct blueprints from routes.py
+    app.register_blueprint(account_bp)
+    app.register_blueprint(document_bp)
+    app.register_blueprint(attendance_bp)
+
+    # -----------------------------
+    # HEALTH CHECK
+    # -----------------------------
+    @app.route("/health")
+    def health():
+        return jsonify({"status": "ok"})
+
+    return app
+
+
+# -----------------------------
+# SEED INITIAL DATA
+# -----------------------------
+def seed_basic_data():
+    """
+    Creates starter positions and admin user if none exist.
+    Safe to run multiple times.
+    """
+
+    # ---- Positions ----
+    if Position.query.count() == 0:
+        # FIXED: Changed 'title' to 'name' to match the Position model in models.py
+        positions = [
+            Position(name="Employee"),
+            Position(name="Provincial Officer"),
+            Position(name="Reviewer"),
+            Position(name="Admin")
+        ]
+        db.session.add_all(positions)
+        db.session.commit()
+
+    # ---- Office Locations ----
+    if OfficeLocation.query.count() == 0:
+        # FIXED: Changed 'province' and 'office_name' to 'location' to match models.py
+        loc = OfficeLocation(
+            location="Cauayan Office, Isabela"
+        )
+        db.session.add(loc)
+        db.session.commit()
+
+    # ---- Admin User ----
+    if not User.query.filter_by(email="admin@system.local").first():
+        # Note: Your model calls the field 'name', but seeding logic used 'title'
+        # I have adjusted logic here to match standard assumption, 
+        # but check your models.py Position class field name. 
+        # Based on models.py provided: Position has 'name', not 'title'.
+        # FIXING SEED LOGIC TO MATCH MODELS.PY:
+        
+        admin_position = Position.query.filter_by(name="Admin").first() # Changed title to name
+
+        admin = User(
+            email="admin@system.local",
+            user_id="ADMIN001", # Added required user_id field
+            first_name="System",
+            last_name="Admin",
+            role="admin",
+            position_id=admin_position.id if admin_position else None
+        )
+
+        admin.set_password("admin123")
+        db.session.add(admin)
+        db.session.commit()
+
+
+# -----------------------------
+# RUN
+# -----------------------------
+if __name__ == "__main__":
+    app = create_app()
     app.run(debug=True)

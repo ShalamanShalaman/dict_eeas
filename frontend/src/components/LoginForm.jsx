@@ -29,9 +29,13 @@ export default function LoginForm({ onLogin }) {
   };
 
   return (
-    <div className="flex max-w-4xl h-100 mx-auto mt-24 bg-white rounded-xl shadow-md">
-        <div className="w-1/2 bg-blue-600 flex items-center justify-center text-white text-3xl font-bold rounded-l-xl">
-        AMONG US
+    <div className="flex max-w-6xl h-150 mx-auto bg-white rounded-xl shadow-md">
+        <div className="w-1/2 relative rounded-l-xl overflow-hidden">
+            <img 
+            src="/images/dict_banner.jpg" 
+            alt="Banner" 
+            className="w-full h-full object-cover"
+            />
         </div>
         <div className="w-1/2 p-8">
         <img src="../public/images/dict-logo.png"></img>

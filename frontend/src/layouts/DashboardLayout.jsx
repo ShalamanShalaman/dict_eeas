@@ -2,6 +2,7 @@ import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 
 export default function DashboardLayout({
+  user, // <--- Receive user object
   role,
   setRole,
   activePage,
@@ -15,11 +16,12 @@ export default function DashboardLayout({
         role={role}
         activePage={activePage}
         onNavigate={setActivePage}
-        onLogout={onLogout}   // ✅ FIX
+        onLogout={onLogout}
       />
 
       <div className="flex-1 flex flex-col">
-        <Header role={role} setRole={setRole} />
+        {/* Pass user to Header for permission checks */}
+        <Header role={role} setRole={setRole} user={user} />
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>
