@@ -1,6 +1,6 @@
 import UploadAttendance from "../views/UploadAttendance"
 
-export default function EmployeeDashboard({ selectedMenu }) {
+export default function EmployeeDashboard({ selectedMenu, user }) { // Accept user
   switch (selectedMenu) {
     case "Dashboard":
       return (
@@ -17,7 +17,8 @@ export default function EmployeeDashboard({ selectedMenu }) {
       );
 
     case "Upload Attendance":
-      return <UploadAttendance />;
+      // Pass user to UploadAttendance so it can access user_id for saving
+      return <UploadAttendance user={user} />;
 
     default:
       return (
