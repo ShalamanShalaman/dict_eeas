@@ -37,9 +37,9 @@ export default function LoginForm({ onLogin }) {
             className="w-full h-full object-cover"
             />
         </div>
-        <div className="w-1/2 p-8">
-        <img src="../public/images/dict-logo.png"></img>
-        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
+        <div className="w-80 mx-auto mb-4">
+        <img src="../public/images/loginlogo.gif"></img>
+        <h2 className="text-2xl font-bold mb-6 text-center">LOGIN</h2>
         {error && <p className="text-red-600 mb-4">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
