@@ -17,6 +17,8 @@ export default function Sidebar({ role, activePage, onNavigate, onLogout }) {
     employee: [
       { label: "Dashboard", icon: FiHome },
       { label: "Upload Attendance", icon: FiUpload },
+      { label: "Saved Progress", icon: FiFileText },
+      { label: "Submission For Aproval", icon: FiFileText },
       { label: "My Submissions", icon: FiFileText },
       { label: "Downloads", icon: FiDownload },
     ],
