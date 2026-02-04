@@ -1,6 +1,8 @@
 import UploadAttendance from "../views/UploadAttendance"
 
-export default function EmployeeDashboard({ selectedMenu, user }) { // Accept user
+import SavedProgress from "./SavedProgress";
+
+export default function EmployeeDashboard({ selectedMenu, setActivePage, user }) { // Accept user and setActivePage
   switch (selectedMenu) {
     case "Dashboard":
       return (
@@ -19,6 +21,14 @@ export default function EmployeeDashboard({ selectedMenu, user }) { // Accept us
     case "Upload Attendance":
       // Pass user to UploadAttendance so it can access user_id for saving
       return <UploadAttendance user={user} />;
+
+    case "Saved Progress":
+      // Pass user, onResumeWork, and onNewProgress to SavedProgress
+      return <SavedProgress user={user} onResumeWork={(doc) => {
+        // Navigate to Upload Attendance and pass doc_id in URL
+        setActivePage("Upload Attendance");
+        window.history.pushState({}, '', `?doc_id=${doc.id}`);
+      }} onNewProgress={() => setActivePage("Upload Attendance")} />;
 
     default:
       return (

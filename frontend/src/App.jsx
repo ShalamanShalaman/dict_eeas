@@ -44,7 +44,7 @@ export default function App() {
     // Render based on the current VIEW MODE (viewRole)
     if (viewRole === "employee") {
       // Pass 'user' prop so UploadAttendance knows who is saving
-      return <EmployeeDashboard selectedMenu={activePage} user={user} />;
+      return <EmployeeDashboard selectedMenu={activePage} setActivePage={setActivePage} user={user} />;
     }
 
     if (viewRole === "reviewer") {

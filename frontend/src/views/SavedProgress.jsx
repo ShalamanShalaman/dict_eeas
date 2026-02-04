@@ -34,29 +34,37 @@ const Trash2Icon = ({ className }) => (
   </Icon>
 );
 
-export default function SavedProgress({ onResumeWork }) {
+const RefreshIcon = ({ className }) => (
+  <Icon className={className}>
+    <polyline points="23 4 23 10 17 10" />
+    <polyline points="1 20 1 14 7 14" />
+    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+  </Icon>
+);
+
+export default function SavedProgress({ onResumeWork, onNewProgress, user }) {
   const [savedDocs, setSavedDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  // Placeholder for fetching from your backend
+  // Fetch user's saved documents from backend
+  const fetchDocs = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const response = await fetch(`http://127.0.0.1:5000/api/document/user/${user.id}`);
+      const result = await response.json();
+      setSavedDocs(result || []);
+    } catch (err) {
+      console.error("Failed to fetch documents:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDocs = async () => {
-      try {
-        setLoading(true);
-        // Replace with your actual GET endpoint
-        const response = await fetch("http://127.0.0.1:5000/api/documents");
-        const result = await response.json();
-        // Assuming backend returns { documents: [...] }
-        setSavedDocs(result.documents || []);
-      } catch (err) {
-        console.error("Failed to fetch documents:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDocs();
-  }, []);
+  }, [user]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this progress?")) return;
@@ -84,15 +92,34 @@ export default function SavedProgress({ onResumeWork }) {
           <p className="text-slate-500 text-sm">Manage and resume your previous attendance drafts.</p>
         </div>
 
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text"
-            placeholder="Search files..."
-            className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-64 transition-all"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onNewProgress}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            <Icon className="w-4 h-4"><path d="M12 5v14M5 12h14" /></Icon>
+            Save New Progress
+          </button>
+
+          <button
+            onClick={fetchDocs}
+            disabled={loading}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh"
+          >
+            <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search files..."
+              className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-64 transition-all"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
