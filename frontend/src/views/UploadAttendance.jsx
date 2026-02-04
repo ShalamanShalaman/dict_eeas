@@ -153,6 +153,7 @@ export default function UploadAttendance() {
 
   const fileInputRef = useRef(null);
 
+  // 1. Initial Load of User
   useEffect(() => {
     const fetchUser = async () => {
       const userStr = localStorage.getItem("user");
@@ -164,6 +165,7 @@ export default function UploadAttendance() {
     fetchUser();
   }, []);
 
+  // 2. Populate fields from User Data
   useEffect(() => {
     if (currentUser) {
        setArMeta(prev => ({
@@ -176,11 +178,50 @@ export default function UploadAttendance() {
     }
   }, [currentUser]);
 
+  // 3. NEW: Check URL for ?doc_id=123 to load data automatically
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const docId = params.get('doc_id');
+    
+    // Only try to load if we have a user and a docId
+    if (docId && currentUser) {
+        loadSavedDocument(docId);
+    }
+  }, [currentUser]); // Dependency on currentUser ensures we have auth info before fetching
+
+  // --- NEW FUNCTION: Fetch Saved Document Content Directly ---
+  const loadSavedDocument = async (docId) => {
+    setLoading(true);
+    try {
+        const response = await fetch(`http://127.0.0.1:5000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to load document: ${response.status}`);
+        }
+
+        const stateData = await response.json();
+        
+        // Restore State from the JSON response
+        if (stateData.employees) setEmployees(stateData.employees);
+        if (stateData.arMeta) setArMeta(stateData.arMeta);
+        if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
+        if (stateData.viewMode) setViewMode(stateData.viewMode);
+        
+        setSavedDocId(docId);
+        // alert("Document Loaded Successfully!"); 
+    } catch (err) {
+        console.error("Load Error:", err);
+        alert("Failed to load saved document: " + err.message);
+    } finally {
+        setLoading(false);
+    }
+  };
+
   // --- HANDLE FILE DROPPED/SELECTED ---
   const handleFile = (f) => {
     if (!f) return;
     
-    // Check if it's a JSON State file (Resume Work)
+    // Check if it's a JSON State file (Legacy Resume Work via file upload)
     if (f.type === "application/json" || f.name.endsWith(".json")) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -191,7 +232,7 @@ export default function UploadAttendance() {
                 if (stateData.arMeta) setArMeta(stateData.arMeta);
                 if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
                 if (stateData.viewMode) setViewMode(stateData.viewMode);
-                alert("Progress Restored Successfully!");
+                alert("Progress Restored from File!");
             } catch (err) {
                 alert("Failed to load saved state: " + err.message);
             }
@@ -233,8 +274,6 @@ export default function UploadAttendance() {
         formData.append("user_id", currentUser.user_id); 
 
         // 3. Determine URL (Upload new or Update existing)
-        // Note: For simplicity, we use Upload for now to create a new record history.
-        // If you strictly want overwrite, we'd use the autosave route with savedDocId.
         let url = "http://127.0.0.1:5000/api/document/upload";
         if (savedDocId) {
              url = `http://127.0.0.1:5000/api/document/autosave/${savedDocId}`;
@@ -248,7 +287,7 @@ export default function UploadAttendance() {
 
         const result = await response.json();
         setSavedDocId(result.document.id); // Store ID for future autosaves
-        alert("Progress Saved to Dashboard!");
+        alert("Progress Saved to Cloud!");
 
     } catch (err) {
         alert("Failed to save progress: " + err.message);
@@ -321,6 +360,11 @@ export default function UploadAttendance() {
         tasks: {} 
     });
     if (fileInputRef.current) fileInputRef.current.value = null;
+    
+    // Clear URL param if it exists so refresh doesn't reload old doc
+    const url = new URL(window.location);
+    url.searchParams.delete('doc_id');
+    window.history.pushState({}, '', url);
   };
 
   const getPeriodText = () => {
@@ -524,7 +568,7 @@ export default function UploadAttendance() {
 
           {/* Controls */}
           <div className="flex flex-col gap-3 justify-center">
-            {/* --- NEW SAVE BUTTON --- */}
+            {/* --- SAVE BUTTON --- */}
             <button
               onClick={saveProgress}
               disabled={!selectedEmployee} // Only enable if working on something

@@ -3,6 +3,7 @@ from models import db, User, Position, OfficeLocation, Document
 import os
 import secrets
 import string
+import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
@@ -15,6 +16,7 @@ def generate_temp_password(length=12):
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 def save_file(file, folder='uploads'):
+    # Ensure the directory exists
     os.makedirs(os.path.join(current_app.root_path, 'static', folder), exist_ok=True)
     filepath = os.path.join(current_app.root_path, 'static', folder, file.filename)
     file.save(filepath)
@@ -274,7 +276,38 @@ def review_document(doc_id):
     db.session.commit()
     return jsonify({'message': f'Document {status}', 'document': doc.to_dict()})
 
-# Download document
+# Load/Get Content of a Document (JSON) directly
+@document_bp.route('/api/document/content/<int:doc_id>', methods=['GET'])
+def get_document_content(doc_id):
+    """
+    Reads the content of the file from the server disk and returns it as JSON.
+    This allows the frontend to 'Load' state without the user downloading a file.
+    """
+    doc = Document.query.get_or_404(doc_id)
+    
+    # Security: Ensure only the owner (or potentially the reviewer) can read the raw content
+    # Note: For strict security, you should pass user_id as a query param or use session
+    requesting_user_id = request.args.get('user_id')
+    if requesting_user_id:
+        user = User.query.filter_by(user_id=requesting_user_id).first()
+        if not user or (doc.employee_id != user.id and doc.reviewer_id != user.id):
+             return jsonify({'error': 'Unauthorized'}), 403
+
+    if not os.path.exists(doc.file_path):
+        return jsonify({'error': 'File not found on server'}), 404
+
+    # We only want to return JSON content this way. PDFs should still be downloaded.
+    if doc.file_path.endswith('.json'):
+        try:
+            with open(doc.file_path, 'r') as f:
+                data = json.load(f)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({'error': f'Failed to parse file: {str(e)}'}), 500
+    
+    return jsonify({'error': 'File is not a JSON state file'}), 400
+
+# Download document (as attachment)
 @document_bp.route('/api/document/download/<int:doc_id>', methods=['GET'])
 def download_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
