@@ -20,7 +20,6 @@ export default function Sidebar({ role, activePage, onNavigate, onLogout }) {
       { label: "Saved Progress", icon: FiFileText },
       { label: "Submission For Aproval", icon: FiFileText },
       { label: "My Submissions", icon: FiFileText },
-      { label: "Downloads", icon: FiDownload },
     ],
     reviewer: [
       { label: "Dashboard", icon: FiHome },
