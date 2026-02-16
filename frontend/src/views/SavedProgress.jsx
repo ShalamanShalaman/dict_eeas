@@ -42,19 +42,58 @@ const RefreshIcon = ({ className }) => (
   </Icon>
 );
 
-export default function SavedProgress({ onResumeWork, onNewProgress, user }) {
+export default function SavedProgress({ onResumeWork, onNewProgress, user: propUser }) {
   const [savedDocs, setSavedDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [currentUser, setCurrentUser] = useState(propUser || null);
 
-  // Fetch user's saved documents from backend
+  // 1. Ensure we have the user (Check Props first, then LocalStorage)
+  useEffect(() => {
+    if (propUser) {
+      setCurrentUser(propUser);
+    } else {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        setCurrentUser(JSON.parse(userStr));
+      }
+    }
+  }, [propUser]);
+
+  // 2. Fetch user's saved documents from backend
   const fetchDocs = async () => {
-    if (!user) return;
+    if (!currentUser) return;
+    
+    // We prefer user_id (String "EMP-001") because that's what Login provides
+    // and what the Backend (once fixed) should expect.
+    const userId = currentUser.user_id || currentUser.id;
+
+    if (!userId) {
+        console.error("User object found, but no ID present:", currentUser);
+        return;
+    }
+
     try {
       setLoading(true);
-      const response = await fetch(`http://127.0.0.1:5000/api/document/user/${user.id}`);
+      const response = await fetch(`http://127.0.0.1:5000/api/document/user/${userId}`);
+      
+      if (!response.ok) {
+         if(response.status === 404) {
+             console.warn("Backend returned 404. Ensure routes.py accepts <string:user_id>");
+         }
+         throw new Error(`Error: ${response.status}`);
+      }
+
       const result = await response.json();
-      setSavedDocs(result || []);
+      
+      // Sort by newest first (using created_at or updated_at)
+      const sorted = (result || []).sort((a, b) => {
+          const dateA = new Date(b.updated_at || b.created_at);
+          const dateB = new Date(a.updated_at || a.created_at);
+          return dateA - dateB;
+      });
+      
+      setSavedDocs(sorted);
     } catch (err) {
       console.error("Failed to fetch documents:", err);
     } finally {
@@ -62,22 +101,40 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user }) {
     }
   };
 
+  // 3. Fetch whenever currentUser is determined
   useEffect(() => {
-    fetchDocs();
-  }, [user]);
+    if (currentUser) {
+        fetchDocs();
+    }
+  }, [currentUser]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this progress?")) return;
     try {
-      await fetch(`http://127.0.0.1:5000/api/document/${id}`, { method: "DELETE" });
-      setSavedDocs(savedDocs.filter(doc => doc.id !== id));
+      const response = await fetch(`http://127.0.0.1:5000/api/document/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        setSavedDocs(savedDocs.filter(doc => doc.id !== id));
+      } else {
+        alert("Failed to delete document from server.");
+      }
     } catch (err) {
-      alert("Delete failed");
+      alert("Delete failed: " + err.message);
     }
   };
 
+  // Helper to safely extract filename from the full path returned by backend
+  const getDisplayFilename = (doc) => {
+      // If backend sends 'file_path', we need to strip the directory
+      if (doc.file_path) {
+          // Regex splits by both / (Linux/Mac) and \ (Windows)
+          const parts = doc.file_path.split(/[/\\]/);
+          return parts[parts.length - 1];
+      }
+      return doc.filename || "Untitled Document";
+  };
+
   const filteredDocs = savedDocs.filter(doc => 
-    doc.filename.toLowerCase().includes(search.toLowerCase())
+    getDisplayFilename(doc).toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -95,17 +152,17 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user }) {
         <div className="flex items-center gap-4">
           <button
             onClick={onNewProgress}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
           >
             <Icon className="w-4 h-4"><path d="M12 5v14M5 12h14" /></Icon>
-            Save New Progress
+            New Draft
           </button>
 
           <button
             onClick={fetchDocs}
             disabled={loading}
-            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Refresh"
+            className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh List"
           >
             <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -115,7 +172,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user }) {
             <input
               type="text"
               placeholder="Search files..."
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-64 transition-all"
+              className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-64 text-sm transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -125,7 +182,12 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user }) {
 
       <hr className="border-slate-100" />
 
-      {loading ? (
+      {!currentUser ? (
+         <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center text-amber-800">
+             <p className="font-semibold">You are not logged in.</p>
+             <p className="text-sm mt-1">Please log in to view your saved documents.</p>
+         </div>
+      ) : loading ? (
         <div className="flex flex-col items-center justify-center h-64 text-slate-400">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
           <p>Loading your library...</p>
@@ -141,33 +203,43 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredDocs.map((doc) => (
-            <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow group relative">
+            <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-lg hover:border-indigo-200 transition-all group relative">
               <div className="flex justify-between items-start mb-4">
                 <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
                    <Icon className="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></Icon>
                 </div>
-                <button 
-                  onClick={() => handleDelete(doc.id)}
-                  className="text-slate-400 hover:text-red-500 p-1 transition-colors"
-                  title="Delete Draft"
-                >
-                  <Trash2Icon className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
+                        doc.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        doc.status === 'declined' ? 'bg-red-100 text-red-700' :
+                        doc.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-600'
+                    }`}>
+                        {doc.status}
+                    </span>
+                    <button 
+                    onClick={() => handleDelete(doc.id)}
+                    className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
+                    title="Delete Draft"
+                    >
+                    <Trash2Icon className="w-4 h-4" />
+                    </button>
+                </div>
               </div>
 
-              <h4 className="font-semibold text-slate-800 truncate mb-1" title={doc.filename}>
-                {doc.filename.replace(".json", "")}
+              <h4 className="font-semibold text-slate-800 truncate mb-1" title={getDisplayFilename(doc)}>
+                {getDisplayFilename(doc).replace(".json", "")}
               </h4>
               
               <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
-                <span className="bg-slate-100 px-2 py-0.5 rounded uppercase font-bold tracking-wider">JSON</span>
+                <span>{new Date(doc.updated_at || doc.created_at).toLocaleDateString()}</span>
                 <span>•</span>
-                <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                <span>{new Date(doc.updated_at || doc.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
               </div>
 
               <button 
                 onClick={() => onResumeWork(doc)}
-                className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-indigo-600 hover:text-white text-slate-700 py-2.5 rounded-lg font-medium transition-all group-hover:border-indigo-600"
+                className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
               >
                 <ExternalLinkIcon className="w-4 h-4" />
                 Resume Work

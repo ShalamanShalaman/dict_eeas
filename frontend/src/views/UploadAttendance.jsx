@@ -187,7 +187,7 @@ export default function UploadAttendance() {
     if (docId && currentUser) {
         loadSavedDocument(docId);
     }
-  }, [currentUser]); // Dependency on currentUser ensures we have auth info before fetching
+  }, [currentUser]);
 
   // --- NEW FUNCTION: Fetch Saved Document Content Directly ---
   const loadSavedDocument = async (docId) => {
@@ -195,6 +195,22 @@ export default function UploadAttendance() {
     try {
         const response = await fetch(`http://127.0.0.1:5000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
         
+        // --- ERROR HANDLING FIX ---
+        // If the document is forbidden (403) or not found (404), likely due to stale URL params
+        // from a previous user or session, we ignore it and clear the URL.
+        if (response.status === 403 || response.status === 404) {
+             console.warn(`Doc ID ${docId} is stale or unauthorized (${response.status}). Clearing URL.`);
+             
+             // Remove doc_id from URL without reloading
+             const url = new URL(window.location);
+             url.searchParams.delete('doc_id');
+             window.history.replaceState({}, '', url);
+             
+             // Stop execution, don't show alert
+             setLoading(false);
+             return; 
+        }
+
         if (!response.ok) {
             throw new Error(`Failed to load document: ${response.status}`);
         }
@@ -208,7 +224,6 @@ export default function UploadAttendance() {
         if (stateData.viewMode) setViewMode(stateData.viewMode);
         
         setSavedDocId(docId);
-        // alert("Document Loaded Successfully!"); 
     } catch (err) {
         console.error("Load Error:", err);
         alert("Failed to load saved document: " + err.message);
@@ -254,6 +269,26 @@ export default function UploadAttendance() {
         return;
     }
 
+    // --- NEW: PROMPT FOR FILENAME ---
+    const defaultName = `attendance_${selectedEmployee || 'draft'}`;
+    const userFilename = prompt("Please name your draft:", defaultName);
+
+    // If user clicked Cancel, stop the save
+    if (userFilename === null) return;
+
+    // Basic validation
+    let finalFilename = userFilename.trim();
+    if (!finalFilename) {
+        alert("Filename cannot be empty.");
+        return;
+    }
+
+    // Ensure .json extension
+    if (!finalFilename.toLowerCase().endsWith(".json")) {
+        finalFilename += ".json";
+    }
+    // ---------------------------------
+
     setLoading(true);
     try {
         // 1. Bundle State
@@ -264,10 +299,9 @@ export default function UploadAttendance() {
             viewMode
         });
         
-        // 2. Create File Object
+        // 2. Create File Object using the Prompted Filename
         const blob = new Blob([stateData], { type: "application/json" });
-        const filename = `attendance_save_${selectedEmployee || 'draft'}_${Date.now()}.json`;
-        const fileObj = new File([blob], filename);
+        const fileObj = new File([blob], finalFilename);
 
         const formData = new FormData();
         formData.append("file", fileObj);

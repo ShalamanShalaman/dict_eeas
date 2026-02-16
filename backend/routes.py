@@ -168,6 +168,11 @@ def login():
     return jsonify({'message': 'Login successful', 'user': user.to_dict()}), 200
 
 # ---------------- PROFILE EDIT (Own Account) ----------------
+@account_bp.route('/api/profile/<public_id>', methods=['GET'])
+def get_profile(public_id):
+    user = User.query.filter_by(public_id=public_id).first_or_404()
+    return jsonify(user.to_dict())
+
 @account_bp.route('/api/profile/<public_id>', methods=['PUT'])
 def edit_own_profile(public_id):
     data = request.get_json()
@@ -317,9 +322,11 @@ def download_document(doc_id):
     return send_file(path, as_attachment=True, download_name=os.path.basename(path))
 
 # Get all documents for a user
-@document_bp.route('/api/document/user/<int:user_id>', methods=['GET'])
+# FIX APPLIED HERE: <int:user_id> changed to <string:user_id>
+@document_bp.route('/api/document/user/<string:user_id>', methods=['GET'])
 def get_user_documents(user_id):
-    user = User.query.get_or_404(user_id)
+    # FIX APPLIED HERE: Changed query.get() to query.filter_by() for string IDs
+    user = User.query.filter_by(user_id=user_id).first_or_404()
     docs = Document.query.filter_by(employee_id=user.id).order_by(Document.updated_at.desc()).all()
     return jsonify([d.to_dict() for d in docs])
 
