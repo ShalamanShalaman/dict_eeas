@@ -60,7 +60,15 @@ export default function LoginForm({ onLogin }) {
           </div>
         </div>
 
-        {error && <p className="text-red-600 mb-4 text-center font-bold bg-white/90 py-2 rounded w-full">{error}</p>}
+        {error && (
+          <div className={`mb-4 text-center font-bold py-2 rounded w-full ${
+            error.toLowerCase().includes('invalid credentials') 
+              ? 'bg-red-100 border-2 border-red-500 text-red-700 animate-pulse' 
+              : 'bg-white/90 text-red-600'
+          }`}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5 w-full">
           <div className="relative">
