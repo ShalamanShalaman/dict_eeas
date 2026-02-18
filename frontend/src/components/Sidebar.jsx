@@ -11,6 +11,7 @@ import {
   Activity,
   LogOut,
   User,
+  Save,
 } from "lucide-react";
 
 export default function Sidebar({ role, activePage, onNavigate, onLogout }) {
@@ -18,8 +19,7 @@ export default function Sidebar({ role, activePage, onNavigate, onLogout }) {
     employee: [
       { label: "Dashboard", icon: Home },
       { label: "Upload Attendance", icon: Upload },
-      { label: "Saved Progress", icon: FileText },
-      { label: "Submission For Aproval", icon: FileText },
+      { label: "Saved Progress", icon: Save },
       { label: "My Submissions", icon: FileText },
       { label: "My Profile", icon: User },
     ],
