@@ -5,9 +5,6 @@ import {
   Calendar, Activity
 } from "lucide-react";
 
-// --- HELPER COMPONENTS ---
-
-// Tab Button Component
 const TabButton = ({ icon: Icon, label, active, onClick }) => (
   <button
     onClick={onClick}
@@ -22,7 +19,6 @@ const TabButton = ({ icon: Icon, label, active, onClick }) => (
   </button>
 );
 
-// Status Badge Component
 const StatusBadge = ({ isActive }) => (
   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
     isActive 
@@ -34,12 +30,10 @@ const StatusBadge = ({ isActive }) => (
   </span>
 );
 
-// Avatar Component with initials
 const ProfileAvatar = ({ firstName, lastName, size = "lg" }) => {
   const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
   const sizeClasses = size === "sm" ? "w-12 h-12 text-sm" : size === "xl" ? "w-28 h-28 text-2xl" : "w-20 h-20 text-lg";
   
-  // Generate consistent color based on name
   const colors = [
     "bg-indigo-500", "bg-blue-500", "bg-teal-500", "bg-green-500", 
     "bg-yellow-500", "bg-orange-500", "bg-pink-500", "bg-purple-500"
@@ -58,13 +52,11 @@ export default function MyProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // UI State
   const [activeTab, setActiveTab] = useState("personal");
   const [showPassword, setShowPassword] = useState(false);
   const [uiModal, setUiModal] = useState({ show: false, type: '', title: '', message: '', onConfirm: null });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
-  // Edit Form State
   const [formData, setFormData] = useState({
     first_name: "",
     middle_name: "",
@@ -73,7 +65,6 @@ export default function MyProfile() {
     password: "",
   });
 
-  // Helper to handle input changes
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
@@ -83,7 +74,6 @@ export default function MyProfile() {
     setUiModal({ show: false, type: '', title: '', message: '', onConfirm: null });
   };
 
-  // Format date helper
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
@@ -100,7 +90,6 @@ export default function MyProfile() {
     }
   };
 
-  // 1. Fetch User Data
   useEffect(() => {
     const fetchProfile = async () => {
       const userStr = localStorage.getItem("user");
@@ -124,7 +113,6 @@ export default function MyProfile() {
         const data = await response.json();
         setProfile(data);
         
-        // Populate Form
         setFormData({
             first_name: data.first_name || "",
             middle_name: data.middle_name || "",
@@ -144,7 +132,6 @@ export default function MyProfile() {
     fetchProfile();
   }, []);
 
-  // Warn on unsaved changes when leaving page
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
@@ -156,7 +143,6 @@ export default function MyProfile() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // 2. Handle Save
   const handleSave = async (e) => {
     e.preventDefault();
     if (!profile) return;
@@ -233,7 +219,6 @@ export default function MyProfile() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-50 p-4 md:p-6">
-      {/* Header Card with Glassmorphism */}
       <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -246,7 +231,7 @@ export default function MyProfile() {
               <h2 className="text-2xl font-bold text-slate-800">
                 {profile.full_name}
               </h2>
-              <p className="text-slate-500">{profile.position_name || "Employee"}</p>
+              <p className="text-slate-500">{profile.position_name || profile.position_id || "Employee"}</p>
               <div className="flex items-center gap-2 mt-2">
                 <StatusBadge isActive={profile.is_active} />
                 <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded">
@@ -256,7 +241,6 @@ export default function MyProfile() {
             </div>
           </div>
           
-          {/* Quick Stats */}
           <div className="flex gap-3">
             <div className="text-center px-4 py-2 bg-indigo-50 rounded-xl">
               <p className="text-xs text-indigo-500 font-semibold uppercase">User ID</p>
@@ -266,7 +250,6 @@ export default function MyProfile() {
         </div>
       </div>
 
-      {/* Tabs Navigation */}
       <div className="flex flex-wrap gap-2 mb-6">
         <TabButton 
           icon={User} 
@@ -288,12 +271,9 @@ export default function MyProfile() {
         />
       </div>
 
-      {/* Content Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Column - Quick Info Cards */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Contact Information Card */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-sm hover:shadow-md transition-shadow duration-200">
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
               <Mail className="w-4 h-4 text-indigo-600" />
@@ -324,7 +304,6 @@ export default function MyProfile() {
             </div>
           </div>
 
-          {/* Work Information Card */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-sm hover:shadow-md transition-shadow duration-200">
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-indigo-600" />
@@ -335,7 +314,7 @@ export default function MyProfile() {
                 <Briefcase className="w-4 h-4 text-slate-400" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-slate-400">Position</p>
-                  <p className="text-sm text-slate-700 font-medium">{profile.position_name || "N/A"}</p>
+                  <p className="text-sm text-slate-700 font-medium">{profile.position_name || profile.position_id || "N/A"}</p>
                 </div>
               </div>
               {profile.provincial_officer && (
@@ -351,9 +330,7 @@ export default function MyProfile() {
           </div>
         </div>
 
-        {/* Right Column - Tab Content */}
         <div className="lg:col-span-2">
-          {/* Personal Info Tab */}
           {activeTab === "personal" && (
             <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
               <div className="flex items-center justify-between mb-6">
@@ -429,7 +406,6 @@ export default function MyProfile() {
             </form>
           )}
 
-          {/* Security Tab */}
           {activeTab === "security" && (
             <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
               <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -486,10 +462,8 @@ export default function MyProfile() {
             </form>
           )}
 
-          {/* Account Tab */}
           {activeTab === "account" && (
             <div className="space-y-6">
-              {/* Account Status Card */}
               <div className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
                 <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                   <Activity className="w-5 h-5 text-indigo-600" />
@@ -523,7 +497,6 @@ export default function MyProfile() {
                 </div>
               </div>
 
-              {/* Account Info Card */}
               <div className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
                 <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                   <Briefcase className="w-5 h-5 text-indigo-600" />
@@ -541,7 +514,7 @@ export default function MyProfile() {
                   </div>
                   <div className="bg-slate-50 rounded-xl p-4">
                     <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Position</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.position_name || "N/A"}</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.position_name || profile.position_id || "N/A"}</p>
                   </div>
                   <div className="bg-slate-50 rounded-xl p-4">
                     <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Office</p>
@@ -554,7 +527,6 @@ export default function MyProfile() {
         </div>
       </div>
 
-      {/* ---------------- UI FEEDBACK MODAL ---------------- */}
       {uiModal.show && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">

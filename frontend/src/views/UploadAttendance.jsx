@@ -128,6 +128,14 @@ const SaveIcon = ({ className }) => (
     </Icon>
 );
 
+const FileSignatureIcon = ({ className }) => (
+    <Icon className={className}>
+        <path d="M20 19v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8" />
+        <path d="M18 13.5L21.5 10l-4.5-4.5L13.5 9" />
+        <path d="M13.5 9L10 12.5V16h3.5L17 12.5" />
+    </Icon>
+);
+
 export default function UploadAttendance() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -552,6 +560,68 @@ export default function UploadAttendance() {
     }
   };
 
+  // --- NEW: Download Merged Report (DTR + AR) ---
+  const downloadMerged = async () => {
+    if (!selectedEmployee) return;
+
+    try {
+      const finalName = arMeta.name || selectedEmployee;
+      const finalPeriod = getPeriodText();
+
+      // Ensure the endpoint matches your backend logic for merging
+      const response = await fetch("http://127.0.0.1:5000/api/generate-merged-report", {
+        method: "POST",
+        mode: 'cors',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // Include all necessary data for both DTR and AR
+          employee_name: finalName,
+          employee_data: employees[selectedEmployee],
+          position: arMeta.position,
+          office: arMeta.office,
+          project: arMeta.project,
+          period_text: finalPeriod,
+          approver: arMeta.approver,
+          overrides: {
+            name: finalName, 
+            position: arMeta.position,
+            office: arMeta.office,
+            project: arMeta.project,
+            tasks: arMeta.tasks,
+            approved_by: arMeta.approver,
+            approver_title: arMeta.approverTitle
+          }
+        }),
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/vnd"))) {
+          if (!response.ok) {
+             const text = await response.text();
+             console.error("Merged Report Generation Error:", text);
+             throw new Error(`Server returned ${response.status}. See console.`);
+          }
+      }
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const filename = finalName.replace(/\s+/g, '_');
+        a.download = `Merged_Report_${filename}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else {
+        const err = await response.json();
+        alert("Error downloading Merged Report: " + err.error);
+      }
+    } catch (error) {
+      alert("Download failed: " + error.message);
+    }
+  };
+
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen">
       {/* Header Card */}
@@ -771,22 +841,29 @@ export default function UploadAttendance() {
                 )}
             </div>
 
-            <div className="flex justify-end mt-6 pt-4 border-t border-gray-100">
-              {viewMode === "dtr" ? (
-                <button
-                  onClick={downloadExcel}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2"
-                >
-                  <DownloadIcon className="w-4 h-4" /> Download DTR (Excel)
-                </button>
-              ) : (
-                <button
-                  onClick={downloadAR}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2"
-                >
-                  <DownloadIcon className="w-4 h-4" /> Generate AR (Word)
-                </button>
-              )}
+            <div className="flex justify-end mt-6 pt-4 border-t border-gray-100 gap-3">
+              {/* --- EXISTING DOWNLOAD BUTTONS --- */}
+              <button
+                onClick={downloadExcel}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
+              >
+                <DownloadIcon className="w-4 h-4" /> DTR (Excel)
+              </button>
+
+              <button
+                onClick={downloadAR}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
+              >
+                <DownloadIcon className="w-4 h-4" /> AR (Word)
+              </button>
+
+              {/* --- NEW MERGE BUTTON --- */}
+              <button
+                onClick={downloadMerged}
+                className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg shadow-md font-bold transition-all transform hover:scale-105 flex items-center gap-2 text-sm"
+              >
+                <FileSignatureIcon className="w-4 h-4" /> Download Merged Report
+              </button>
             </div>
           </div>
         </div>
@@ -796,6 +873,17 @@ export default function UploadAttendance() {
 }
 
 /* --- SUB COMPONENTS --- */
+
+// Moved InputCell outside DTRTable to prevent re-render focus loss
+const InputCell = ({ day, field, value, onUpdate }) => (
+    <input 
+        type="text" 
+        value={value || ""}
+        onChange={(e) => onUpdate(day, field, e.target.value)}
+        className="w-full bg-transparent border-0 p-1 text-center focus:ring-1 focus:ring-blue-500 focus:bg-white rounded text-gray-700 font-mono text-sm"
+        placeholder={field === "remarks" ? "..." : "--:--"}
+    />
+);
 
 function DTRTable({ data, onUpdate, onBatchUpdate }) {
   // Generate Days 1-31
@@ -826,19 +914,15 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
   const applyBatch = () => {
       const reasonToApply = batchReason === "Others" ? customReason : batchReason;
       onBatchUpdate(Array.from(selectedDays), "remarks", reasonToApply);
-      // Optional: Clear selection after apply
-      // setSelectedDays(new Set());
+      // Untick checkboxes after applying to prevent accidental overwrites
+      setSelectedDays(new Set());
   };
 
-  const InputCell = ({ day, field, value }) => (
-    <input 
-        type="text" 
-        value={value || ""}
-        onChange={(e) => onUpdate(day, field, e.target.value)}
-        className="w-full bg-transparent border-0 p-1 text-center focus:ring-1 focus:ring-blue-500 focus:bg-white rounded text-gray-700 font-mono text-sm"
-        placeholder={field === "remarks" ? "..." : "--:--"}
-    />
-  );
+  const clearBatchRemarks = () => {
+      // Sets remarks to empty string, effectively "undoing" a merge
+      onBatchUpdate(Array.from(selectedDays), "remarks", "");
+      setSelectedDays(new Set());
+  };
 
   return (
     <div>
@@ -878,6 +962,14 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
                         className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700"
                     >
                         Apply to Selected
+                    </button>
+
+                    <button 
+                        onClick={clearBatchRemarks}
+                        className="bg-white border border-gray-300 text-gray-700 text-xs px-3 py-1.5 rounded hover:bg-gray-100 ml-2"
+                        title="Remove remarks and restore time columns"
+                    >
+                        Clear Remarks
                     </button>
                 </div>
             </div>
@@ -927,30 +1019,30 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
                     ) : (
                         <>
                             <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="am_in" value={rowData.am_in} />
+                                <InputCell day={day} field="am_in" value={rowData.am_in} onUpdate={onUpdate} />
                             </td>
                             <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="am_out" value={rowData.am_out} />
+                                <InputCell day={day} field="am_out" value={rowData.am_out} onUpdate={onUpdate} />
                             </td>
                             <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="pm_in" value={rowData.pm_in} />
+                                <InputCell day={day} field="pm_in" value={rowData.pm_in} onUpdate={onUpdate} />
                             </td>
                             <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="pm_out" value={rowData.pm_out} />
+                                <InputCell day={day} field="pm_out" value={rowData.pm_out} onUpdate={onUpdate} />
                             </td>
                         </>
                     )}
 
                     <td className={`border-r min-w-[60px] bg-red-50/30 ${hasRemark ? 'opacity-40' : ''}`}>
-                        <InputCell day={day} field="undertime_hrs" value={rowData.undertime_hrs} />
+                        <InputCell day={day} field="undertime_hrs" value={rowData.undertime_hrs} onUpdate={onUpdate} />
                     </td>
                     <td className={`min-w-[60px] bg-red-50/30 border-r ${hasRemark ? 'opacity-40' : ''}`}>
-                        <InputCell day={day} field="undertime_min" value={rowData.undertime_min} />
+                        <InputCell day={day} field="undertime_min" value={rowData.undertime_min} onUpdate={onUpdate} />
                     </td>
                     
                     {/* Remarks Column */}
                     <td className="min-w-[150px] bg-yellow-50/30">
-                        <InputCell day={day} field="remarks" value={rowData.remarks} />
+                        <InputCell day={day} field="remarks" value={rowData.remarks} onUpdate={onUpdate} />
                     </td>
                 </tr>
                 );
