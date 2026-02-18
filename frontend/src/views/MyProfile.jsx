@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { 
   User, Mail, Phone, Briefcase, MapPin, Shield, Key, Save, 
   AlertCircle, CheckCircle, Eye, EyeOff, UserCheck, Clock, 
-  Calendar, Activity
+  Calendar, Activity, Pencil, X
 } from "lucide-react";
+
+// --- HELPER COMPONENTS ---
 
 const TabButton = ({ icon: Icon, label, active, onClick }) => (
   <button
@@ -38,7 +40,7 @@ const ProfileAvatar = ({ firstName, lastName, size = "lg" }) => {
     "bg-indigo-500", "bg-blue-500", "bg-teal-500", "bg-green-500", 
     "bg-yellow-500", "bg-orange-500", "bg-pink-500", "bg-purple-500"
   ];
-  const colorIndex = (firstName?.length || 0 + lastName?.length || 0) % colors.length;
+  const colorIndex = ((firstName?.length || 0) + (lastName?.length || 0)) % colors.length;
   
   return (
     <div className={`${sizeClasses} rounded-full flex items-center justify-center text-white font-bold shadow-lg ${colors[colorIndex]}`}>
@@ -52,11 +54,17 @@ export default function MyProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
+  // UI State
   const [activeTab, setActiveTab] = useState("personal");
   const [showPassword, setShowPassword] = useState(false);
   const [uiModal, setUiModal] = useState({ show: false, type: '', title: '', message: '', onConfirm: null });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   
+  // Confirmation Dialog State
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  
+  // Edit Form State
   const [formData, setFormData] = useState({
     first_name: "",
     middle_name: "",
@@ -72,6 +80,42 @@ export default function MyProfile() {
 
   const closeUiModal = () => {
     setUiModal({ show: false, type: '', title: '', message: '', onConfirm: null });
+  };
+
+  const handleEditClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancelClick = () => {
+    if (hasUnsavedChanges) {
+      setShowCancelConfirm(true);
+    } else {
+      setIsEditing(false);
+      if (profile) {
+        setFormData({
+          first_name: profile.first_name || "",
+          middle_name: profile.middle_name || "",
+          last_name: profile.last_name || "",
+          contact_no: profile.contact_no || "",
+          password: ""
+        });
+      }
+    }
+  };
+
+  const confirmCancel = () => {
+    setIsEditing(false);
+    setShowCancelConfirm(false);
+    if (profile) {
+      setFormData({
+        first_name: profile.first_name || "",
+        middle_name: profile.middle_name || "",
+        last_name: profile.last_name || "",
+        contact_no: profile.contact_no || "",
+        password: ""
+      });
+    }
+    setHasUnsavedChanges(false);
   };
 
   const formatDate = (dateString) => {
@@ -121,6 +165,7 @@ export default function MyProfile() {
             password: ""
         });
         setHasUnsavedChanges(false);
+        setIsEditing(false); 
       } catch (err) {
         console.error(err);
         setUiModal({ show: true, type: 'error', title: 'Error', message: 'Failed to load profile data.' });
@@ -174,13 +219,17 @@ export default function MyProfile() {
         
         setFormData(prev => ({ ...prev, password: "" }));
         setHasUnsavedChanges(false);
+        setIsEditing(false);
         
         setUiModal({ 
             show: true, 
             type: 'success', 
             title: 'Success', 
             message: 'Profile updated successfully!',
-            onConfirm: closeUiModal
+            onConfirm: () => {
+              closeUiModal();
+              setIsEditing(false);
+            }
         });
     } catch (err) {
         setUiModal({ 
@@ -231,7 +280,7 @@ export default function MyProfile() {
               <h2 className="text-2xl font-bold text-slate-800">
                 {profile.full_name}
               </h2>
-              <p className="text-slate-500">{profile.position_name || profile.position_id || "Employee"}</p>
+              <p className="text-slate-500">{profile.position_id || "Employee"}</p>
               <div className="flex items-center gap-2 mt-2">
                 <StatusBadge isActive={profile.is_active} />
                 <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded">
@@ -273,6 +322,7 @@ export default function MyProfile() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
+        {/* Left Column - Quick Info Cards */}
         <div className="lg:col-span-1 space-y-4">
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-sm hover:shadow-md transition-shadow duration-200">
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -314,7 +364,7 @@ export default function MyProfile() {
                 <Briefcase className="w-4 h-4 text-slate-400" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-slate-400">Position</p>
-                  <p className="text-sm text-slate-700 font-medium">{profile.position_name || profile.position_id || "N/A"}</p>
+                  <p className="text-sm text-slate-700 font-medium">{profile.position_id || "N/A"}</p>
                 </div>
               </div>
               {profile.provincial_officer && (
@@ -330,19 +380,56 @@ export default function MyProfile() {
           </div>
         </div>
 
+        {/* Right Column - Tab Content */}
         <div className="lg:col-span-2">
           {activeTab === "personal" && (
-            <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
+            <form id="personal-info-form" onSubmit={handleSave} className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <User className="w-5 h-5 text-indigo-600" />
                   Personal Information
                 </h3>
-                {hasUnsavedChanges && (
-                  <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                    Unsaved changes
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {hasUnsavedChanges && !isEditing && (
+                    <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                      Unsaved changes
+                    </span>
+                  )}
+                  {!isEditing ? (
+                    <button 
+                      type="button"
+                      onClick={handleEditClick}
+                      className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:shadow-lg font-medium transition-all duration-200 flex items-center gap-2"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      Edit
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button"
+                        onClick={handleCancelClick}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit"
+                        form="personal-info-form"
+                        disabled={saving || !hasUnsavedChanges}
+                        className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:shadow-lg font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                      >
+                        {saving ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -351,7 +438,9 @@ export default function MyProfile() {
                   <input 
                     type="text"
                     required
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    id="first_name"
+                    disabled={!isEditing}
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                     value={formData.first_name}
                     onChange={(e) => handleInputChange("first_name", e.target.value)}
                   />
@@ -360,7 +449,9 @@ export default function MyProfile() {
                   <label className="text-sm font-medium text-slate-600">Middle Name</label>
                   <input 
                     type="text"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    id="middle_name"
+                    disabled={!isEditing}
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                     value={formData.middle_name}
                     onChange={(e) => handleInputChange("middle_name", e.target.value)}
                   />
@@ -370,7 +461,9 @@ export default function MyProfile() {
                   <input 
                     type="text"
                     required
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    id="last_name"
+                    disabled={!isEditing}
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                     value={formData.last_name}
                     onChange={(e) => handleInputChange("last_name", e.target.value)}
                   />
@@ -381,27 +474,14 @@ export default function MyProfile() {
                   </label>
                   <input 
                     type="text"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    id="contact_no"
+                    disabled={!isEditing}
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                     value={formData.contact_no}
                     onChange={(e) => handleInputChange("contact_no", e.target.value)}
-                    placeholder="09XX XXX XXXX"
+                    placeholder={isEditing ? "09XX XXX XXXX" : ""}
                   />
                 </div>
-              </div>
-
-              <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button 
-                  type="submit"
-                  disabled={saving || !hasUnsavedChanges}
-                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                >
-                  {saving ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  Save Changes
-                </button>
               </div>
             </form>
           )}
@@ -492,8 +572,6 @@ export default function MyProfile() {
                       {formatDate(profile.created_at)}
                     </p>
                   </div>
-
-                  
                 </div>
               </div>
 
@@ -514,7 +592,7 @@ export default function MyProfile() {
                   </div>
                   <div className="bg-slate-50 rounded-xl p-4">
                     <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Position</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.position_name || profile.position_id || "N/A"}</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.position_id || "N/A"}</p>
                   </div>
                   <div className="bg-slate-50 rounded-xl p-4">
                     <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Office</p>
@@ -526,6 +604,44 @@ export default function MyProfile() {
           )}
         </div>
       </div>
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCancelConfirm(false)} />
+          
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-amber-100">
+                  <AlertCircle size={24} className="text-amber-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Discard Changes?</h3>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-gray-600 text-base leading-relaxed">
+                You have unsaved changes. Are you sure you want to cancel? All changes will be lost.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+              >
+                Keep Editing
+              </button>
+              <button
+                onClick={confirmCancel}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors duration-200"
+              >
+                Discard Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {uiModal.show && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">

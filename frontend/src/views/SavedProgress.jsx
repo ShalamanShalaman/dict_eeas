@@ -110,8 +110,11 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this progress?")) return;
+    
+    const userId = currentUser?.user_id || currentUser?.id;
+    
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/document/${id}`, { method: "DELETE" });
+      const response = await fetch(`http://127.0.0.1:5000/api/document/${id}?user_id=${userId}`, { method: "DELETE" });
       if (response.ok) {
         setSavedDocs(savedDocs.filter(doc => doc.id !== id));
       } else {

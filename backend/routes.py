@@ -291,7 +291,6 @@ def get_document_content(doc_id):
     doc = Document.query.get_or_404(doc_id)
     
     # Security: Ensure only the owner (or potentially the reviewer) can read the raw content
-    # Note: For strict security, you should pass user_id as a query param or use session
     requesting_user_id = request.args.get('user_id')
     if requesting_user_id:
         user = User.query.filter_by(user_id=requesting_user_id).first()
@@ -321,11 +320,40 @@ def download_document(doc_id):
         return jsonify({'error': 'File not found'}), 404
     return send_file(path, as_attachment=True, download_name=os.path.basename(path))
 
+# Delete Document (Added as requested)
+@document_bp.route('/api/document/<int:doc_id>', methods=['DELETE'])
+def delete_document(doc_id):
+    doc = Document.query.get_or_404(doc_id)
+    
+    # Check authorization if user_id is provided
+    user_id = request.args.get('user_id')
+    if user_id:
+        user = User.query.filter_by(user_id=user_id).first()
+        # Allow owner to delete
+        if user and doc.employee_id != user.id:
+             return jsonify({'error': 'Unauthorized'}), 403
+
+    # Attempt to remove the file from disk
+    if doc.file_path and os.path.exists(doc.file_path):
+        try:
+            os.remove(doc.file_path)
+        except OSError:
+            pass 
+            
+    # Also remove review file if it exists
+    if hasattr(doc, 'review_file_path') and doc.review_file_path and os.path.exists(doc.review_file_path):
+        try:
+            os.remove(doc.review_file_path)
+        except OSError:
+            pass
+
+    db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'message': 'Document deleted'})
+
 # Get all documents for a user
-# FIX APPLIED HERE: <int:user_id> changed to <string:user_id>
 @document_bp.route('/api/document/user/<string:user_id>', methods=['GET'])
 def get_user_documents(user_id):
-    # FIX APPLIED HERE: Changed query.get() to query.filter_by() for string IDs
     user = User.query.filter_by(user_id=user_id).first_or_404()
     docs = Document.query.filter_by(employee_id=user.id).order_by(Document.updated_at.desc()).all()
     return jsonify([d.to_dict() for d in docs])
