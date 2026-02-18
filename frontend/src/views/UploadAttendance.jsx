@@ -136,7 +136,7 @@ const FileSignatureIcon = ({ className }) => (
     </Icon>
 );
 
-export default function UploadAttendance() {
+export default function UploadAttendance({ onNavigate }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState({});
@@ -147,6 +147,12 @@ export default function UploadAttendance() {
   
   // Track if we are editing an existing saved draft (for Autosave logic)
   const [savedDocId, setSavedDocId] = useState(null);
+
+  // Track unsaved changes for confirmation dialog
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'clear' or 'changeTab' or 'navigate'
+  const [targetNavigatePath, setTargetNavigatePath] = useState(null);
 
   const [arMeta, setArMeta] = useState({
     name: "",
@@ -196,6 +202,35 @@ export default function UploadAttendance() {
         loadSavedDocument(docId);
     }
   }, [currentUser]);
+
+  // 4. Handle beforeunload to warn about unsaved changes when leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        // Show a browser-native warning dialog
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  // 5. Handle navigation when onNavigate prop is called
+  const handleNavigate = (path) => {
+    if (hasUnsavedChanges) {
+      setPendingAction('navigate');
+      setTargetNavigatePath(path);
+      setShowConfirmDialog(true);
+    } else if (onNavigate) {
+      onNavigate(path);
+    }
+  };
 
   // --- NEW FUNCTION: Fetch Saved Document Content Directly ---
   const loadSavedDocument = async (docId) => {
@@ -386,11 +421,61 @@ export default function UploadAttendance() {
     }
   };
 
+  // Confirmation dialog handlers
+  const handleClearClick = () => {
+    if (hasUnsavedChanges) {
+      setPendingAction('clear');
+      setShowConfirmDialog(true);
+    } else {
+      handleClearAll();
+    }
+  };
+
+  const handleTabChange = (newMode) => {
+    if (hasUnsavedChanges) {
+      setPendingAction('changeTab');
+      setShowConfirmDialog(true);
+    } else {
+      setViewMode(newMode);
+    }
+  };
+
+  const handleConfirmSave = async () => {
+    setShowConfirmDialog(false);
+    await saveProgress();
+    setHasUnsavedChanges(false);
+    
+    if (pendingAction === 'clear') {
+      handleClearAll();
+    } else if (pendingAction === 'changeTab') {
+      setViewMode(viewMode === 'dtr' ? 'ar' : 'dtr');
+    }
+    setPendingAction(null);
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowConfirmDialog(false);
+    setHasUnsavedChanges(false);
+    
+    if (pendingAction === 'clear') {
+      handleClearAll();
+    } else if (pendingAction === 'changeTab') {
+      setViewMode(viewMode === 'dtr' ? 'ar' : 'dtr');
+    }
+    setPendingAction(null);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowConfirmDialog(false);
+    setPendingAction(null);
+  };
+
   const handleClearAll = () => {
     setFile(null);
     setEmployees({});
     setSelectedEmployee("");
     setSavedDocId(null);
+    setHasUnsavedChanges(false);
     setArMeta({ 
         name: currentUser?.full_name || "", 
         position: currentUser?.position_name || "", 
@@ -436,6 +521,7 @@ export default function UploadAttendance() {
         },
       },
     }));
+    setHasUnsavedChanges(true);
   };
 
   const handleBatchUpdate = (daysToUpdate, field, value) => {
@@ -453,6 +539,7 @@ export default function UploadAttendance() {
         [selectedEmployee]: updatedEmployeeData
       };
     });
+    setHasUnsavedChanges(true);
   };
 
   const downloadExcel = async () => {
@@ -696,7 +783,7 @@ export default function UploadAttendance() {
             </button>
 
             <button
-              onClick={handleClearAll}
+              onClick={handleClearClick}
               className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               <Trash2Icon className="w-4 h-4" /> Clear
@@ -728,8 +815,8 @@ export default function UploadAttendance() {
           {/* Toggle Switch */}
           <div className="flex justify-center mb-6">
             <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-100">
-              <button
-                onClick={() => setViewMode("dtr")}
+            <button
+                onClick={() => handleTabChange("dtr")}
                 className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
                   viewMode === "dtr"
                     ? "bg-blue-50 text-blue-700 shadow-sm"
@@ -739,7 +826,7 @@ export default function UploadAttendance() {
                 Daily Time Record
               </button>
               <button
-                onClick={() => setViewMode("ar")}
+                onClick={() => handleTabChange("ar")}
                 className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
                   viewMode === "ar"
                     ? "bg-blue-50 text-blue-700 shadow-sm"
@@ -770,7 +857,7 @@ export default function UploadAttendance() {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="e.g. Juan Dela Cruz"
                         value={arMeta.name}
-                        onChange={(e) => setArMeta({ ...arMeta, name: e.target.value })}
+                        onChange={(e) => { setArMeta({ ...arMeta, name: e.target.value }); setHasUnsavedChanges(true); }}
                     />
                 </div>
                 <div className="space-y-1">
@@ -779,7 +866,7 @@ export default function UploadAttendance() {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="e.g. Project Officer I"
                         value={arMeta.position}
-                        onChange={(e) => setArMeta({ ...arMeta, position: e.target.value })}
+                        onChange={(e) => { setArMeta({ ...arMeta, position: e.target.value }); setHasUnsavedChanges(true); }}
                     />
                 </div>
                 <div className="space-y-1">
@@ -788,7 +875,7 @@ export default function UploadAttendance() {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="e.g. Cauayan Office"
                         value={arMeta.office}
-                        onChange={(e) => setArMeta({ ...arMeta, office: e.target.value })}
+                        onChange={(e) => { setArMeta({ ...arMeta, office: e.target.value }); setHasUnsavedChanges(true); }}
                     />
                 </div>
                 <div className="space-y-1">
@@ -797,7 +884,7 @@ export default function UploadAttendance() {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="Provincial Officer Name"
                         value={arMeta.approver}
-                        onChange={(e) => setArMeta({ ...arMeta, approver: e.target.value })}
+                        onChange={(e) => { setArMeta({ ...arMeta, approver: e.target.value }); setHasUnsavedChanges(true); }}
                     />
                 </div>
                 {/* --- Approver Title Input --- */}
@@ -807,7 +894,7 @@ export default function UploadAttendance() {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="e.g. PROVINCIAL OFFICER..."
                         value={arMeta.approverTitle}
-                        onChange={(e) => setArMeta({ ...arMeta, approverTitle: e.target.value })}
+                        onChange={(e) => { setArMeta({ ...arMeta, approverTitle: e.target.value }); setHasUnsavedChanges(true); }}
                     />
                 </div>
                 {/* --- Period Coverage Selector --- */}
@@ -816,7 +903,7 @@ export default function UploadAttendance() {
                     <select
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                         value={arMeta.periodFormat}
-                        onChange={(e) => setArMeta({ ...arMeta, periodFormat: e.target.value })}
+                        onChange={(e) => { setArMeta({ ...arMeta, periodFormat: e.target.value }); setHasUnsavedChanges(true); }}
                     >
                         <option value="full">Full Month</option>
                         <option value="1-15">1st Quincena (1-15)</option>
@@ -864,6 +951,50 @@ export default function UploadAttendance() {
               >
                 <FileSignatureIcon className="w-4 h-4" /> Download Merged Report
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog Modal */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50" onClick={handleCancelConfirm}></div>
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center">
+              {/* Warning Icon */}
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Unsaved Changes</h3>
+              <p className="text-gray-600 mb-6">Want to save changes to this attendance?</p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelConfirm}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDiscard}
+                  className="flex-1 px-4 py-2.5 border border-red-200 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors"
+                >
+                  Don't Save
+                </button>
+                <button
+                  onClick={handleConfirmSave}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         </div>
