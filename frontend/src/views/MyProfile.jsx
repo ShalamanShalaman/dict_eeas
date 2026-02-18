@@ -1,89 +1,66 @@
 import React, { useState, useEffect } from "react";
+import { 
+  User, Mail, Phone, Briefcase, MapPin, Shield, Key, Save, 
+  AlertCircle, CheckCircle, Eye, EyeOff, UserCheck, Clock, 
+  Calendar, Activity
+} from "lucide-react";
 
-// --- ICONS ---
-const Icon = ({ children, className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    {children}
-  </svg>
+// --- HELPER COMPONENTS ---
+
+// Tab Button Component
+const TabButton = ({ icon: Icon, label, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+      active
+        ? "bg-indigo-600 text-white shadow-md"
+        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+    }`}
+  >
+    <Icon size={18} />
+    <span>{label}</span>
+  </button>
 );
 
-const UserIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </Icon>
+// Status Badge Component
+const StatusBadge = ({ isActive }) => (
+  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+    isActive 
+      ? "bg-green-100 text-green-700" 
+      : "bg-red-100 text-red-700"
+  }`}>
+    <span className={`w-2 h-2 rounded-full ${isActive ? "bg-green-500" : "bg-red-500"}`} />
+    {isActive ? "Active" : "Inactive"}
+  </span>
 );
 
-const MailIcon = ({ className }) => (
-  <Icon className={className}>
-    <rect width="20" height="16" x="2" y="4" rx="2" />
-    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-  </Icon>
-);
-
-const PhoneIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-  </Icon>
-);
-
-const BriefcaseIcon = ({ className }) => (
-  <Icon className={className}>
-    <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
-    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-  </Icon>
-);
-
-const MapPinIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-    <circle cx="12" cy="10" r="3" />
-  </Icon>
-);
-
-const ShieldIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-  </Icon>
-);
-
-const KeyIcon = ({ className }) => (
-  <Icon className={className}>
-    <circle cx="7.5" cy="15.5" r="5.5" />
-    <path d="m21 2-9.6 9.6" />
-    <path d="m15.5 7.5 3 3L22 7l-3-3" />
-  </Icon>
-);
-
-const SaveIcon = ({ className }) => (
-    <Icon className={className}>
-        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-        <polyline points="17 21 17 13 7 13 7 21" />
-        <polyline points="7 3 7 8 15 8" />
-    </Icon>
-);
-
-const AlertCircleIcon = ({ className }) => (
-  <Icon className={className}>
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="12" />
-    <line x1="12" y1="16" x2="12.01" y2="16" />
-  </Icon>
-);
-
-const CheckCircleIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </Icon>
-);
+// Avatar Component with initials
+const ProfileAvatar = ({ firstName, lastName, size = "lg" }) => {
+  const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+  const sizeClasses = size === "sm" ? "w-12 h-12 text-sm" : size === "xl" ? "w-28 h-28 text-2xl" : "w-20 h-20 text-lg";
+  
+  // Generate consistent color based on name
+  const colors = [
+    "bg-indigo-500", "bg-blue-500", "bg-teal-500", "bg-green-500", 
+    "bg-yellow-500", "bg-orange-500", "bg-pink-500", "bg-purple-500"
+  ];
+  const colorIndex = (firstName?.length || 0 + lastName?.length || 0) % colors.length;
+  
+  return (
+    <div className={`${sizeClasses} rounded-full flex items-center justify-center text-white font-bold shadow-lg ${colors[colorIndex]}`}>
+      {initials || "U"}
+    </div>
+  );
+};
 
 export default function MyProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // UI Modal State
+  // UI State
+  const [activeTab, setActiveTab] = useState("personal");
+  const [showPassword, setShowPassword] = useState(false);
   const [uiModal, setUiModal] = useState({ show: false, type: '', title: '', message: '', onConfirm: null });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
@@ -93,7 +70,7 @@ export default function MyProfile() {
     middle_name: "",
     last_name: "",
     contact_no: "",
-    password: "", // Optional
+    password: "",
   });
 
   // Helper to handle input changes
@@ -106,6 +83,23 @@ export default function MyProfile() {
     setUiModal({ show: false, type: '', title: '', message: '', onConfirm: null });
   };
 
+  // Format date helper
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return "N/A";
+    }
+  };
+
   // 1. Fetch User Data
   useEffect(() => {
     const fetchProfile = async () => {
@@ -116,7 +110,6 @@ export default function MyProfile() {
       }
       
       const localUser = JSON.parse(userStr);
-      // We need public_id to fetch/update
       const publicId = localUser.public_id;
 
       if (!publicId) {
@@ -151,7 +144,7 @@ export default function MyProfile() {
     fetchProfile();
   }, []);
 
-  // Warn on unsaved changes when leaving page (browser level)
+  // Warn on unsaved changes when leaving page
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
@@ -177,7 +170,6 @@ export default function MyProfile() {
             contact_no: formData.contact_no,
         };
 
-        // Only send password if user typed something
         if (formData.password) {
             payload.password = formData.password;
         }
@@ -192,11 +184,8 @@ export default function MyProfile() {
 
         const result = await response.json();
         setProfile(result.user);
-        
-        // Update local storage to reflect name changes immediately across app
         localStorage.setItem("user", JSON.stringify(result.user));
         
-        // Clear password field
         setFormData(prev => ({ ...prev, password: "" }));
         setHasUnsavedChanges(false);
         
@@ -222,211 +211,370 @@ export default function MyProfile() {
 
   if (loading) {
       return (
-        <div className="flex h-64 items-center justify-center text-slate-400">
-             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mr-3" />
-             Loading Profile...
+        <div className="flex h-96 items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-500 font-medium">Loading Profile...</p>
+          </div>
         </div>
       );
   }
 
   if (!profile) {
-      return <div className="p-8 text-center text-gray-500">Please log in to view your profile.</div>;
+      return (
+        <div className="flex h-96 items-center justify-center">
+          <div className="text-center">
+            <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500 text-lg">Please log in to view your profile.</p>
+          </div>
+        </div>
+      );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                <UserIcon className="w-6 h-6 text-indigo-600" />
-                My Profile
-            </h2>
-            <p className="text-slate-500 text-sm">Manage your personal information and security settings.</p>
-        </div>
-        <div className="flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
-            <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">{profile.role}</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-50 p-4 md:p-6">
+      {/* Header Card with Glassmorphism */}
+      <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <ProfileAvatar 
+              firstName={profile.first_name} 
+              lastName={profile.last_name} 
+              size="xl" 
+            />
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800">
+                {profile.full_name}
+              </h2>
+              <p className="text-slate-500">{profile.position_name || "Employee"}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <StatusBadge isActive={profile.is_active} />
+                <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                  {profile.role?.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Quick Stats */}
+          <div className="flex gap-3">
+            <div className="text-center px-4 py-2 bg-indigo-50 rounded-xl">
+              <p className="text-xs text-indigo-500 font-semibold uppercase">User ID</p>
+              <p className="text-sm font-mono font-bold text-indigo-700">{profile.user_id}</p>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Tabs Navigation */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <TabButton 
+          icon={User} 
+          label="Personal Info" 
+          active={activeTab === "personal"} 
+          onClick={() => setActiveTab("personal")} 
+        />
+        <TabButton 
+          icon={Shield} 
+          label="Security" 
+          active={activeTab === "security"} 
+          onClick={() => setActiveTab("security")} 
+        />
+        <TabButton 
+          icon={Activity} 
+          label="Account" 
+          active={activeTab === "account"} 
+          onClick={() => setActiveTab("account")} 
+        />
+      </div>
+
+      {/* Content Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Column: Read-Only Info Card */}
-        <div className="lg:col-span-1 space-y-6">
-             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
-                 <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">
-                   Account Details
-                 </h3>
-                 
-                 <div className="space-y-4">
-                     <div>
-                         <label className="text-xs text-slate-400 font-semibold uppercase">Employee ID</label>
-                         <div className="text-slate-800 font-mono font-medium">{profile.user_id}</div>
-                     </div>
-                     
-                     <div>
-                         <label className="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1">
-                             <MailIcon className="w-3 h-3" /> Email Address
-                         </label>
-                         <div className="text-slate-800 font-medium break-all">{profile.email}</div>
-                     </div>
+        {/* Left Column - Quick Info Cards */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* Contact Information Card */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-indigo-600" />
+              Contact Information
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                <Mail className="w-4 h-4 text-slate-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-400">Email</p>
+                  <p className="text-sm text-slate-700 font-medium truncate">{profile.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                <Phone className="w-4 h-4 text-slate-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-400">Phone</p>
+                  <p className="text-sm text-slate-700 font-medium">{profile.contact_no || "Not set"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                <MapPin className="w-4 h-4 text-slate-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-400">Office</p>
+                  <p className="text-sm text-slate-700 font-medium truncate">{profile.office_name || "N/A"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                     <div>
-                         <label className="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1">
-                             <BriefcaseIcon className="w-3 h-3" /> Position
-                         </label>
-                         <div className="text-slate-800 font-medium">{profile.position_name || "N/A"}</div>
-                     </div>
-
-                     <div>
-                         <label className="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1">
-                             <MapPinIcon className="w-3 h-3" /> Office / Unit
-                         </label>
-                         <div className="text-slate-800 font-medium">{profile.office_name || "N/A"}</div>
-                     </div>
-                     
-                     {profile.provincial_officer && (
-                        <div>
-                            <label className="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1">
-                                <ShieldIcon className="w-3 h-3" /> Reviewing Officer
-                            </label>
-                            <div className="text-slate-800 font-medium text-sm">{profile.provincial_officer}</div>
-                        </div>
-                     )}
-                 </div>
-             </div>
+          {/* Work Information Card */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-indigo-600" />
+              Work Information
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                <Briefcase className="w-4 h-4 text-slate-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-400">Position</p>
+                  <p className="text-sm text-slate-700 font-medium">{profile.position_name || "N/A"}</p>
+                </div>
+              </div>
+              {profile.provincial_officer && (
+                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                  <UserCheck className="w-4 h-4 text-slate-400" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-400">Reviewing Officer</p>
+                    <p className="text-sm text-slate-700 font-medium truncate">{profile.provincial_officer}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Right Column: Editable Form */}
+        {/* Right Column - Tab Content */}
         <div className="lg:col-span-2">
-            <form onSubmit={handleSave} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                 <h3 className="text-lg font-bold text-slate-800 mb-6">Edit Information</h3>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                     <div className="space-y-1">
-                         <label className="text-sm font-medium text-slate-600">First Name</label>
-                         <input 
-                            type="text"
-                            required
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                            value={formData.first_name}
-                            onChange={(e) => handleInputChange("first_name", e.target.value)}
-                         />
-                     </div>
-                     <div className="space-y-1">
-                         <label className="text-sm font-medium text-slate-600">Middle Name</label>
-                         <input 
-                            type="text"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                            value={formData.middle_name}
-                            onChange={(e) => handleInputChange("middle_name", e.target.value)}
-                         />
-                     </div>
-                     <div className="space-y-1">
-                         <label className="text-sm font-medium text-slate-600">Last Name</label>
-                         <input 
-                            type="text"
-                            required
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                            value={formData.last_name}
-                            onChange={(e) => handleInputChange("last_name", e.target.value)}
-                         />
-                     </div>
-                     <div className="space-y-1">
-                         <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
-                             <PhoneIcon className="w-3 h-3" /> Contact No.
-                         </label>
-                         <input 
-                            type="text"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                            value={formData.contact_no}
-                            onChange={(e) => handleInputChange("contact_no", e.target.value)}
-                            placeholder="09XX XXX XXXX"
-                         />
-                     </div>
-                 </div>
+          {/* Personal Info Tab */}
+          {activeTab === "personal" && (
+            <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <User className="w-5 h-5 text-indigo-600" />
+                  Personal Information
+                </h3>
+                {hasUnsavedChanges && (
+                  <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                    Unsaved changes
+                  </span>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-600">First Name</label>
+                  <input 
+                    type="text"
+                    required
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    value={formData.first_name}
+                    onChange={(e) => handleInputChange("first_name", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-600">Middle Name</label>
+                  <input 
+                    type="text"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    value={formData.middle_name}
+                    onChange={(e) => handleInputChange("middle_name", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-600">Last Name</label>
+                  <input 
+                    type="text"
+                    required
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    value={formData.last_name}
+                    onChange={(e) => handleInputChange("last_name", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
+                    <Phone className="w-3 h-3" /> Contact No.
+                  </label>
+                  <input 
+                    type="text"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50"
+                    value={formData.contact_no}
+                    onChange={(e) => handleInputChange("contact_no", e.target.value)}
+                    placeholder="09XX XXX XXXX"
+                  />
+                </div>
+              </div>
 
-                 <hr className="border-gray-100 mb-6" />
-                 
-                 <div className="mb-6">
-                     <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                         <KeyIcon className="w-4 h-4 text-indigo-500" /> Change Password
-                     </h4>
-                     <p className="text-xs text-slate-500 mb-3">Leave blank if you do not want to change your password.</p>
-                     
-                     <div className="space-y-1 max-w-md">
-                         <label className="text-sm font-medium text-slate-600">New Password</label>
-                         <input 
-                            type="password"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                            value={formData.password}
-                            onChange={(e) => handleInputChange("password", e.target.value)}
-                            placeholder="••••••••"
-                         />
-                     </div>
-                 </div>
-
-                 <div className="flex justify-end pt-4 gap-3">
-                     <button 
-                        type="submit"
-                        disabled={saving}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                     >
-                        {saving ? (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                            <SaveIcon className="w-4 h-4" />
-                        )}
-                        Save Changes
-                     </button>
-                 </div>
+              <div className="flex justify-end pt-4 border-t border-slate-100">
+                <button 
+                  type="submit"
+                  disabled={saving || !hasUnsavedChanges}
+                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Save Changes
+                </button>
+              </div>
             </form>
+          )}
+
+          {/* Security Tab */}
+          {activeTab === "security" && (
+            <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-indigo-600" />
+                Security Settings
+              </h3>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">Password Security</p>
+                    <p className="text-xs text-amber-700 mt-1">Leave the password field blank if you don't want to change it.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-1 max-w-md">
+                <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
+                  <Key className="w-3 h-3" /> New Password
+                </label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-slate-50/50 pr-12"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange("password", e.target.value)}
+                    placeholder="••••••••"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-6 mt-6 border-t border-slate-100">
+                <button 
+                  type="submit"
+                  disabled={saving}
+                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Update Password
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Account Tab */}
+          {activeTab === "account" && (
+            <div className="space-y-6">
+              {/* Account Status Card */}
+              <div className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-indigo-600" />
+                  Account Status
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-indigo-100 rounded-lg">
+                        <UserCheck className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <span className="text-sm font-medium text-slate-600">Account Status</span>
+                    </div>
+                    <StatusBadge isActive={profile.is_active} />
+                  </div>
+
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Calendar className="w-5 h-5 text-green-600" />
+                      </div>
+                      <span className="text-sm font-medium text-slate-600">Member Since</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {formatDate(profile.created_at)}
+                    </p>
+                  </div>
+
+                  
+                </div>
+              </div>
+
+              {/* Account Info Card */}
+              <div className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-indigo-600" />
+                  Account Information
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Employee ID</p>
+                    <p className="text-sm font-mono font-bold text-slate-800">{profile.user_id}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Role</p>
+                    <p className="text-sm font-bold text-slate-800 capitalize">{profile.role}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Position</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.position_name || "N/A"}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 font-semibold uppercase mb-1">Office</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.office_name || "N/A"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ---------------- UI FEEDBACK MODAL ---------------- */}
       {uiModal.show && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
-                <div className={`p-6 flex flex-col items-center text-center ${uiModal.type === 'error' ? 'bg-red-50' : uiModal.type === 'success' ? 'bg-green-50' : 'bg-white'}`}>
-                    {uiModal.type === 'success' && <CheckCircleIcon className="w-12 h-12 text-green-500 mb-3" />}
-                    {uiModal.type === 'error' && <AlertCircleIcon className="w-12 h-12 text-red-500 mb-3" />}
-                    {uiModal.type === 'confirm' && <AlertCircleIcon className="w-12 h-12 text-amber-500 mb-3" />}
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
+                <div className={`p-8 flex flex-col items-center text-center ${uiModal.type === 'error' ? 'bg-red-50' : uiModal.type === 'success' ? 'bg-green-50' : 'bg-white'}`}>
+                    {uiModal.type === 'success' && <CheckCircle className="w-16 h-16 text-green-500 mb-4" />}
+                    {uiModal.type === 'error' && <AlertCircle className="w-16 h-16 text-red-500 mb-4" />}
                     
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">{uiModal.title}</h3>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{uiModal.title}</h3>
                     <p className="text-sm text-gray-600 mb-6">{uiModal.message}</p>
                     
-                    <div className="flex gap-3 w-full justify-center">
-                        {uiModal.type === 'confirm' ? (
-                            <>
-                                <button 
-                                    onClick={closeUiModal} 
-                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                                >
-                                    Continue Editing
-                                </button>
-                                <button 
-                                    onClick={uiModal.onConfirm} 
-                                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors"
-                                >
-                                    Confirm
-                                </button>
-                            </>
-                        ) : (
-                            <button 
-                                onClick={uiModal.onConfirm || closeUiModal} 
-                                className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-medium transition-colors"
-                            >
-                                Close
-                            </button>
-                        )}
-                    </div>
+                    <button 
+                        onClick={uiModal.onConfirm || closeUiModal} 
+                        className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 font-medium transition-all"
+                    >
+                        Close
+                    </button>
                 </div>
             </div>
         </div>
       )}
-
     </div>
   );
 }
