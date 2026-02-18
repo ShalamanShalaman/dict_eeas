@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useSearchParams } from "react-router-dom"; // Added for better URL param handling
+import { useSearchParams } from "react-router-dom";
 
 // --- INLINE ICONS ---
 const Icon = ({ children, className }) => (
@@ -155,7 +155,7 @@ export default function UploadAttendance({ onNavigate }) {
   const [pendingAction, setPendingAction] = useState(null); 
   const [targetNavigatePath, setTargetNavigatePath] = useState(null);
 
-  // Use React Router hook for search params
+  // React Router Search Params Hook
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [arMeta, setArMeta] = useState({
@@ -234,12 +234,13 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
-  // --- NEW FUNCTION: Fetch Saved Document Content Directly ---
+  // --- Fetch Saved Document Content Directly ---
   const loadSavedDocument = async (docId) => {
     setLoading(true);
     try {
         const response = await fetch(`http://127.0.0.1:5000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
         
+        // --- ERROR HANDLING FIX ---
         if (response.status === 403 || response.status === 404) {
              console.warn(`Doc ID ${docId} is stale or unauthorized (${response.status}). Clearing URL.`);
              setSearchParams({}); // Clear params properly
@@ -417,12 +418,8 @@ export default function UploadAttendance({ onNavigate }) {
   };
 
   const handleTabChange = (newMode) => {
-    if (hasUnsavedChanges) {
-      setPendingAction('changeTab');
-      setShowConfirmDialog(true);
-    } else {
-      setViewMode(newMode);
-    }
+    // No notification when changing tabs, just switch directly (Merged from your code)
+    setViewMode(newMode);
   };
 
   const handleConfirmSave = async () => {
@@ -432,9 +429,8 @@ export default function UploadAttendance({ onNavigate }) {
     
     if (pendingAction === 'clear') {
       handleClearAll();
-    } else if (pendingAction === 'changeTab') {
-      setViewMode(viewMode === 'dtr' ? 'ar' : 'dtr');
     }
+    // Tab change is instant now, so no need to handle here
     setPendingAction(null);
   };
 
@@ -444,8 +440,6 @@ export default function UploadAttendance({ onNavigate }) {
     
     if (pendingAction === 'clear') {
       handleClearAll();
-    } else if (pendingAction === 'changeTab') {
-      setViewMode(viewMode === 'dtr' ? 'ar' : 'dtr');
     }
     setPendingAction(null);
   };
@@ -473,7 +467,7 @@ export default function UploadAttendance({ onNavigate }) {
     });
     if (fileInputRef.current) fileInputRef.current.value = null;
     
-    setSearchParams({}); // Clear params
+    setSearchParams({}); // Clear params (React Router way)
   };
 
   const getPeriodText = () => {
@@ -904,14 +898,14 @@ export default function UploadAttendance({ onNavigate }) {
                 onClick={downloadExcel}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
               >
-                <DownloadIcon className="w-4 h-4" /> DTR (Excel)
+                <DownloadIcon className="w-4 h-4" /> Download DTR (Excel)
               </button>
 
               <button
                 onClick={downloadAR}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
               >
-                <DownloadIcon className="w-4 h-4" /> AR (Word)
+                <DownloadIcon className="w-4 h-4" /> Generate AR (Word)
               </button>
 
               <button
