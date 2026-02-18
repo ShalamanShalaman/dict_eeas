@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout";
 import Login from "./views/Login";
 import UserManagement from "./views/UserManagement";
@@ -14,7 +15,6 @@ export default function App() {
   });
 
   const [viewRole, setViewRole] = useState(user ? user.role : "");
-  const [activePage, setActivePage] = useState("Dashboard");
 
   useEffect(() => {
     if (user) {
@@ -28,39 +28,38 @@ export default function App() {
 
   const handleLogout = () => {
     setUser(null);
-    setActivePage("Dashboard");
     setViewRole("");
     localStorage.removeItem("user");
-    if (window.location.search) {
-      const url = new URL(window.location);
-      url.search = "";
-      window.history.replaceState({}, "", url);
-    }
   };
 
-  const renderView = () => {
-    if (activePage === "My Profile") return <MyProfile />;
-    if (activePage === "User Management") return <UserManagement />;
-
-    if (viewRole === "employee") return <EmployeeDashboard selectedMenu={activePage} setActivePage={setActivePage} user={user} />;
-    if (viewRole === "reviewer") return <ReviewerDashboard selectedMenu={activePage} />;
-    if (viewRole === "admin") return <AdminDashboard selectedMenu={activePage} />;
-
-    return null;
+  const Protected = ({ children }) => {
+    if (!user) return <Navigate to="/login" replace />;
+    return <DashboardLayout user={user} role={viewRole} setRole={setViewRole} onLogout={handleLogout}>{children}</DashboardLayout>;
   };
-
-  if (!user) return <Login onLogin={setUser} />;
 
   return (
-    <DashboardLayout
-      user={user}
-      role={viewRole}
-      setRole={setViewRole}
-      activePage={activePage}
-      setActivePage={setActivePage}
-      onLogout={handleLogout}
-    >
-      {renderView()}
-    </DashboardLayout>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login onLogin={setUser} />} />
+        <Route path="/" element={
+          <Protected>
+            {viewRole === "employee" && <EmployeeDashboard selectedMenu="Dashboard" user={user} setActivePage={() => {}} />}
+            {viewRole === "reviewer" && <ReviewerDashboard />}
+            {viewRole === "admin" && <AdminDashboard selectedMenu="Dashboard" />}
+          </Protected>
+        } />
+        <Route path="/upload" element={<Protected><EmployeeDashboard selectedMenu="Upload Attendance" user={user} setActivePage={() => {}} /></Protected>} />
+        <Route path="/saved-progress" element={<Protected><EmployeeDashboard selectedMenu="Saved Progress" user={user} setActivePage={() => {}} /></Protected>} />
+        <Route path="/submissions" element={<Protected><EmployeeDashboard selectedMenu="My Submissions" user={user} setActivePage={() => {}} /></Protected>} />
+        <Route path="/pending-reviews" element={<Protected><ReviewerDashboard /></Protected>} />
+        <Route path="/archive" element={<Protected><ReviewerDashboard /></Protected>} />
+        <Route path="/signature" element={<Protected><ReviewerDashboard /></Protected>} />
+        <Route path="/users" element={<Protected>{viewRole === "admin" ? <UserManagement /> : <Navigate to="/" replace />}</Protected>} />
+        <Route path="/templates" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="Templates" /> : <Navigate to="/" replace />}</Protected>} />
+        <Route path="/logs" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="System Logs" /> : <Navigate to="/" replace />}</Protected>} />
+        <Route path="/profile" element={<Protected><MyProfile /></Protected>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

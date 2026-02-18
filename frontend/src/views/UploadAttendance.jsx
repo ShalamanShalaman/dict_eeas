@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom"; // Added for better URL param handling
 
 // --- INLINE ICONS ---
 const Icon = ({ children, className }) => (
@@ -151,8 +152,11 @@ export default function UploadAttendance({ onNavigate }) {
   // Track unsaved changes for confirmation dialog
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null); // 'clear' or 'changeTab' or 'navigate'
+  const [pendingAction, setPendingAction] = useState(null); 
   const [targetNavigatePath, setTargetNavigatePath] = useState(null);
+
+  // Use React Router hook for search params
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [arMeta, setArMeta] = useState({
     name: "",
@@ -192,22 +196,20 @@ export default function UploadAttendance({ onNavigate }) {
     }
   }, [currentUser]);
 
-  // 3. NEW: Check URL for ?doc_id=123 to load data automatically
+  // 3. Check URL for ?doc_id=123 to load data automatically using Search Params
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const docId = params.get('doc_id');
+    const docId = searchParams.get('doc_id');
     
-    // Only try to load if we have a user and a docId
-    if (docId && currentUser) {
+    // Only try to load if we have a user, a docId, and it's NOT the one we already loaded
+    if (docId && currentUser && docId !== savedDocId) {
         loadSavedDocument(docId);
     }
-  }, [currentUser]);
+  }, [currentUser, searchParams]);
 
   // 4. Handle beforeunload to warn about unsaved changes when leaving the page
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
-        // Show a browser-native warning dialog
         e.preventDefault();
         e.returnValue = '';
         return '';
@@ -238,18 +240,9 @@ export default function UploadAttendance({ onNavigate }) {
     try {
         const response = await fetch(`http://127.0.0.1:5000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
         
-        // --- ERROR HANDLING FIX ---
-        // If the document is forbidden (403) or not found (404), likely due to stale URL params
-        // from a previous user or session, we ignore it and clear the URL.
         if (response.status === 403 || response.status === 404) {
              console.warn(`Doc ID ${docId} is stale or unauthorized (${response.status}). Clearing URL.`);
-             
-             // Remove doc_id from URL without reloading
-             const url = new URL(window.location);
-             url.searchParams.delete('doc_id');
-             window.history.replaceState({}, '', url);
-             
-             // Stop execution, don't show alert
+             setSearchParams({}); // Clear params properly
              setLoading(false);
              return; 
         }
@@ -260,7 +253,6 @@ export default function UploadAttendance({ onNavigate }) {
 
         const stateData = await response.json();
         
-        // Restore State from the JSON response
         if (stateData.employees) setEmployees(stateData.employees);
         if (stateData.arMeta) setArMeta(stateData.arMeta);
         if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
@@ -279,13 +271,11 @@ export default function UploadAttendance({ onNavigate }) {
   const handleFile = (f) => {
     if (!f) return;
     
-    // Check if it's a JSON State file (Legacy Resume Work via file upload)
     if (f.type === "application/json" || f.name.endsWith(".json")) {
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
                 const stateData = JSON.parse(e.target.result);
-                // Restore State
                 if (stateData.employees) setEmployees(stateData.employees);
                 if (stateData.arMeta) setArMeta(stateData.arMeta);
                 if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
@@ -299,7 +289,6 @@ export default function UploadAttendance({ onNavigate }) {
         return;
     }
 
-    // Default PDF Handling
     if (f.type === "application/pdf") {
         setFile(f);
     }
@@ -312,29 +301,23 @@ export default function UploadAttendance({ onNavigate }) {
         return;
     }
 
-    // --- NEW: PROMPT FOR FILENAME ---
     const defaultName = `attendance_${selectedEmployee || 'draft'}`;
     const userFilename = prompt("Please name your draft:", defaultName);
 
-    // If user clicked Cancel, stop the save
     if (userFilename === null) return;
 
-    // Basic validation
     let finalFilename = userFilename.trim();
     if (!finalFilename) {
         alert("Filename cannot be empty.");
         return;
     }
 
-    // Ensure .json extension
     if (!finalFilename.toLowerCase().endsWith(".json")) {
         finalFilename += ".json";
     }
-    // ---------------------------------
 
     setLoading(true);
     try {
-        // 1. Bundle State
         const stateData = JSON.stringify({
             employees,
             selectedEmployee,
@@ -342,7 +325,6 @@ export default function UploadAttendance({ onNavigate }) {
             viewMode
         });
         
-        // 2. Create File Object using the Prompted Filename
         const blob = new Blob([stateData], { type: "application/json" });
         const fileObj = new File([blob], finalFilename);
 
@@ -350,7 +332,6 @@ export default function UploadAttendance({ onNavigate }) {
         formData.append("file", fileObj);
         formData.append("user_id", currentUser.user_id); 
 
-        // 3. Determine URL (Upload new or Update existing)
         let url = "http://127.0.0.1:5000/api/document/upload";
         if (savedDocId) {
              url = `http://127.0.0.1:5000/api/document/autosave/${savedDocId}`;
@@ -363,7 +344,11 @@ export default function UploadAttendance({ onNavigate }) {
         }
 
         const result = await response.json();
-        setSavedDocId(result.document.id); // Store ID for future autosaves
+        setSavedDocId(result.document.id); 
+        
+        // Update URL to include doc_id so refresh doesn't lose context
+        setSearchParams({ doc_id: result.document.id });
+        
         alert("Progress Saved to Cloud!");
 
     } catch (err) {
@@ -399,7 +384,8 @@ export default function UploadAttendance({ onNavigate }) {
         setEmployees(result.data || {});
         const first = Object.keys(result.data || {})[0] || "";
         setSelectedEmployee(first);
-        setSavedDocId(null); // Reset doc ID on new PDF upload
+        setSavedDocId(null); 
+        setSearchParams({}); // Clear doc_id on new upload
         
         setArMeta(prev => ({
             ...prev,
@@ -421,7 +407,6 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
-  // Confirmation dialog handlers
   const handleClearClick = () => {
     if (hasUnsavedChanges) {
       setPendingAction('clear');
@@ -488,10 +473,7 @@ export default function UploadAttendance({ onNavigate }) {
     });
     if (fileInputRef.current) fileInputRef.current.value = null;
     
-    // Clear URL param if it exists so refresh doesn't reload old doc
-    const url = new URL(window.location);
-    url.searchParams.delete('doc_id');
-    window.history.pushState({}, '', url);
+    setSearchParams({}); // Clear params
   };
 
   const getPeriodText = () => {
@@ -647,7 +629,6 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
-  // --- NEW: Download Merged Report (DTR + AR) ---
   const downloadMerged = async () => {
     if (!selectedEmployee) return;
 
@@ -655,13 +636,11 @@ export default function UploadAttendance({ onNavigate }) {
       const finalName = arMeta.name || selectedEmployee;
       const finalPeriod = getPeriodText();
 
-      // Ensure the endpoint matches your backend logic for merging
       const response = await fetch("http://127.0.0.1:5000/api/generate-merged-report", {
         method: "POST",
         mode: 'cors',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Include all necessary data for both DTR and AR
           employee_name: finalName,
           employee_data: employees[selectedEmployee],
           position: arMeta.position,
@@ -711,7 +690,6 @@ export default function UploadAttendance({ onNavigate }) {
 
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen">
-      {/* Header Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
           <FileTextIcon className="w-6 h-6 text-blue-600" />
@@ -719,7 +697,6 @@ export default function UploadAttendance({ onNavigate }) {
         </h2>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {/* Upload Area */}
           <div
             onDrop={(e) => {
               e.preventDefault();
@@ -743,7 +720,7 @@ export default function UploadAttendance({ onNavigate }) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.json" // Added .json support
+                accept=".pdf,.json" 
                 onChange={(e) => handleFile(e.target.files[0])}
                 className="hidden"
                 id="attendanceUpload"
@@ -757,12 +734,10 @@ export default function UploadAttendance({ onNavigate }) {
             </div>
           </div>
 
-          {/* Controls */}
           <div className="flex flex-col gap-3 justify-center">
-            {/* --- SAVE BUTTON --- */}
             <button
               onClick={saveProgress}
-              disabled={!selectedEmployee} // Only enable if working on something
+              disabled={!selectedEmployee} 
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <SaveIcon className="w-4 h-4" /> Save Progress
@@ -770,7 +745,7 @@ export default function UploadAttendance({ onNavigate }) {
 
             <button
               onClick={handleUpload}
-              disabled={!file || loading || (file && file.type === "application/json")} // Disable extract if it's a JSON file
+              disabled={!file || loading || (file && file.type === "application/json")} 
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
@@ -812,7 +787,6 @@ export default function UploadAttendance({ onNavigate }) {
 
       {selectedEmployee && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Toggle Switch */}
           <div className="flex justify-center mb-6">
             <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-100">
             <button
@@ -849,7 +823,6 @@ export default function UploadAttendance({ onNavigate }) {
                 </div>
             </div>
             
-            {/* --- SHARED FORM FIELDS --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6 mb-6 border-b border-gray-100">
                 <div className="space-y-1">
                     <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><UserIcon className="w-3 h-3"/> Employee Name</label>
@@ -887,7 +860,6 @@ export default function UploadAttendance({ onNavigate }) {
                         onChange={(e) => { setArMeta({ ...arMeta, approver: e.target.value }); setHasUnsavedChanges(true); }}
                     />
                 </div>
-                {/* --- Approver Title Input --- */}
                 <div className="space-y-1">
                     <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
                     <input
@@ -897,7 +869,6 @@ export default function UploadAttendance({ onNavigate }) {
                         onChange={(e) => { setArMeta({ ...arMeta, approverTitle: e.target.value }); setHasUnsavedChanges(true); }}
                     />
                 </div>
-                {/* --- Period Coverage Selector --- */}
                 <div className="space-y-1">
                     <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><CalendarIcon className="w-3 h-3"/> Period Coverage</label>
                     <select
@@ -929,7 +900,6 @@ export default function UploadAttendance({ onNavigate }) {
             </div>
 
             <div className="flex justify-end mt-6 pt-4 border-t border-gray-100 gap-3">
-              {/* --- EXISTING DOWNLOAD BUTTONS --- */}
               <button
                 onClick={downloadExcel}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
@@ -944,7 +914,6 @@ export default function UploadAttendance({ onNavigate }) {
                 <DownloadIcon className="w-4 h-4" /> AR (Word)
               </button>
 
-              {/* --- NEW MERGE BUTTON --- */}
               <button
                 onClick={downloadMerged}
                 className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg shadow-md font-bold transition-all transform hover:scale-105 flex items-center gap-2 text-sm"
@@ -956,16 +925,12 @@ export default function UploadAttendance({ onNavigate }) {
         </div>
       )}
 
-      {/* Confirmation Dialog Modal */}
       {showConfirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/50" onClick={handleCancelConfirm}></div>
           
-          {/* Modal Content */}
           <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="text-center">
-              {/* Warning Icon */}
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1003,9 +968,6 @@ export default function UploadAttendance({ onNavigate }) {
   );
 }
 
-/* --- SUB COMPONENTS --- */
-
-// Moved InputCell outside DTRTable to prevent re-render focus loss
 const InputCell = ({ day, field, value, onUpdate }) => (
     <input 
         type="text" 
@@ -1017,7 +979,6 @@ const InputCell = ({ day, field, value, onUpdate }) => (
 );
 
 function DTRTable({ data, onUpdate, onBatchUpdate }) {
-  // Generate Days 1-31
   const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
   
   const [selectedDays, setSelectedDays] = useState(new Set());
@@ -1045,19 +1006,16 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
   const applyBatch = () => {
       const reasonToApply = batchReason === "Others" ? customReason : batchReason;
       onBatchUpdate(Array.from(selectedDays), "remarks", reasonToApply);
-      // Untick checkboxes after applying to prevent accidental overwrites
       setSelectedDays(new Set());
   };
 
   const clearBatchRemarks = () => {
-      // Sets remarks to empty string, effectively "undoing" a merge
       onBatchUpdate(Array.from(selectedDays), "remarks", "");
       setSelectedDays(new Set());
   };
 
   return (
     <div>
-        {/* Batch Action Toolbar */}
         {selectedDays.size > 0 && (
             <div className="bg-blue-50 p-3 border-b flex items-center justify-between gap-4 sticky top-0 z-10">
                 <div className="text-sm text-blue-800 font-medium">
@@ -1142,7 +1100,6 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
                     </td>
                     <td className="px-4 py-2 font-medium text-gray-500 bg-gray-50 border-r w-16 text-center">{day}</td>
                     
-                    {/* Time Columns or Merged Remark */}
                     {hasRemark ? (
                         <td colSpan={4} className="border-r px-2 py-1 text-center font-medium text-gray-600 italic bg-gray-50/50">
                             {rowData.remarks}
@@ -1171,7 +1128,6 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
                         <InputCell day={day} field="undertime_min" value={rowData.undertime_min} onUpdate={onUpdate} />
                     </td>
                     
-                    {/* Remarks Column */}
                     <td className="min-w-[150px] bg-yellow-50/30">
                         <InputCell day={day} field="remarks" value={rowData.remarks} onUpdate={onUpdate} />
                     </td>
@@ -1185,9 +1141,6 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
 }
 
 function AccomplishmentTable({ attendance, arMeta, setArMeta }) {
-  // Only show rows for days that exist in the parsed attendance data (or should we show all? usually AR is daily)
-  // Keeping it to parsed days + any manually added tasks for now, or just 1-31 like DTR?
-  // Usually AR is only for days present. Let's stick to days present + valid inputs.
   const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
 
   const addBullet = (day) => {
@@ -1203,7 +1156,6 @@ function AccomplishmentTable({ attendance, arMeta, setArMeta }) {
 
   return (
     <div className="p-4 space-y-6">
-        {/* Project Input (others are now shared above) */}
         <div className="space-y-1">
             <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><LayersIcon className="w-3 h-3"/> Project</label>
             <input
@@ -1214,7 +1166,6 @@ function AccomplishmentTable({ attendance, arMeta, setArMeta }) {
             />
         </div>
 
-      {/* Task List */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm font-semibold text-gray-600 px-2">
             <span>Date</span>
@@ -1222,7 +1173,6 @@ function AccomplishmentTable({ attendance, arMeta, setArMeta }) {
         </div>
         <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
             {days.map((day) => {
-                // Determine if we should show this day (if it has data or is active)
                 const hasAttendance = attendance && attendance[day] && (
                     attendance[day].am_in ||
                     attendance[day].am_out ||

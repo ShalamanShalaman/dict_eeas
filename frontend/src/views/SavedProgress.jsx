@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
-// --- REUSING YOUR ICON PATTERN ---
+// --- INLINE ICONS ---
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -47,6 +48,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [currentUser, setCurrentUser] = useState(propUser || null);
+  const navigate = useNavigate();
 
   // 1. Ensure we have the user (Check Props first, then LocalStorage)
   useEffect(() => {
@@ -64,8 +66,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
   const fetchDocs = async () => {
     if (!currentUser) return;
     
-    // We prefer user_id (String "EMP-001") because that's what Login provides
-    // and what the Backend (once fixed) should expect.
     const userId = currentUser.user_id || currentUser.id;
 
     if (!userId) {
@@ -86,7 +86,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
       const result = await response.json();
       
-      // Sort by newest first (using created_at or updated_at)
+      // Sort by newest first
       const sorted = (result || []).sort((a, b) => {
           const dateA = new Date(b.updated_at || b.created_at);
           const dateB = new Date(a.updated_at || a.created_at);
@@ -124,9 +124,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
   // Helper to safely extract filename from the full path returned by backend
   const getDisplayFilename = (doc) => {
-      // If backend sends 'file_path', we need to strip the directory
       if (doc.file_path) {
-          // Regex splits by both / (Linux/Mac) and \ (Windows)
           const parts = doc.file_path.split(/[/\\]/);
           return parts[parts.length - 1];
       }
@@ -151,7 +149,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
         <div className="flex items-center gap-4">
           <button
-            onClick={onNewProgress}
+            onClick={() => navigate('/upload')} // Changed to /upload to match App.jsx
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
           >
             <Icon className="w-4 h-4"><path d="M12 5v14M5 12h14" /></Icon>
@@ -238,7 +236,8 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
               </div>
 
               <button 
-                onClick={() => onResumeWork(doc)}
+                // Changed to /upload to match App.jsx route
+                onClick={() => navigate(`/upload?doc_id=${doc.id}`)}
                 className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
               >
                 <ExternalLinkIcon className="w-4 h-4" />
