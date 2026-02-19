@@ -50,6 +50,7 @@ export default function App() {
         } />
         <Route path="/upload" element={<Protected><EmployeeDashboard selectedMenu="Upload Attendance" user={user} setActivePage={() => {}} /></Protected>} />
         <Route path="/saved-progress" element={<Protected><EmployeeDashboard selectedMenu="Saved Progress" user={user} setActivePage={() => {}} /></Protected>} />
+        <Route path="/submit-for-approval" element={<Protected><EmployeeDashboard selectedMenu="Submit for Approval" user={user} setActivePage={() => {}} /></Protected>} />
         <Route path="/submissions" element={<Protected><EmployeeDashboard selectedMenu="My Submissions" user={user} setActivePage={() => {}} /></Protected>} />
         <Route path="/pending-reviews" element={<Protected><ReviewerDashboard /></Protected>} />
         <Route path="/archive" element={<Protected><ReviewerDashboard /></Protected>} />

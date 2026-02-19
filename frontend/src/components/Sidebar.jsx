@@ -25,6 +25,7 @@ export default function Sidebar({ role, onLogout }) {
       { label: "Dashboard", icon: Home, path: "/" },
       { label: "Upload Attendance", icon: Upload, path: "/upload" },
       { label: "Saved Progress", icon: Save, path: "/saved-progress" },
+      { label: "Submit for Approval", icon: Clock, path: "/submit-for-approval" },
       { label: "My Submissions", icon: FileText, path: "/submissions" },
       { label: "My Profile", icon: User, path: "/profile" },
     ],
