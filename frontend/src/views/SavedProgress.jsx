@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-// --- INLINE ICONS ---
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -43,14 +42,23 @@ const RefreshIcon = ({ className }) => (
   </Icon>
 );
 
+const AlertCircleIcon = ({ className }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </Icon>
+);
+
 export default function SavedProgress({ onResumeWork, onNewProgress, user: propUser }) {
   const [savedDocs, setSavedDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [currentUser, setCurrentUser] = useState(propUser || null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
   const navigate = useNavigate();
 
-  // 1. Ensure we have the user (Check Props first, then LocalStorage)
   useEffect(() => {
     if (propUser) {
       setCurrentUser(propUser);
@@ -62,7 +70,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
     }
   }, [propUser]);
 
-  // 2. Fetch user's saved documents from backend
   const fetchDocs = async () => {
     if (!currentUser) return;
     
@@ -86,7 +93,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
       const result = await response.json();
       
-      // Sort by newest first
       const sorted = (result || []).sort((a, b) => {
           const dateA = new Date(b.updated_at || b.created_at);
           const dateB = new Date(a.updated_at || a.created_at);
@@ -101,31 +107,37 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
     }
   };
 
-  // 3. Fetch whenever currentUser is determined
   useEffect(() => {
     if (currentUser) {
         fetchDocs();
     }
   }, [currentUser]);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this progress?")) return;
-    
+  const handleDeleteClick = (id) => {
+    setDeleteTargetId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+
     const userId = currentUser?.user_id || currentUser?.id;
     
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/document/${id}?user_id=${userId}`, { method: "DELETE" });
+      const response = await fetch(`http://127.0.0.1:5000/api/document/${deleteTargetId}?user_id=${userId}`, { method: "DELETE" });
       if (response.ok) {
-        setSavedDocs(savedDocs.filter(doc => doc.id !== id));
+        setSavedDocs(savedDocs.filter(doc => doc.id !== deleteTargetId));
       } else {
         alert("Failed to delete document from server.");
       }
     } catch (err) {
       alert("Delete failed: " + err.message);
+    } finally {
+      setShowDeleteConfirm(false);
+      setDeleteTargetId(null);
     }
   };
 
-  // Helper to safely extract filename from the full path returned by backend
   const getDisplayFilename = (doc) => {
       if (doc.file_path) {
           const parts = doc.file_path.split(/[/\\]/);
@@ -140,7 +152,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -152,7 +163,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/upload')} // Changed to /upload to match App.jsx
+            onClick={() => navigate('/upload')}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
           >
             <Icon className="w-4 h-4"><path d="M12 5v14M5 12h14" /></Icon>
@@ -219,7 +230,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
                         {doc.status}
                     </span>
                     <button 
-                    onClick={() => handleDelete(doc.id)}
+                    onClick={() => handleDeleteClick(doc.id)}
                     className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
                     title="Delete Draft"
                     >
@@ -239,7 +250,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
               </div>
 
               <button 
-                // Changed to /upload to match App.jsx route
                 onClick={() => navigate(`/upload?doc_id=${doc.id}`)}
                 className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
               >
@@ -248,6 +258,39 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2Icon className="w-8 h-8 text-red-600" />
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Draft?</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this draft? This action cannot be undone.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

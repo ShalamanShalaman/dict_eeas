@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useBlocker, useNavigate } from "react-router-dom";
 
-// --- INLINE ICONS ---
 const Icon = ({ children, className }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
@@ -146,17 +145,23 @@ export default function UploadAttendance({ onNavigate }) {
   const [isDragging, setIsDragging] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   
-  // Track if we are editing an existing saved draft (for Autosave logic)
   const [savedDocId, setSavedDocId] = useState(null);
 
-  // Track unsaved changes for confirmation dialog
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); 
   const [targetNavigatePath, setTargetNavigatePath] = useState(null);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [draftName, setDraftName] = useState("");
 
-  // React Router Search Params Hook
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Block navigation when unsaved changes exist
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+  );
 
   const [arMeta, setArMeta] = useState({
     name: "",
@@ -171,7 +176,6 @@ export default function UploadAttendance({ onNavigate }) {
 
   const fileInputRef = useRef(null);
 
-  // 1. Initial Load of User
   useEffect(() => {
     const fetchUser = async () => {
       const userStr = localStorage.getItem("user");
@@ -183,7 +187,6 @@ export default function UploadAttendance({ onNavigate }) {
     fetchUser();
   }, []);
 
-  // 2. Populate fields from User Data
   useEffect(() => {
     if (currentUser) {
        setArMeta(prev => ({
@@ -196,17 +199,14 @@ export default function UploadAttendance({ onNavigate }) {
     }
   }, [currentUser]);
 
-  // 3. Check URL for ?doc_id=123 to load data automatically using Search Params
   useEffect(() => {
     const docId = searchParams.get('doc_id');
     
-    // Only try to load if we have a user, a docId, and it's NOT the one we already loaded
     if (docId && currentUser && docId !== savedDocId) {
         loadSavedDocument(docId);
     }
   }, [currentUser, searchParams]);
 
-  // 4. Handle beforeunload to warn about unsaved changes when leaving the page
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
@@ -223,27 +223,21 @@ export default function UploadAttendance({ onNavigate }) {
     };
   }, [hasUnsavedChanges]);
 
-  // 5. Handle navigation when onNavigate prop is called
-  const handleNavigate = (path) => {
-    if (hasUnsavedChanges) {
+  // Handle React Router Blocker state
+  useEffect(() => {
+    if (blocker.state === "blocked") {
       setPendingAction('navigate');
-      setTargetNavigatePath(path);
       setShowConfirmDialog(true);
-    } else if (onNavigate) {
-      onNavigate(path);
     }
-  };
+  }, [blocker]);
 
-  // --- Fetch Saved Document Content Directly ---
   const loadSavedDocument = async (docId) => {
     setLoading(true);
     try {
         const response = await fetch(`http://127.0.0.1:5000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
         
-        // --- ERROR HANDLING FIX ---
         if (response.status === 403 || response.status === 404) {
-             console.warn(`Doc ID ${docId} is stale or unauthorized (${response.status}). Clearing URL.`);
-             setSearchParams({}); // Clear params properly
+             setSearchParams({}); 
              setLoading(false);
              return; 
         }
@@ -268,7 +262,6 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
-  // --- HANDLE FILE DROPPED/SELECTED ---
   const handleFile = (f) => {
     if (!f) return;
     
@@ -295,19 +288,18 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
-  // --- SAVE PROGRESS (TO BACKEND) ---
-  const saveProgress = async () => {
+  const openSaveModal = () => {
     if (!currentUser) {
         alert("Please log in to save your progress.");
         return;
     }
-
     const defaultName = `attendance_${selectedEmployee || 'draft'}`;
-    const userFilename = prompt("Please name your draft:", defaultName);
+    setDraftName(defaultName);
+    setShowNameModal(true);
+  };
 
-    if (userFilename === null) return;
-
-    let finalFilename = userFilename.trim();
+  const handleSaveConfirmed = async () => {
+    let finalFilename = draftName.trim();
     if (!finalFilename) {
         alert("Filename cannot be empty.");
         return;
@@ -346,11 +338,20 @@ export default function UploadAttendance({ onNavigate }) {
 
         const result = await response.json();
         setSavedDocId(result.document.id); 
-        
-        // Update URL to include doc_id so refresh doesn't lose context
         setSearchParams({ doc_id: result.document.id });
         
+        setHasUnsavedChanges(false);
+        setShowNameModal(false);
         alert("Progress Saved to Cloud!");
+
+        // Handle navigation after successful save if blocked
+        if (pendingAction === 'navigate' && blocker.state === "blocked") {
+             blocker.proceed();
+        }
+        if (pendingAction === 'clear') {
+             handleClearAll();
+        }
+        setPendingAction(null);
 
     } catch (err) {
         alert("Failed to save progress: " + err.message);
@@ -386,7 +387,7 @@ export default function UploadAttendance({ onNavigate }) {
         const first = Object.keys(result.data || {})[0] || "";
         setSelectedEmployee(first);
         setSavedDocId(null); 
-        setSearchParams({}); // Clear doc_id on new upload
+        setSearchParams({}); 
         
         setArMeta(prev => ({
             ...prev,
@@ -418,20 +419,12 @@ export default function UploadAttendance({ onNavigate }) {
   };
 
   const handleTabChange = (newMode) => {
-    // No notification when changing tabs, just switch directly (Merged from your code)
     setViewMode(newMode);
   };
 
-  const handleConfirmSave = async () => {
+  const handleConfirmSave = () => {
     setShowConfirmDialog(false);
-    await saveProgress();
-    setHasUnsavedChanges(false);
-    
-    if (pendingAction === 'clear') {
-      handleClearAll();
-    }
-    // Tab change is instant now, so no need to handle here
-    setPendingAction(null);
+    openSaveModal(); 
   };
 
   const handleConfirmDiscard = () => {
@@ -440,12 +433,17 @@ export default function UploadAttendance({ onNavigate }) {
     
     if (pendingAction === 'clear') {
       handleClearAll();
+    } else if (pendingAction === 'navigate' && blocker.state === "blocked") {
+      blocker.proceed();
     }
     setPendingAction(null);
   };
 
   const handleCancelConfirm = () => {
     setShowConfirmDialog(false);
+    if (pendingAction === 'navigate' && blocker.state === "blocked") {
+      blocker.reset();
+    }
     setPendingAction(null);
   };
 
@@ -466,8 +464,7 @@ export default function UploadAttendance({ onNavigate }) {
         tasks: {} 
     });
     if (fileInputRef.current) fileInputRef.current.value = null;
-    
-    setSearchParams({}); // Clear params (React Router way)
+    setSearchParams({});
   };
 
   const getPeriodText = () => {
@@ -730,7 +727,7 @@ export default function UploadAttendance({ onNavigate }) {
 
           <div className="flex flex-col gap-3 justify-center">
             <button
-              onClick={saveProgress}
+              onClick={openSaveModal}
               disabled={!selectedEmployee} 
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -923,7 +920,7 @@ export default function UploadAttendance({ onNavigate }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={handleCancelConfirm}></div>
           
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="text-center">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -954,6 +951,40 @@ export default function UploadAttendance({ onNavigate }) {
                   Save
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowNameModal(false)}></div>
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Save Draft</h3>
+            <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Draft Name</label>
+                <input 
+                    type="text" 
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveConfirmed(); }}
+                    autoFocus
+                />
+            </div>
+            <div className="flex justify-end gap-3">
+                <button 
+                    onClick={() => setShowNameModal(false)}
+                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                    Cancel
+                </button>
+                <button 
+                    onClick={handleSaveConfirmed}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    Save
+                </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { createBrowserRouter, RouterProvider, createRoutesFromElements, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout";
 import Login from "./views/Login";
 import UserManagement from "./views/UserManagement";
@@ -37,9 +37,9 @@ export default function App() {
     return <DashboardLayout user={user} role={viewRole} setRole={setViewRole} onLogout={handleLogout}>{children}</DashboardLayout>;
   };
 
-  return (
-    <BrowserRouter>
-      <Routes>
+  const router = useMemo(() => createBrowserRouter(
+    createRoutesFromElements(
+      <>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login onLogin={setUser} />} />
         <Route path="/" element={
           <Protected>
@@ -59,7 +59,9 @@ export default function App() {
         <Route path="/logs" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="System Logs" /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/profile" element={<Protected><MyProfile /></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
+      </>
+    )
+  ), [user, viewRole]);
+
+  return <RouterProvider router={router} />;
 }
