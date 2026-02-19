@@ -82,6 +82,7 @@ export default function MyProfile() {
     first_name: "",
     middle_name: "",
     last_name: "",
+    email: "",
     contact_no: "",
     password: "",
     old_password: "", 
@@ -122,6 +123,7 @@ export default function MyProfile() {
         first_name: profile.first_name || "",
         middle_name: profile.middle_name || "",
         last_name: profile.last_name || "",
+        email: profile.email || "",
         contact_no: profile.contact_no || "",
         password: "",
         old_password: ""
@@ -281,6 +283,7 @@ export default function MyProfile() {
             first_name: data.first_name || "",
             middle_name: data.middle_name || "",
             last_name: data.last_name || "",
+            email: data.email || "",
             contact_no: data.contact_no || "",
             password: "",
             old_password: ""
@@ -334,6 +337,7 @@ export default function MyProfile() {
             first_name: formData.first_name,
             middle_name: formData.middle_name,
             last_name: formData.last_name,
+            email: formData.email,
             contact_no: formData.contact_no,
         };
 
@@ -613,6 +617,19 @@ export default function MyProfile() {
                     className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                     value={formData.last_name}
                     onChange={(e) => handleInputChange("last_name", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-600">Email</label>
+                  <input
+                    type="email"
+                    required
+                    id="email"
+                    disabled={!isEditing}
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
+                    value={formData.email}
+                    onChange={(e) => handleInputChange("email", e.target.value)}
                   />
                 </div>
                 

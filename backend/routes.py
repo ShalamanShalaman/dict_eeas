@@ -188,6 +188,13 @@ def edit_own_profile(public_id):
     user.middle_name = data.get('middle_name', user.middle_name)
     user.last_name = data.get('last_name', user.last_name)
     user.contact_no = data.get('contact_no', user.contact_no)
+
+    # Allow updating email as well; check for uniqueness if it changes
+    new_email = data.get('email')
+    if new_email and new_email != user.email:
+        if User.query.filter_by(email=new_email).first():
+            return jsonify({'error': 'Email already in use'}), 409
+        user.email = new_email
     
     # Password Change Logic with Old Password Verification OR OTP
     new_password = data.get('password')

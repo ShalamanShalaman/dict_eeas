@@ -102,27 +102,29 @@ def seed_basic_data():
         db.session.commit()
 
     # ---- Admin User ----
-    if not User.query.filter_by(email="admin@system.local").first():
-        # Note: Your model calls the field 'name', but seeding logic used 'title'
-        # I have adjusted logic here to match standard assumption, 
-        # but check your models.py Position class field name. 
-        # Based on models.py provided: Position has 'name', not 'title'.
-        # FIXING SEED LOGIC TO MATCH MODELS.PY:
-        
-        admin_position = Position.query.filter_by(name="Admin").first() # Changed title to name
+    # Only create admin if neither the email nor the reserved user_id exist
+    existing_admin = User.query.filter(
+        (User.email == "admin@system.local") | (User.user_id == "ADMIN001")
+    ).first()
+    if not existing_admin:
+        admin_position = Position.query.filter_by(name="Admin").first()
 
         admin = User(
             email="admin@system.local",
-            user_id="ADMIN001", # Added required user_id field
+            user_id="ADMIN001",
             first_name="System",
             last_name="Admin",
             role="admin",
             position_id=admin_position.id if admin_position else None
         )
-
         admin.set_password("admin123")
         db.session.add(admin)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as ex:
+            # In case of any integrity error (race condition, duplicate insert), rollback and continue
+            db.session.rollback()
+            print("Warning: admin user already exists or could not be created.", ex)
 
 
 # -----------------------------
