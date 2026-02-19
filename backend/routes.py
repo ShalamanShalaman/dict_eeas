@@ -4,11 +4,16 @@ import os
 import secrets
 import string
 import json
+import random
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
 account_bp = Blueprint('account', __name__)
 document_bp = Blueprint('document', __name__)
+
+# Mock OTP Store (In-memory for testing - replace with Redis/DB in production)
+# Format: { 'user_id': '123456' }
+otp_store = {}
 
 # ---------------- HELPER FUNCTIONS ----------------
 def generate_temp_password(length=12):
@@ -177,15 +182,98 @@ def get_profile(public_id):
 def edit_own_profile(public_id):
     data = request.get_json()
     user = User.query.filter_by(public_id=public_id).first_or_404()
+    
+    # Update basic fields
     user.first_name = data.get('first_name', user.first_name)
     user.middle_name = data.get('middle_name', user.middle_name)
     user.last_name = data.get('last_name', user.last_name)
     user.contact_no = data.get('contact_no', user.contact_no)
-    if data.get('password'):
-        user.set_password(data['password'])
-        user.force_change_password = False
+    
+    # Password Change Logic with Old Password Verification OR OTP
+    new_password = data.get('password')
+    if new_password:
+        old_password = data.get('old_password')
+        otp = data.get('otp')
+        
+        # Scenario 1: User provides OTP (Forgot password flow)
+        if otp:
+            stored_otp = otp_store.get(user.user_id)
+            if not stored_otp or stored_otp != otp:
+                return jsonify({'error': 'Invalid or expired OTP'}), 400
+            
+            # OTP is valid, proceed to change password
+            user.set_password(new_password)
+            user.force_change_password = False
+            
+            # Clear used OTP
+            if user.user_id in otp_store:
+                del otp_store[user.user_id]
+        
+        # Scenario 2: User provides Old Password (Standard flow)
+        elif old_password:
+            if not user.check_password(old_password):
+                return jsonify({'error': 'Incorrect old password'}), 401
+                
+            user.set_password(new_password)
+            user.force_change_password = False
+            
+        # Scenario 3: Neither provided
+        else:
+            return jsonify({'error': 'Old password or OTP verification is required to set a new password'}), 400
+
     db.session.commit()
     return jsonify({'message': 'Profile updated', 'user': user.to_dict()})
+
+# ---------------- MOCK PHONE VERIFICATION ----------------
+@account_bp.route('/api/profile/send-otp', methods=['POST'])
+def send_otp():
+    """
+    Simulates sending an OTP to the user's phone.
+    Since we are local, we print the code to the console and return it in the response for debugging.
+    """
+    data = request.get_json()
+    user_id = data.get('user_id')
+    contact_no = data.get('contact_no')
+    
+    if not user_id or not contact_no:
+        return jsonify({'error': 'Missing user_id or contact_no'}), 400
+        
+    # Generate 6 digit code
+    code = ''.join(random.choices(string.digits, k=6))
+    
+    # Store in memory (mock DB/Redis)
+    otp_store[user_id] = code
+    
+    print(f"\n[MOCK SMS GATEWAY] Sending OTP to {contact_no}: {code}\n")
+    
+    return jsonify({
+        'message': 'OTP sent successfully',
+        'debug_otp': code # Returned only for testing convenience
+    })
+
+@account_bp.route('/api/profile/verify-otp', methods=['POST'])
+def verify_otp():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    otp = data.get('otp')
+    
+    if not user_id or not otp:
+        return jsonify({'error': 'Missing data'}), 400
+        
+    stored_otp = otp_store.get(user_id)
+    
+    if stored_otp and stored_otp == otp:
+        # OTP is correct
+        del otp_store[user_id] # Clear OTP after use
+        
+        # Here you would typically update a 'verified' flag in the User model
+        # user = User.query.filter_by(user_id=user_id).first()
+        # user.phone_verified = True
+        # db.session.commit()
+        
+        return jsonify({'message': 'Phone verified successfully'})
+    else:
+        return jsonify({'error': 'Invalid or expired OTP'}), 400
 
 
 # ---------------- DOCUMENT WORKFLOW ----------------
@@ -289,7 +377,7 @@ def get_document_content(doc_id):
     This allows the frontend to 'Load' state without the user downloading a file.
     """
     doc = Document.query.get_or_404(doc_id)
-    
+     
     # Security: Ensure only the owner (or potentially the reviewer) can read the raw content
     requesting_user_id = request.args.get('user_id')
     if requesting_user_id:
@@ -308,7 +396,7 @@ def get_document_content(doc_id):
             return jsonify(data)
         except Exception as e:
             return jsonify({'error': f'Failed to parse file: {str(e)}'}), 500
-    
+     
     return jsonify({'error': 'File is not a JSON state file'}), 400
 
 # Download document (as attachment)
@@ -324,7 +412,7 @@ def download_document(doc_id):
 @document_bp.route('/api/document/<int:doc_id>', methods=['DELETE'])
 def delete_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
-    
+     
     # Check authorization if user_id is provided
     user_id = request.args.get('user_id')
     if user_id:
@@ -339,7 +427,7 @@ def delete_document(doc_id):
             os.remove(doc.file_path)
         except OSError:
             pass 
-            
+             
     # Also remove review file if it exists
     if hasattr(doc, 'review_file_path') and doc.review_file_path and os.path.exists(doc.review_file_path):
         try:
