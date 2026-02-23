@@ -44,7 +44,7 @@ export default function App() {
         <Route path="/" element={
           <Protected>
             {viewRole === "employee" && <EmployeeDashboard selectedMenu="Dashboard" user={user} setActivePage={() => {}} />}
-            {viewRole === "reviewer" && <ReviewerDashboard />}
+            {viewRole === "reviewer" && <ReviewerDashboard user={user} />}
             {viewRole === "admin" && <AdminDashboard selectedMenu="Dashboard" />}
           </Protected>
         } />
@@ -52,9 +52,9 @@ export default function App() {
         <Route path="/saved-progress" element={<Protected><EmployeeDashboard selectedMenu="Saved Progress" user={user} setActivePage={() => {}} /></Protected>} />
         <Route path="/submit-for-approval" element={<Protected><EmployeeDashboard selectedMenu="Submit for Approval" user={user} setActivePage={() => {}} /></Protected>} />
         <Route path="/submissions" element={<Protected><EmployeeDashboard selectedMenu="My Submissions" user={user} setActivePage={() => {}} /></Protected>} />
-        <Route path="/pending-reviews" element={<Protected><ReviewerDashboard /></Protected>} />
-        <Route path="/archive" element={<Protected><ReviewerDashboard /></Protected>} />
-        <Route path="/signature" element={<Protected><ReviewerDashboard /></Protected>} />
+        <Route path="/pending-reviews" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
+        <Route path="/archive" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
+        <Route path="/signature" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
         <Route path="/users" element={<Protected>{viewRole === "admin" ? <UserManagement /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/templates" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="Templates" /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/logs" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="System Logs" /> : <Navigate to="/" replace />}</Protected>} />

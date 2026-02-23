@@ -152,6 +152,7 @@ class User(db.Model):
             provincial_officer = self.office_location.reviewer.full_name
 
         return {
+            "id": self.id,
             "public_id": self.public_id,
             "user_id": self.user_id,
             "email": self.email,

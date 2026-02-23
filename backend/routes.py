@@ -338,11 +338,23 @@ def submit_document(doc_id):
     if doc.employee_id != user.id:
         return jsonify({'error': 'Unauthorized'}), 403
 
-    office = user.office_location
-    if not office or not office.reviewer_id:
-        return jsonify({'error': 'No reviewer assigned for your office'}), 400
+    # Get reviewer_id from form data (if employee selects a specific reviewer)
+    reviewer_id = request.form.get('reviewer_id')
+    
+    if reviewer_id:
+        # Employee selected a specific reviewer - verify the reviewer exists and is active
+        reviewer = User.query.filter_by(id=int(reviewer_id), role='reviewer', is_active=True).first()
+        if not reviewer:
+            return jsonify({'error': 'Invalid or inactive reviewer selected'}), 400
+    else:
+        # Fallback to office-assigned reviewer
+        office = user.office_location
+        if not office or not office.reviewer_id:
+            return jsonify({'error': 'No reviewer assigned for your office. Please select a reviewer.'}), 400
+        reviewer = User.query.get(office.reviewer_id)
+        if not reviewer:
+            return jsonify({'error': 'Assigned reviewer not found'}), 400
 
-    reviewer = User.query.get(office.reviewer_id)
     doc.reviewer_id = reviewer.id
     doc.status = 'submitted'
     doc.is_draft = False
@@ -354,27 +366,33 @@ def submit_document(doc_id):
 @document_bp.route('/api/document/review/<int:doc_id>', methods=['POST'])
 def review_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
-    reviewer_id = request.form.get('reviewer_id')
-    reviewer = User.query.get_or_404(reviewer_id)
+    
+    # Accept either reviewer_id or user_id
+    reviewer_id = request.form.get('reviewer_id') or request.form.get('user_id')
+    reviewer = User.query.filter_by(user_id=reviewer_id).first_or_404()
 
     if doc.reviewer_id != reviewer.id:
-        return jsonify({'error': 'Unauthorized'}), 403
+        return jsonify({'error': 'Unauthorized - you are not assigned to review this document'}), 403
 
-    status = request.form.get('status')
-    note = request.form.get('note', '')
-    if status not in ['approved', 'declined']:
-        return jsonify({'error': 'Invalid status'}), 400
+    # Accept either status or action
+    action = request.form.get('action') or request.form.get('status')
 
-    if 'file' in request.files:
-        file = request.files['file']
-        filepath = save_file(file, folder='documents')
-        doc.review_file_path = filepath
+    if action == 'approve' or action == 'approved':
+        doc.status = 'approved'
+        doc.reviewed_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'message': 'Document approved', 'document': doc.to_dict()})
 
-    doc.status = status
-    doc.reviewer_note = note
-    doc.reviewed_at = datetime.utcnow()
-    db.session.commit()
-    return jsonify({'message': f'Document {status}', 'document': doc.to_dict()})
+    elif action == 'decline' or action == 'declined':
+        # Accept either reason or note
+        reason = request.form.get('reason') or request.form.get('note', '')
+        doc.status = 'declined'
+        doc.reviewer_note = reason
+        doc.reviewed_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'message': 'Document declined', 'document': doc.to_dict()})
+
+    return jsonify({'error': 'Invalid action. Use action=approve or action=decline'}), 400
 
 # Load/Get Content of a Document (JSON) directly
 @document_bp.route('/api/document/content/<int:doc_id>', methods=['GET'])
@@ -459,3 +477,15 @@ def get_reviewer_documents(reviewer_id):
     reviewer = User.query.get_or_404(reviewer_id)
     docs = Document.query.filter_by(reviewer_id=reviewer.id, status='submitted').order_by(Document.submitted_at.desc()).all()
     return jsonify([d.to_dict() for d in docs])
+
+# Get all reviewers (for employee to select)
+@document_bp.route('/api/document/reviewers', methods=['GET'])
+def get_reviewers():
+    reviewers = User.query.filter_by(role='reviewer', is_active=True).all()
+    return jsonify([{
+        "id": r.id,
+        "user_id": r.user_id,
+        "full_name": r.full_name,
+        "email": r.email,
+        "office_location": r.office_location.location if r.office_location else None
+    } for r in reviewers])

@@ -743,6 +743,12 @@ function SubmitForApproval({ user, onNavigate }) {
   const [submitting, setSubmitting] = useState(null);
   const [selectedDocs, setSelectedDocs] = useState([]);
   const [search, setSearch] = useState('');
+  
+  // Reviewer selection states
+  const [reviewers, setReviewers] = useState([]);
+  const [showReviewerModal, setShowReviewerModal] = useState(false);
+  const [pendingSubmitDocId, setPendingSubmitDocId] = useState(null);
+  const [selectedReviewerId, setSelectedReviewerId] = useState('');
 
   useEffect(() => {
     const fetchDraftDocuments = async () => {
@@ -763,7 +769,21 @@ function SubmitForApproval({ user, onNavigate }) {
       }
     };
 
+    // Fetch reviewers list
+    const fetchReviewers = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:5000/api/document/reviewers');
+        if (response.ok) {
+          const data = await response.json();
+          setReviewers(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch reviewers:", err);
+      }
+    };
+
     fetchDraftDocuments();
+    fetchReviewers();
   }, [user?.user_id]);
 
   const getFilename = (doc) => {
@@ -790,13 +810,29 @@ function SubmitForApproval({ user, onNavigate }) {
     }
   };
 
-  const handleSubmit = async (docId) => {
-    setSubmitting(docId);
+  // Open reviewer selection modal
+  const handleOpenReviewerModal = (docId) => {
+    setPendingSubmitDocId(docId);
+    setSelectedReviewerId('');
+    setShowReviewerModal(true);
+  };
+
+  // Submit with selected reviewer
+  const handleSubmitWithReviewer = async () => {
+    if (!selectedReviewerId) {
+      alert('Please select a reviewer');
+      return;
+    }
+    
+    setSubmitting(pendingSubmitDocId);
+    setShowReviewerModal(false);
+    
     try {
       const formData = new FormData();
       formData.append('user_id', user.user_id);
+      formData.append('reviewer_id', selectedReviewerId);
       
-      const response = await fetch(`http://127.0.0.1:5000/api/document/submit/${docId}`, {
+      const response = await fetch(`http://127.0.0.1:5000/api/document/submit/${pendingSubmitDocId}`, {
         method: 'POST',
         body: formData
       });
@@ -804,8 +840,8 @@ function SubmitForApproval({ user, onNavigate }) {
       if (response.ok) {
         const updatedDoc = await response.json();
         // Remove from list and update
-        setDocuments(documents.filter(doc => doc.id !== docId));
-        setSelectedDocs(prev => prev.filter(id => id !== docId));
+        setDocuments(documents.filter(doc => doc.id !== pendingSubmitDocId));
+        setSelectedDocs(prev => prev.filter(id => id !== pendingSubmitDocId));
         alert('Document submitted successfully!');
       } else {
         const error = await response.json();
@@ -815,11 +851,25 @@ function SubmitForApproval({ user, onNavigate }) {
       alert('Submit failed: ' + err.message);
     } finally {
       setSubmitting(null);
+      setPendingSubmitDocId(null);
+      setSelectedReviewerId('');
     }
+  };
+
+  const handleSubmit = async (docId) => {
+    // Open reviewer selection modal
+    handleOpenReviewerModal(docId);
   };
 
   const handleSubmitSelected = async () => {
     if (selectedDocs.length === 0) return;
+    
+    // For bulk submit, we need to ask for a reviewer first
+    if (selectedDocs.length > 0 && !selectedReviewerId) {
+      setPendingSubmitDocId('selected');
+      setShowReviewerModal(true);
+      return;
+    }
     
     setSubmitting('selected');
     let successCount = 0;
@@ -829,6 +879,9 @@ function SubmitForApproval({ user, onNavigate }) {
       try {
         const formData = new FormData();
         formData.append('user_id', user.user_id);
+        if (selectedReviewerId) {
+          formData.append('reviewer_id', selectedReviewerId);
+        }
         
         const response = await fetch(`http://127.0.0.1:5000/api/document/submit/${docId}`, {
           method: 'POST',
@@ -854,6 +907,8 @@ function SubmitForApproval({ user, onNavigate }) {
     }
     setSelectedDocs([]);
     setSubmitting(null);
+    setSelectedReviewerId('');
+    setShowReviewerModal(false);
     
     if (failedCount === 0) {
       alert(`Successfully submitted ${successCount} document(s)!`);
@@ -892,8 +947,58 @@ function SubmitForApproval({ user, onNavigate }) {
       : <SquareIcon className="w-5 h-5 text-slate-400" />
   );
 
+  // Reviewer Selection Modal
+  const ReviewerModal = () => {
+    if (!showReviewerModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Select Reviewer</h3>
+          <p className="text-sm text-slate-600 mb-4">
+            Choose which reviewer will approve your document(s):
+          </p>
+          
+          <select
+            value={selectedReviewerId}
+            onChange={(e) => setSelectedReviewerId(e.target.value)}
+            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm mb-4"
+          >
+            <option value="">-- Select a Reviewer --</option>
+            {reviewers.map(reviewer => (
+              <option key={reviewer.id} value={reviewer.id}>
+                {reviewer.full_name} {reviewer.office_location ? `(${reviewer.office_location})` : ''}
+              </option>
+            ))}
+          </select>
+          
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => {
+                setShowReviewerModal(false);
+                setPendingSubmitDocId(null);
+                setSelectedReviewerId('');
+              }}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmitWithReviewer}
+              disabled={!selectedReviewerId || submitting}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors text-sm"
+            >
+              {submitting ? 'Submitting...' : 'Submit'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
+      <ReviewerModal />
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
