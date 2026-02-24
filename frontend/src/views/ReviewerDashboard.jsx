@@ -6,8 +6,10 @@ const ReviewerDashboard = ({ user }) => {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
   const [processing, setProcessing] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -27,6 +29,50 @@ const ReviewerDashboard = ({ user }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle download document
+  const handleDownload = (doc) => {
+    window.open(`http://127.0.0.1:5000/api/document/download/${doc.id}`, '_blank');
+  };
+
+  // Handle upload signed document
+  const handleUploadSigned = async (docId, file) => {
+    if (!file) {
+      alert('Please select a file to upload');
+      return;
+    }
+    
+    setUploadingFile(docId);
+    try {
+      const formData = new FormData();
+      formData.append('user_id', user.user_id);
+      formData.append('file', file);
+      
+      const response = await fetch(`http://127.0.0.1:5000/api/document/upload-review/${docId}`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        alert('Signed document uploaded successfully!');
+        setShowUploadModal(false);
+        fetchDocuments();
+      } else {
+        const error = await response.json();
+        alert('Failed to upload: ' + (error.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
+    } finally {
+      setUploadingFile(null);
+    }
+  };
+
+  // Open upload modal
+  const openUploadModal = (doc) => {
+    setSelectedDoc(doc);
+    setShowUploadModal(true);
   };
 
   const handleApprove = async (docId) => {
@@ -146,6 +192,22 @@ const ReviewerDashboard = ({ user }) => {
     </svg>
   );
 
+  const DownloadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+
+  const UploadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+
   const ApproveModal = () => {
     if (!showApproveModal) return null;
     
@@ -242,12 +304,73 @@ const ReviewerDashboard = ({ user }) => {
     );
   };
 
+  // Upload Modal Component
+  const UploadModal = () => {
+    const [selectedFile, setSelectedFile] = useState(null);
+    
+    if (!showUploadModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-blue-100 rounded-full">
+              <FileIcon />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">Upload Signed Document</h3>
+              <p className="text-sm text-slate-500">Upload the signed document to send back to employee</p>
+            </div>
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Select Signed Document <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.xls,.xlsx"
+              onChange={(e) => setSelectedFile(e.target.files[0])}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+            />
+            <p className="text-xs text-slate-500 mt-1">Supported formats: PDF, DOC, DOCX, XLS, XLSX</p>
+          </div>
+          
+          {selectedDoc && (
+            <div className="bg-slate-50 rounded-lg p-3 mb-4">
+              <p className="text-sm text-slate-600">
+                <strong>Original Document:</strong> {getDocumentName(selectedDoc).replace('.json', '')}
+              </p>
+            </div>
+          )}
+          
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => { setShowUploadModal(false); setSelectedDoc(null); setSelectedFile(null); }}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleUploadSigned(selectedDoc.id, selectedFile)}
+              disabled={!selectedFile || uploadingFile}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+            >
+              {uploadingFile ? 'Uploading...' : 'Upload Signed Document'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const pendingCount = documents.filter(d => d.status === 'submitted').length;
 
   return (
     <div>
       <ApproveModal />
       <DeclineModal />
+      <UploadModal />
       
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-slate-900">Reviewer Dashboard</h2>
@@ -332,7 +455,7 @@ const ReviewerDashboard = ({ user }) => {
                   <th className="px-6 py-3">Document</th>
                   <th className="px-6 py-3">Date Submitted</th>
                   <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Action</th>
+                  <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -361,6 +484,23 @@ const ReviewerDashboard = ({ user }) => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {/* Download Button */}
+                        <button 
+                          onClick={() => handleDownload(doc)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Download Document"
+                        >
+                          <DownloadIcon />
+                        </button>
+                        {/* Upload Signed Document Button */}
+                        <button 
+                          onClick={() => openUploadModal(doc)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Upload Signed Document"
+                        >
+                          <UploadIcon />
+                        </button>
+                        {/* Decline Button */}
                         <button 
                           onClick={() => openDeclineModal(doc)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -368,6 +508,7 @@ const ReviewerDashboard = ({ user }) => {
                         >
                           <XIcon />
                         </button>
+                        {/* Approve Button */}
                         <button 
                           onClick={() => openApproveModal(doc)}
                           className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors shadow-sm flex items-center gap-1"

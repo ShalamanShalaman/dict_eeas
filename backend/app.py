@@ -19,6 +19,10 @@ def create_app():
     app.config["SECRET_KEY"] = "dev-secret-key"
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    
+    # File upload settings
+    app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max file size
+    app.config["MAX_FORM_MEMORY_SIZE"] = 50 * 1024 * 1024  # 50MB max form data
 
     # -----------------------------
     # FOLDERS

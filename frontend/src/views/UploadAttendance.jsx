@@ -128,14 +128,6 @@ const SaveIcon = ({ className }) => (
     </Icon>
 );
 
-const FileSignatureIcon = ({ className }) => (
-    <Icon className={className}>
-        <path d="M20 19v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8" />
-        <path d="M18 13.5L21.5 10l-4.5-4.5L13.5 9" />
-        <path d="M13.5 9L10 12.5V16h3.5L17 12.5" />
-    </Icon>
-);
-
 export default function UploadAttendance({ onNavigate }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -150,14 +142,12 @@ export default function UploadAttendance({ onNavigate }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); 
-  const [targetNavigatePath, setTargetNavigatePath] = useState(null);
   const [showNameModal, setShowNameModal] = useState(false);
   const [draftName, setDraftName] = useState("");
 
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Block navigation when unsaved changes exist
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
@@ -201,7 +191,6 @@ export default function UploadAttendance({ onNavigate }) {
 
   useEffect(() => {
     const docId = searchParams.get('doc_id');
-    
     if (docId && currentUser && docId !== savedDocId) {
         loadSavedDocument(docId);
     }
@@ -215,15 +204,12 @@ export default function UploadAttendance({ onNavigate }) {
         return '';
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [hasUnsavedChanges]);
 
-  // Handle React Router Blocker state
   useEffect(() => {
     if (blocker.state === "blocked") {
       setPendingAction('navigate');
@@ -344,7 +330,6 @@ export default function UploadAttendance({ onNavigate }) {
         setShowNameModal(false);
         alert("Progress Saved to Cloud!");
 
-        // Handle navigation after successful save if blocked
         if (pendingAction === 'navigate' && blocker.state === "blocked") {
              blocker.proceed();
         }
@@ -515,7 +500,7 @@ export default function UploadAttendance({ onNavigate }) {
     setHasUnsavedChanges(true);
   };
 
-  const downloadExcel = async () => {
+  const downloadDTR = async () => {
     if (!selectedEmployee) return;
 
     try {
@@ -535,7 +520,7 @@ export default function UploadAttendance({ onNavigate }) {
       });
 
       const contentType = response.headers.get("content-type");
-      if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/vnd"))) {
+      if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/pdf"))) {
           if (!response.ok) {
              const text = await response.text();
              console.error("DTR Download Error:", text);
@@ -580,20 +565,14 @@ export default function UploadAttendance({ onNavigate }) {
           office: arMeta.office,
           project: arMeta.project,
           period_text: finalPeriod,
-          overrides: {
-            name: finalName, 
-            position: arMeta.position,
-            office: arMeta.office,
-            project: arMeta.project,
-            tasks: arMeta.tasks,
-            approved_by: arMeta.approver,
-            approver_title: arMeta.approverTitle
-          }
+          approver: arMeta.approver,
+          approver_title: arMeta.approverTitle,
+          tasks: arMeta.tasks
         }),
       });
 
       const contentType = response.headers.get("content-type");
-      if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/vnd"))) {
+      if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/pdf"))) {
           if (!response.ok) {
              const text = await response.text();
              console.error("AR Generation Error:", text);
@@ -614,65 +593,6 @@ export default function UploadAttendance({ onNavigate }) {
       } else {
         const err = await response.json();
         alert("Error downloading AR: " + err.error);
-      }
-    } catch (error) {
-      alert("Download failed: " + error.message);
-    }
-  };
-
-  const downloadMerged = async () => {
-    if (!selectedEmployee) return;
-
-    try {
-      const finalName = arMeta.name || selectedEmployee;
-      const finalPeriod = getPeriodText();
-
-      const response = await fetch("http://127.0.0.1:5000/api/generate-merged-report", {
-        method: "POST",
-        mode: 'cors',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employee_name: finalName,
-          employee_data: employees[selectedEmployee],
-          position: arMeta.position,
-          office: arMeta.office,
-          project: arMeta.project,
-          period_text: finalPeriod,
-          approver: arMeta.approver,
-          overrides: {
-            name: finalName, 
-            position: arMeta.position,
-            office: arMeta.office,
-            project: arMeta.project,
-            tasks: arMeta.tasks,
-            approved_by: arMeta.approver,
-            approver_title: arMeta.approverTitle
-          }
-        }),
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/vnd"))) {
-          if (!response.ok) {
-             const text = await response.text();
-             console.error("Merged Report Generation Error:", text);
-             throw new Error(`Server returned ${response.status}. See console.`);
-          }
-      }
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        const filename = finalName.replace(/\s+/g, '_');
-        a.download = `Merged_Report_${filename}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } else {
-        const err = await response.json();
-        alert("Error downloading Merged Report: " + err.error);
       }
     } catch (error) {
       alert("Download failed: " + error.message);
@@ -892,7 +812,7 @@ export default function UploadAttendance({ onNavigate }) {
 
             <div className="flex justify-end mt-6 pt-4 border-t border-gray-100 gap-3">
               <button
-                onClick={downloadExcel}
+                onClick={downloadDTR}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
               >
                 <DownloadIcon className="w-4 h-4" /> Download DTR (Excel)
@@ -903,13 +823,6 @@ export default function UploadAttendance({ onNavigate }) {
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
               >
                 <DownloadIcon className="w-4 h-4" /> Generate AR (Word)
-              </button>
-
-              <button
-                onClick={downloadMerged}
-                className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg shadow-md font-bold transition-all transform hover:scale-105 flex items-center gap-2 text-sm"
-              >
-                <FileSignatureIcon className="w-4 h-4" /> Download Merged Report
               </button>
             </div>
           </div>

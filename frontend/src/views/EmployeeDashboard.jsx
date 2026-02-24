@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import UploadAttendance from "../views/UploadAttendance";
 import SavedProgress from "./SavedProgress";
+import AttachFiles from "./AttachFiles";
 
 // Icons
 const Icon = ({ children, className }) => (
@@ -109,14 +110,6 @@ const ActivityIcon = ({ className }) => (
   </Icon>
 );
 
-const RefreshIcon = ({ className }) => (
-  <Icon className={className}>
-    <polyline points="23 4 23 10 17 10" />
-    <polyline points="1 20 1 14 7 14" />
-    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
-  </Icon>
-);
-
 const TrashIcon = ({ className }) => (
   <Icon className={className}>
     <polyline points="3 6 5 6 21 6" />
@@ -126,8 +119,16 @@ const TrashIcon = ({ className }) => (
 
 const EyeIcon = ({ className }) => (
   <Icon className={className}>
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
     <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+
+const DownloadIcon = ({ className }) => (
+  <Icon className={className}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </Icon>
 );
 
@@ -269,7 +270,6 @@ function MySubmissions({ user, onNavigate }) {
         const response = await fetch(`http://127.0.0.1:5000/api/document/user/${user.user_id}`);
         if (response.ok) {
           const data = await response.json();
-          // Sort by most recent first
           const sorted = data.sort((a, b) => 
             new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
           );
@@ -291,6 +291,14 @@ function MySubmissions({ user, onNavigate }) {
       return parts[parts.length - 1];
     }
     return `Document #${doc.id}`;
+  };
+
+  const getSignedFilename = (doc) => {
+    if (doc.review_file_path) {
+      const parts = doc.review_file_path.split(/[/\\]/);
+      return parts[parts.length - 1];
+    }
+    return null;
   };
 
   const filteredSubmissions = submissions.filter(doc => {
@@ -318,9 +326,12 @@ function MySubmissions({ user, onNavigate }) {
   };
 
   const handleView = (doc) => {
-    // Navigate to upload with doc_id to resume work
     onNavigate("Upload Attendance");
     window.history.pushState({}, '', `?doc_id=${doc.id}`);
+  };
+
+  const handleDownloadSigned = (doc) => {
+    window.open(`http://127.0.0.1:5000/api/document/download/${doc.id}`, '_blank');
   };
 
   const filterOptions = [
@@ -333,7 +344,6 @@ function MySubmissions({ user, onNavigate }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -344,7 +354,6 @@ function MySubmissions({ user, onNavigate }) {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Search */}
           <div className="relative">
             <input
               type="text"
@@ -358,7 +367,6 @@ function MySubmissions({ user, onNavigate }) {
             </Icon>
           </div>
 
-          {/* Filter */}
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -379,7 +387,6 @@ function MySubmissions({ user, onNavigate }) {
         </div>
       </div>
 
-      {/* Stats Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {filterOptions.slice(1).map(opt => {
           const count = submissions.filter(d => d.status === opt.value).length;
@@ -396,7 +403,6 @@ function MySubmissions({ user, onNavigate }) {
         })}
       </div>
 
-      {/* Submissions List */}
       {loading ? (
         <div className="flex flex-col items-center justify-center h-64 text-slate-400">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
@@ -407,9 +413,7 @@ function MySubmissions({ user, onNavigate }) {
           <FileTextIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900">No submissions found</h3>
           <p className="text-slate-500 max-w-sm mx-auto mt-2">
-            {search || filter !== 'all' 
-              ? "Try adjusting your search or filter criteria" 
-              : "Start by creating your first attendance submission"}
+            {search || filter !== 'all' ? "Try adjusting your search or filter criteria" : "Start by creating your first attendance submission"}
           </p>
           <button
             onClick={() => onNavigate("Upload Attendance")}
@@ -425,6 +429,7 @@ function MySubmissions({ user, onNavigate }) {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Document</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Signed Document</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Last Updated</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
               </tr>
@@ -446,6 +451,19 @@ function MySubmissions({ user, onNavigate }) {
                   <td className="px-6 py-4">
                     <StatusBadge status={doc.status} />
                   </td>
+                  <td className="px-6 py-4">
+                    {doc.review_file_path ? (
+                      <button
+                        onClick={() => handleDownloadSigned(doc)}
+                        className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-sm"
+                      >
+                        <DownloadIcon className="w-4 h-4" />
+                        {getSignedFilename(doc)}
+                      </button>
+                    ) : (
+                      <span className="text-slate-400 text-sm">-</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {new Date(doc.updated_at || doc.created_at).toLocaleDateString('en-US', {
                       month: 'short',
@@ -457,6 +475,15 @@ function MySubmissions({ user, onNavigate }) {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
+                      {doc.review_file_path && (
+                        <button
+                          onClick={() => handleDownloadSigned(doc)}
+                          className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Download Signed Document"
+                        >
+                          <DownloadIcon className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleView(doc)}
                         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
@@ -500,7 +527,6 @@ function DashboardHome({ user, onNavigate }) {
         if (response.ok) {
           const data = await response.json();
           
-          // Calculate stats
           const statsData = {
             total: data.length,
             draft: data.filter(d => d.status === 'draft' || d.is_draft).length,
@@ -510,7 +536,6 @@ function DashboardHome({ user, onNavigate }) {
           };
           setStats(statsData);
 
-          // Get recent activity (last 5)
           const sorted = [...data].sort((a, b) => 
             new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
           );
@@ -536,7 +561,6 @@ function DashboardHome({ user, onNavigate }) {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Welcome back, {user?.first_name || 'Employee'}! 👋</h2>
@@ -551,85 +575,34 @@ function DashboardHome({ user, onNavigate }) {
         </button>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard 
-          title="Total Submissions" 
-          value={stats.total} 
-          icon={FileTextIcon} 
-          color="indigo"
-        />
-        <StatsCard 
-          title="Drafts (Pending)" 
-          value={stats.draft} 
-          icon={ClockIcon} 
-          color="yellow"
-        />
-        <StatsCard 
-          title="Submitted" 
-          value={stats.submitted} 
-          icon={AlertCircleIcon} 
-          color="blue"
-        />
-        <StatsCard 
-          title="Approved" 
-          value={stats.approved} 
-          icon={CheckCircleIcon} 
-          color="green"
-        />
+        <StatsCard title="Total Submissions" value={stats.total} icon={FileTextIcon} color="indigo" />
+        <StatsCard title="Drafts (Pending)" value={stats.draft} icon={ClockIcon} color="yellow" />
+        <StatsCard title="Submitted" value={stats.submitted} icon={AlertCircleIcon} color="blue" />
+        <StatsCard title="Approved" value={stats.approved} icon={CheckCircleIcon} color="green" />
       </div>
 
-      {/* Quick Actions */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
           <ActivityIcon className="w-5 h-5 text-indigo-600" />
           Quick Actions
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <QuickAction
-            icon={UploadIcon}
-            title="New Submission"
-            description="Create attendance report"
-            onClick={() => onNavigate("Upload Attendance")}
-            color="blue"
-          />
-          <QuickAction
-            icon={SaveIcon}
-            title="Saved Progress"
-            description="Continue working on drafts"
-            onClick={() => onNavigate("Saved Progress")}
-            color="purple"
-          />
-          <QuickAction
-            icon={FileTextIcon}
-            title="My Submissions"
-            description="View all submissions"
-            onClick={() => onNavigate("My Submissions")}
-            color="green"
-          />
-          <QuickAction
-            icon={UserIcon}
-            title="My Profile"
-            description="Update your information"
-            onClick={() => window.location.href = '/profile'}
-            color="orange"
-          />
+          <QuickAction icon={UploadIcon} title="New Submission" description="Create attendance report" onClick={() => onNavigate("Upload Attendance")} color="blue" />
+          <QuickAction icon={SaveIcon} title="Saved Progress" description="Continue working on drafts" onClick={() => onNavigate("Saved Progress")} color="purple" />
+          <QuickAction icon={FileTextIcon} title="My Submissions" description="View all submissions" onClick={() => onNavigate("My Submissions")} color="green" />
+          <QuickAction icon={UserIcon} title="My Profile" description="Update your information" onClick={() => window.location.href = '/profile'} color="orange" />
         </div>
       </div>
 
-      {/* Two Column Layout: Recent Activity & Profile Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <TrendingUpIcon className="w-5 h-5 text-indigo-600" />
               Recent Activity
             </h3>
-            <button 
-              onClick={() => onNavigate("My Submissions")}
-              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-            >
+            <button onClick={() => onNavigate("My Submissions")} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
               View All →
             </button>
           </div>
@@ -649,7 +622,6 @@ function DashboardHome({ user, onNavigate }) {
           )}
         </div>
 
-        {/* Profile Summary */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <UserIcon className="w-5 h-5 text-indigo-600" />
@@ -657,7 +629,6 @@ function DashboardHome({ user, onNavigate }) {
           </h3>
           
           <div className="space-y-4">
-            {/* Avatar */}
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
                 <span className="text-2xl font-bold text-indigo-600">
@@ -672,7 +643,6 @@ function DashboardHome({ user, onNavigate }) {
 
             <hr className="border-slate-100" />
 
-            {/* Info */}
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <BriefcaseIcon className="w-4 h-4 text-slate-400" />
@@ -697,36 +667,9 @@ function DashboardHome({ user, onNavigate }) {
                   <p className="font-medium text-slate-800">{user?.provincial_officer || 'Not assigned'}</p>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3 text-sm">
-                <CalendarIcon className="w-4 h-4 text-slate-400" />
-                <div>
-                  <p className="text-slate-500">Member Since</p>
-                  <p className="font-medium text-slate-800">
-                    {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'}
-                  </p>
-                </div>
-              </div>
             </div>
 
-            <hr className="border-slate-100" />
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-slate-800">{stats.approved}</p>
-                <p className="text-xs text-slate-500">Approved</p>
-              </div>
-              <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-slate-800">{stats.declined}</p>
-                <p className="text-xs text-slate-500">Need Revision</p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => window.location.href = '/profile'}
-              className="w-full mt-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium transition-colors text-sm"
-            >
+            <button onClick={() => window.location.href = '/profile'} className="w-full mt-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium transition-colors text-sm">
               Edit Profile
             </button>
           </div>
@@ -738,188 +681,172 @@ function DashboardHome({ user, onNavigate }) {
 
 // Submit for Approval Component
 function SubmitForApproval({ user, onNavigate }) {
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(null);
-  const [selectedDocs, setSelectedDocs] = useState([]);
-  const [search, setSearch] = useState('');
-  
-  // Reviewer selection states
+  const [files, setFiles] = useState([]);
+  const [converting, setConverting] = useState(false);
+  const [error, setError] = useState(null);
   const [reviewers, setReviewers] = useState([]);
-  const [showReviewerModal, setShowReviewerModal] = useState(false);
-  const [pendingSubmitDocId, setPendingSubmitDocId] = useState(null);
   const [selectedReviewerId, setSelectedReviewerId] = useState('');
+  const [loadingReviewers, setLoadingReviewers] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const fetchDraftDocuments = async () => {
-      if (!user?.user_id) return;
-      
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/api/document/user/${user.user_id}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Filter only draft documents
-          const drafts = data.filter(doc => doc.status === 'draft' || doc.is_draft);
-          setDocuments(drafts);
-        }
-      } catch (err) {
-        console.error("Failed to fetch documents:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Fetch reviewers list
     const fetchReviewers = async () => {
       try {
         const response = await fetch('http://127.0.0.1:5000/api/document/reviewers');
         if (response.ok) {
           const data = await response.json();
           setReviewers(data);
+          if (data.length === 1) {
+            setSelectedReviewerId(data[0].id.toString());
+          }
         }
       } catch (err) {
         console.error("Failed to fetch reviewers:", err);
+      } finally {
+        setLoadingReviewers(false);
       }
     };
-
-    fetchDraftDocuments();
     fetchReviewers();
-  }, [user?.user_id]);
+  }, []);
 
-  const getFilename = (doc) => {
-    if (doc.file_path) {
-      const parts = doc.file_path.split(/[/\\]/);
-      return parts[parts.length - 1];
-    }
-    return `Document #${doc.id}`;
-  };
-
-  const handleSelectDoc = (docId) => {
-    setSelectedDocs(prev => 
-      prev.includes(docId) 
-        ? prev.filter(id => id !== docId)
-        : [...prev, docId]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedDocs.length === filteredDocs.length) {
-      setSelectedDocs([]);
-    } else {
-      setSelectedDocs(filteredDocs.map(doc => doc.id));
+  const handleFileSelect = (e) => {
+    const newFiles = Array.from(e.target.files);
+    if (newFiles.length > 0) {
+      setFiles([...files, ...newFiles]);
     }
   };
 
-  // Open reviewer selection modal
-  const handleOpenReviewerModal = (docId) => {
-    setPendingSubmitDocId(docId);
-    setSelectedReviewerId('');
-    setShowReviewerModal(true);
+  const handleRemoveFile = (index) => {
+    setFiles(files.filter((_, i) => i !== index));
   };
 
-  // Submit with selected reviewer
-  const handleSubmitWithReviewer = async () => {
-    if (!selectedReviewerId) {
-      alert('Please select a reviewer');
+  const getFileIcon = (filename) => {
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return <FileTextIcon className="w-5 h-5 text-red-500" />;
+      case 'doc':
+      case 'docx':
+        return <FileTextIcon className="w-5 h-5 text-blue-500" />;
+      case 'xls':
+      case 'xlsx':
+        return <FileTextIcon className="w-5 h-5 text-green-500" />;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return <FileTextIcon className="w-5 h-5 text-purple-500" />;
+      default:
+        return <FileTextIcon className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleConvertAndSubmit = async () => {
+    if (files.length === 0) {
+      setError("Please attach at least one file");
       return;
     }
-    
-    setSubmitting(pendingSubmitDocId);
-    setShowReviewerModal(false);
-    
+
+    if (!selectedReviewerId) {
+      setError("Please select a reviewer");
+      return;
+    }
+
+    setConverting(true);
+    setError(null);
+
     try {
       const formData = new FormData();
       formData.append('user_id', user.user_id);
-      formData.append('reviewer_id', selectedReviewerId);
       
-      const response = await fetch(`http://127.0.0.1:5000/api/document/submit/${pendingSubmitDocId}`, {
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      const uploadResponse = await fetch('/api/document/upload-attachments', {
         method: 'POST',
         body: formData
       });
-      
-      if (response.ok) {
-        const updatedDoc = await response.json();
-        // Remove from list and update
-        setDocuments(documents.filter(doc => doc.id !== pendingSubmitDocId));
-        setSelectedDocs(prev => prev.filter(id => id !== pendingSubmitDocId));
-        alert('Document submitted successfully!');
+
+      let uploadResult;
+      const contentType = uploadResponse.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        uploadResult = await uploadResponse.json();
       } else {
-        const error = await response.json();
-        alert('Failed to submit: ' + (error.error || 'Unknown error'));
+        const text = await uploadResponse.text();
+        console.error('Non-JSON response:', text);
+        setError('Server error: ' + (uploadResponse.statusText || 'Invalid response'));
+        return;
+      }
+
+      if (!uploadResponse.ok) {
+        setError(uploadResult.error || 'Failed to convert files to PDF');
+        return;
+      }
+
+      const createDocFormData = new FormData();
+      createDocFormData.append('user_id', user.user_id);
+      
+      const fileResponse = await fetch(`/static/${uploadResult.file_path}`);
+      const fileBlob = await fileResponse.blob();
+      const fileName = uploadResult.file_path.split('/').pop();
+      const convertedFile = new File([fileBlob], fileName, { type: 'application/pdf' });
+      createDocFormData.append('file', convertedFile);
+
+      const createDocResponse = await fetch('/api/document/upload', {
+        method: 'POST',
+        body: createDocFormData
+      });
+
+      const createDocResult = await createDocResponse.json();
+
+      if (!createDocResponse.ok) {
+        setError(createDocResult.error || 'Failed to create document');
+        return;
+      }
+
+      const submitFormData = new FormData();
+      submitFormData.append('user_id', user.user_id);
+      submitFormData.append('reviewer_id', selectedReviewerId);
+
+      const submitResponse = await fetch(`/api/document/submit/${createDocResult.document.id}`, {
+        method: 'POST',
+        body: submitFormData
+      });
+
+      const submitResult = await submitResponse.json();
+
+      if (submitResponse.ok) {
+        const selectedReviewer = reviewers.find(r => r.id.toString() === selectedReviewerId);
+        const reviewerName = selectedReviewer ? selectedReviewer.full_name : 'selected reviewer';
+        
+        alert(`Successfully submitted to ${reviewerName}!`);
+        setFiles([]);
+        setSelectedReviewerId(reviewers.length === 1 ? reviewers[0].id.toString() : '');
+      } else {
+        setError(submitResult.error || 'Failed to submit document to reviewer');
       }
     } catch (err) {
-      alert('Submit failed: ' + err.message);
-    } finally {
-      setSubmitting(null);
-      setPendingSubmitDocId(null);
-      setSelectedReviewerId('');
-    }
-  };
-
-  const handleSubmit = async (docId) => {
-    // Open reviewer selection modal
-    handleOpenReviewerModal(docId);
-  };
-
-  const handleSubmitSelected = async () => {
-    if (selectedDocs.length === 0) return;
-    
-    // For bulk submit, we need to ask for a reviewer first
-    if (selectedDocs.length > 0 && !selectedReviewerId) {
-      setPendingSubmitDocId('selected');
-      setShowReviewerModal(true);
-      return;
-    }
-    
-    setSubmitting('selected');
-    let successCount = 0;
-    let failedCount = 0;
-    
-    for (const docId of selectedDocs) {
-      try {
-        const formData = new FormData();
-        formData.append('user_id', user.user_id);
-        if (selectedReviewerId) {
-          formData.append('reviewer_id', selectedReviewerId);
-        }
-        
-        const response = await fetch(`http://127.0.0.1:5000/api/document/submit/${docId}`, {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (response.ok) {
-          successCount++;
-        } else {
-          failedCount++;
-        }
-      } catch (err) {
-        failedCount++;
+      console.error("Full error:", err);
+      let errorMessage = err.message;
+      if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+        errorMessage = 'Failed to connect to the server. Please ensure the backend is running.';
+      } else if (err.message && err.message.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection and ensure the backend is running.';
       }
-    }
-    
-    // Refresh the list
-    const response = await fetch(`http://127.0.0.1:5000/api/document/user/${user.user_id}`);
-    if (response.ok) {
-      const data = await response.json();
-      const drafts = data.filter(doc => doc.status === 'draft' || doc.is_draft);
-      setDocuments(drafts);
-    }
-    setSelectedDocs([]);
-    setSubmitting(null);
-    setSelectedReviewerId('');
-    setShowReviewerModal(false);
-    
-    if (failedCount === 0) {
-      alert(`Successfully submitted ${successCount} document(s)!`);
-    } else {
-      alert(`Submitted ${successCount} document(s). Failed: ${failedCount}`);
+      setError('Error: ' + errorMessage + '. Please check if the backend server is running.');
+    } finally {
+      setConverting(false);
     }
   };
-
-  const filteredDocs = documents.filter(doc => 
-    getFilename(doc).toLowerCase().includes(search.toLowerCase())
-  );
 
   const SendIcon = ({ className }) => (
     <Icon className={className}>
@@ -928,255 +855,187 @@ function SubmitForApproval({ user, onNavigate }) {
     </Icon>
   );
 
-  const CheckSquareIcon = ({ className }) => (
+  const XIcon = ({ className }) => (
     <Icon className={className}>
-      <polyline points="9 11 12 14 22 4" />
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </Icon>
   );
-
-  const SquareIcon = ({ className }) => (
-    <Icon className={className}>
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    </Icon>
-  );
-
-  const CheckBoxIcon = ({ checked }) => (
-    checked 
-      ? <CheckSquareIcon className="w-5 h-5 text-indigo-600" />
-      : <SquareIcon className="w-5 h-5 text-slate-400" />
-  );
-
-  // Reviewer Selection Modal
-  const ReviewerModal = () => {
-    if (!showReviewerModal) return null;
-    
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Select Reviewer</h3>
-          <p className="text-sm text-slate-600 mb-4">
-            Choose which reviewer will approve your document(s):
-          </p>
-          
-          <select
-            value={selectedReviewerId}
-            onChange={(e) => setSelectedReviewerId(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm mb-4"
-          >
-            <option value="">-- Select a Reviewer --</option>
-            {reviewers.map(reviewer => (
-              <option key={reviewer.id} value={reviewer.id}>
-                {reviewer.full_name} {reviewer.office_location ? `(${reviewer.office_location})` : ''}
-              </option>
-            ))}
-          </select>
-          
-          <div className="flex gap-3 justify-end">
-            <button
-              onClick={() => {
-                setShowReviewerModal(false);
-                setPendingSubmitDocId(null);
-                setSelectedReviewerId('');
-              }}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmitWithReviewer}
-              disabled={!selectedReviewerId || submitting}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors text-sm"
-            >
-              {submitting ? 'Submitting...' : 'Submit'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
-    <div className="space-y-6">
-      <ReviewerModal />
+    <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <SendIcon className="w-7 h-7 text-indigo-600" />
-            Submit for Approval
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">Review and submit your attendance documents for approval</p>
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg mb-4">
+          <SendIcon className="w-7 h-7 text-white" />
         </div>
-
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search documents..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm w-full md:w-64"
-            />
-            <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </Icon>
-          </div>
-
-          <button
-            onClick={() => onNavigate("Upload Attendance")}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-          >
-            <UploadIcon className="w-4 h-4" />
-            New Submission
-          </button>
-        </div>
+        <h2 className="text-2xl font-bold text-slate-800">Submit for Approval</h2>
+        <p className="text-slate-500 text-sm mt-1">Attach files, select a reviewer, and submit for approval</p>
       </div>
 
-      {/* Info Banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircleIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-medium text-blue-800">Ready to submit?</p>
-            <p className="text-sm text-blue-700 mt-1">
-              Select the documents below that you want to submit for approval. 
-              Once submitted, you won't be able to edit them until a reviewer declines them.
+      {/* Main Form Card */}
+      <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+        {/* File Drop Zone Section */}
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="text-base font-semibold text-slate-800 mb-1 flex items-center gap-2">
+            <UploadIcon className="w-5 h-5 text-indigo-500" />
+            Attach Files
+          </h3>
+          <p className="text-sm text-slate-500 mb-4">
+            Attach multiple files. They will be converted to PDF and submitted to your reviewer.
+          </p>
+
+          <div 
+            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50'}`}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+              const droppedFiles = Array.from(e.dataTransfer.files);
+              if (droppedFiles.length > 0) {
+                setFiles([...files, ...droppedFiles]);
+              }
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png,.pdf,.txt"
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files);
+                if (newFiles.length > 0) {
+                  setFiles([...files, ...newFiles]);
+                }
+              }}
+              className="hidden"
+            />
+            <div className="w-14 h-14 mx-auto mb-3 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <UploadIcon className="w-6 h-6 text-indigo-600" />
+            </div>
+            <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">
+              Click to select files or drag and drop
+            </p>
+            <p className="text-xs text-slate-400 mt-2">
+              Excel (.xlsx, .xls) • Word (.doc, .docx) • Images (.jpg, .png) • PDF
             </p>
           </div>
+
+          {/* Selected Files List */}
+          {files.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-700">
+                  Selected Files <span className="text-indigo-600">({files.length})</span>
+                </p>
+                <button
+                  onClick={() => setFiles([])}
+                  className="text-xs text-slate-500 hover:text-red-500 transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {files.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-indigo-200 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
+                        {getFileIcon(file.name)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{file.name}</p>
+                        <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveFile(index)}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    >
+                      <XIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Reviewer Selection Section */}
+        <div className="p-6 bg-slate-50/50">
+          <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <UserIcon className="w-5 h-5 text-indigo-500" />
+            Select Reviewer <span className="text-red-500">*</span>
+          </label>
+          {loadingReviewers ? (
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              Loading reviewers...
+            </div>
+          ) : reviewers.length === 0 ? (
+            <p className="text-sm text-red-500">No reviewers available. Please contact your administrator.</p>
+          ) : (
+            <select
+              value={selectedReviewerId}
+              onChange={(e) => setSelectedReviewerId(e.target.value)}
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm shadow-sm"
+            >
+              <option value="">-- Select a Reviewer --</option>
+              {reviewers.map(reviewer => (
+                <option key={reviewer.id} value={reviewer.id}>
+                  {reviewer.full_name} {reviewer.office_location ? `(${reviewer.office_location})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-100 rounded-xl">
+            <p className="text-sm text-red-600 flex items-center gap-2">
+              <AlertCircleIcon className="w-4 h-4" />
+              {error}
+            </p>
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="p-6 border-t border-slate-100">
+          <button
+            onClick={handleConvertAndSubmit}
+            disabled={files.length === 0 || converting || !selectedReviewerId || loadingReviewers}
+            className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl transition-all text-sm font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
+          >
+            {converting ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Converting & Submitting...
+              </>
+            ) : (
+              <>
+                <SendIcon className="w-5 h-5" />
+                Convert & Submit for Approval
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Documents List */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-          <p>Loading documents...</p>
-        </div>
-      ) : filteredDocs.length === 0 ? (
-        <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
-          <FileTextIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900">No documents to submit</h3>
-          <p className="text-slate-500 max-w-sm mx-auto mt-2">
-            {search 
-              ? "Try adjusting your search criteria" 
-              : "You don't have any draft documents ready for submission"}
-          </p>
-          <button
-            onClick={() => onNavigate("Upload Attendance")}
-            className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
-          >
-            Upload New Document
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Actions Bar */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleSelectAll}
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800"
-              >
-                <CheckBoxIcon checked={selectedDocs.length === filteredDocs.length && filteredDocs.length > 0} />
-                Select All ({filteredDocs.length} documents)
-              </button>
-              <span className="text-sm text-slate-500">
-                {selectedDocs.length} selected
-              </span>
-            </div>
-            
-            {selectedDocs.length > 0 && (
-              <button
-                onClick={handleSubmitSelected}
-                disabled={submitting === 'selected'}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-              >
-                {submitting === 'selected' ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <SendIcon className="w-4 h-4" />
-                    Submit Selected ({selectedDocs.length})
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* Documents Table */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-10"></th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Document</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Last Updated</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredDocs.map(doc => (
-                  <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleSelectDoc(doc.id)}
-                        className="p-1 hover:bg-slate-100 rounded"
-                      >
-                        <CheckBoxIcon checked={selectedDocs.includes(doc.id)} />
-                      </button>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-yellow-100 rounded-lg">
-                          <FileTextIcon className="w-5 h-5 text-yellow-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-slate-800">{getFilename(doc).replace('.json', '')}</p>
-                          <p className="text-xs text-slate-500">ID: {doc.id}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status="draft" />
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {new Date(doc.updated_at || doc.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleSubmit(doc.id)}
-                          disabled={submitting === doc.id}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm rounded-lg transition-colors"
-                        >
-                          {submitting === doc.id ? (
-                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <SendIcon className="w-3 h-3" />
-                          )}
-                          Submit
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+      {/* Help Text */}
+      <p className="text-center text-xs text-slate-400">
+        Files will be automatically converted to PDF before submission
+      </p>
     </div>
   );
 }
@@ -1186,7 +1045,6 @@ export default function EmployeeDashboard({ selectedMenu, setActivePage, user })
   const navigate = useNavigate();
 
   const handleNavigate = (menu) => {
-    // Use React Router navigation
     switch (menu) {
       case "Dashboard":
         navigate('/');

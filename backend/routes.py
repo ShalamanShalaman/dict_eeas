@@ -23,7 +23,9 @@ def generate_temp_password(length=12):
 def save_file(file, folder='uploads'):
     # Ensure the directory exists
     os.makedirs(os.path.join(current_app.root_path, 'static', folder), exist_ok=True)
-    filepath = os.path.join(current_app.root_path, 'static', folder, file.filename)
+    # Extract just the filename to avoid path duplication issues
+    filename = os.path.basename(file.filename)
+    filepath = os.path.join(current_app.root_path, 'static', folder, filename)
     file.save(filepath)
     return filepath
 
@@ -289,7 +291,12 @@ def verify_otp():
 @document_bp.route('/api/document/upload', methods=['POST'])
 def upload_document():
     user_id = request.form.get('user_id')
-    user = User.query.filter_by(user_id=user_id).first_or_404()
+    if not user_id:
+        return jsonify({'error': 'user_id is required'}), 400
+    
+    user = User.query.filter_by(user_id=user_id).first()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
@@ -489,3 +496,142 @@ def get_reviewers():
         "email": r.email,
         "office_location": r.office_location.location if r.office_location else None
     } for r in reviewers])
+
+# Upload signed document by reviewer
+@document_bp.route('/api/document/upload-review/<int:doc_id>', methods=['POST'])
+def upload_review_document(doc_id):
+    """
+    Allows reviewer to upload a signed/approved document.
+    This is separate from the review action - reviewer can upload first, then approve.
+    """
+    doc = Document.query.get_or_404(doc_id)
+    
+    # Get reviewer info
+    user_id = request.form.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id is required'}), 400
+    
+    reviewer = User.query.filter_by(user_id=user_id).first_or_404()
+    
+    # Verify the reviewer is assigned to this document
+    if doc.reviewer_id != reviewer.id:
+        return jsonify({'error': 'Unauthorized - you are not assigned to review this document'}), 403
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Empty filename'}), 400
+    
+    # Save the signed document
+    filepath = save_file(file, folder='uploads')
+    doc.review_file_path = filepath
+    doc.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({'message': 'Signed document uploaded', 'document': doc.to_dict()}), 200
+
+# Upload multiple files and convert to single PDF
+@document_bp.route('/api/document/upload-attachments', methods=['POST'])
+def upload_attachments():
+    """
+    Accepts multiple files (Excel, Word, images, etc.) and converts them to a single PDF.
+    Returns the path to the merged PDF file.
+    """
+    try:
+        user_id = request.form.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'user_id is required'}), 400
+        
+        user = User.query.filter_by(user_id=user_id).first_or_404()
+        
+        # Check if files were uploaded
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files uploaded'}), 400
+        
+        files = request.files.getlist('files')
+        if not files or len(files) == 0:
+            return jsonify({'error': 'No files uploaded'}), 400
+        
+        # Import the file converter
+        try:
+            from file_converter import convert_file_to_pdf, merge_pdfs_to_single
+        except ImportError as e:
+            print(f"Import error: {e}")
+            return jsonify({'error': 'File conversion service not available. Please install required packages: pip install python-docx openpyxl reportlab PyPDF2'}), 500
+        
+        # Create temporary directory for conversions
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        converted_pdfs = []
+        conversion_errors = []
+        
+        try:
+            # Save and convert each file
+            for file in files:
+                if file.filename == '':
+                    continue
+                
+                # Save uploaded file
+                filename = file.filename
+                temp_input_path = os.path.join(temp_dir, filename)
+                file.save(temp_input_path)
+                
+                # Convert to PDF
+                output_dir = os.path.join(temp_dir, 'pdfs')
+                os.makedirs(output_dir, exist_ok=True)
+                try:
+                    pdf_path = convert_file_to_pdf(temp_input_path, output_dir)
+                    if pdf_path and os.path.exists(pdf_path):
+                        converted_pdfs.append(pdf_path)
+                        print(f"Successfully converted {filename} to {pdf_path}")
+                except Exception as e:
+                    error_msg = f"Error converting {filename}: {str(e)}"
+                    print(error_msg)
+                    conversion_errors.append(error_msg)
+                    # Continue with other files
+            
+            print(f"Conversion results: {len(converted_pdfs)} files converted, {len(conversion_errors)} errors")
+            print(f"Conversion errors: {conversion_errors}")
+            
+            if not converted_pdfs:
+                error_detail = "; ".join(conversion_errors) if conversion_errors else "No files could be converted to PDF. Please ensure you have .xlsx, .xls, .docx, .doc, .png, .jpg, .jpeg, or .txt files."
+                return jsonify({'error': error_detail}), 400
+            
+            # Generate output filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_filename = f"attachments_{timestamp}.pdf"
+            output_dir = os.path.join(current_app.root_path, 'static', 'documents')
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, output_filename)
+            
+            # Merge all PDFs
+            if len(converted_pdfs) == 1:
+                # Only one file, just rename
+                shutil.move(converted_pdfs[0], output_path)
+            else:
+                # Merge multiple PDFs
+                merge_pdfs_to_single(converted_pdfs, output_path)
+            
+            # Return the file path relative to static folder
+            relative_path = os.path.join('documents', output_filename)
+            
+            return jsonify({
+                'message': 'Files converted to PDF successfully',
+                'file_path': relative_path,
+                'original_files': [f.filename for f in files]
+            }), 200
+            
+        except Exception as e:
+            print(f"Conversion error: {str(e)}")
+            return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
+        finally:
+            # Clean up temp directory
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+    except Exception as e:
+        print(f"Unexpected error in upload_attachments: {str(e)}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
