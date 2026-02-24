@@ -86,47 +86,74 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
     # Try using docx2pdf first - it uses Microsoft Word to preserve ALL formatting, logos, images
     if DOCX2PDF_AVAILABLE:
         try:
-            # docx2pdf requires the output path without extension
-            temp_dir = os.path.dirname(pdf_path)
-            docx2pdf_convert(docx_path, temp_dir)
-            
-            # The output file will have the same name as the input, but .pdf extension
-            input_filename = os.path.basename(docx_path)
-            name_without_ext = os.path.splitext(input_filename)[0]
-            generated_pdf = os.path.join(temp_dir, f"{name_without_ext}.pdf")
-            
-            if os.path.exists(generated_pdf):
-                # Move to the expected output path
-                import shutil
-                shutil.move(generated_pdf, pdf_path)
-                return pdf_path
+            import pythoncom
+            pythoncom.CoInitialize()
+            try:
+                # docx2pdf requires the output path without extension
+                temp_dir = os.path.dirname(pdf_path)
+                docx2pdf_convert(docx_path, temp_dir)
+                
+                # The output file will have the same name as the input, but .pdf extension
+                input_filename = os.path.basename(docx_path)
+                name_without_ext = os.path.splitext(input_filename)[0]
+                generated_pdf = os.path.join(temp_dir, f"{name_without_ext}.pdf")
+                
+                if os.path.exists(generated_pdf):
+                    # Move to the expected output path
+                    import shutil
+                    shutil.move(generated_pdf, pdf_path)
+                    print(f"Successfully converted DOCX to PDF using Microsoft Word: {pdf_path}")
+                    return pdf_path
+            finally:
+                pythoncom.CoUninitialize()
         except Exception as e:
-            print(f"docx2pdf conversion failed, falling back to ReportLab: {e}")
+            error_msg = str(e).lower()
+            print(f"docx2pdf conversion failed: {e}")
+            # Check if it's a "Word not available" or COM error
+            if "word" in error_msg or "com" in error_msg or "co_create_instance" in error_msg:
+                print("ERROR: Microsoft Word is not available or not properly installed.")
+                print("The system cannot convert DOCX with full formatting preservation.")
+                print("To preserve formatting, logos, and images in Word documents, please install Microsoft Word.")
+                raise Exception("Microsoft Word is required to convert Word documents with full formatting. Please install Microsoft Word and try again.")
             # Fall through to ReportLab method
+    
+    # Check if docx2pdf is available
+    if not DOCX2PDF_AVAILABLE:
+        print("WARNING: docx2pdf is not installed. Word document formatting will be lost during conversion.")
+        print("To preserve formatting, please install: pip install docx2pdf")
     
     # Fallback: Use ReportLab (loses formatting, images, logos)
     if not DOCX_AVAILABLE:
         raise Exception("python-docx not available for DOCX conversion")
     
+    print("WARNING: Using basic PDF conversion. Word formatting, logos, and images will be lost.")
+    print("Consider installing Microsoft Word for full formatting preservation.")
+    
     doc = DocxDocument(docx_path)
     
-    # Create PDF
-    pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    # Create PDF with improved formatting preservation
+    pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter, leftMargin=0.5*inch, rightMargin=0.5*inch)
     story = []
     styles = getSampleStyleSheet()
     
+    # Try to preserve some basic formatting
     for para in doc.paragraphs:
         if para.text.strip():
+            # Create a custom style that tries to preserve some formatting
             style_name = para.style.name if para.style else 'Normal'
+            
             if 'Heading' in style_name:
                 level = 1 if '1' in style_name else 2 if '2' in style_name else 3
                 para_style = styles[f'Heading{level}']
             else:
                 para_style = styles['Normal']
-            story.append(Paragraph(para.text, para_style))
-            story.append(Spacer(1, 8))
+            
+            # Create paragraph with text
+            p = Paragraph(para.text, para_style)
+            story.append(p)
+            story.append(Spacer(1, 6))
     
-    # Handle tables
+    # Handle tables - try to preserve structure but not formatting
     for table in doc.tables:
         table_data = []
         for row in table.rows:
@@ -135,7 +162,9 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
         
         if table_data:
             num_cols = len(table_data[0]) if table_data else 1
-            col_widths = [4.5 * inch / num_cols] * num_cols
+            # Use dynamic column widths
+            col_width = 7 * inch / num_cols if num_cols > 0 else 1
+            col_widths = [col_width] * num_cols
             
             t = Table(table_data, colWidths=col_widths)
             t.setStyle(TableStyle([
@@ -143,16 +172,18 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-                ('TOPPADDING', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
             ]))
             story.append(t)
         
-        story.append(Spacer(1, 20))
+        story.append(Spacer(1, 15))
     
     pdf_doc.build(story)
     return pdf_path

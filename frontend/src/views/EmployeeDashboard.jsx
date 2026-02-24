@@ -683,11 +683,20 @@ function DashboardHome({ user, onNavigate }) {
 function SubmitForApproval({ user, onNavigate }) {
   const [files, setFiles] = useState([]);
   const [converting, setConverting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [reviewers, setReviewers] = useState([]);
   const [selectedReviewerId, setSelectedReviewerId] = useState('');
   const [loadingReviewers, setLoadingReviewers] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // State for two-step process
+  const [currentStep, setCurrentStep] = useState(1); // 1 = Attach Files, 2 = Submit for Approval
+  const [convertedDocumentId, setConvertedDocumentId] = useState(null);
+  const [convertedFilePath, setConvertedFilePath] = useState(null);
+  const [convertedFileName, setConvertedFileName] = useState(null);
+  
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -749,19 +758,16 @@ function SubmitForApproval({ user, onNavigate }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleConvertAndSubmit = async () => {
+  // Step 1: Convert files to PDF and save as draft
+  const handleConvertToPDF = async () => {
     if (files.length === 0) {
       setError("Please attach at least one file");
       return;
     }
 
-    if (!selectedReviewerId) {
-      setError("Please select a reviewer");
-      return;
-    }
-
     setConverting(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       const formData = new FormData();
@@ -792,6 +798,7 @@ function SubmitForApproval({ user, onNavigate }) {
         return;
       }
 
+      // Create document from converted PDF
       const createDocFormData = new FormData();
       createDocFormData.append('user_id', user.user_id);
       
@@ -813,11 +820,48 @@ function SubmitForApproval({ user, onNavigate }) {
         return;
       }
 
+      // Success - save document ID and move to step 2
+      setConvertedDocumentId(createDocResult.document.id);
+      setConvertedFilePath(uploadResult.file_path);
+      setConvertedFileName(fileName);
+      setCurrentStep(2);
+      setSuccessMessage("Files converted to PDF successfully! You can review the file before submitting.");
+      
+    } catch (err) {
+      console.error("Full error:", err);
+      let errorMessage = err.message;
+      if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+        errorMessage = 'Failed to connect to the server. Please ensure the backend is running.';
+      } else if (err.message && err.message.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection and ensure the backend is running.';
+      }
+      setError('Error: ' + errorMessage + '. Please check if the backend server is running.');
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  // Step 2: Submit to reviewer
+  const handleSubmitForApproval = async () => {
+    if (!selectedReviewerId) {
+      setError("Please select a reviewer");
+      return;
+    }
+
+    if (!convertedDocumentId) {
+      setError("No document to submit. Please convert files first.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
       const submitFormData = new FormData();
       submitFormData.append('user_id', user.user_id);
       submitFormData.append('reviewer_id', selectedReviewerId);
 
-      const submitResponse = await fetch(`/api/document/submit/${createDocResult.document.id}`, {
+      const submitResponse = await fetch(`/api/document/submit/${convertedDocumentId}`, {
         method: 'POST',
         body: submitFormData
       });
@@ -829,8 +873,8 @@ function SubmitForApproval({ user, onNavigate }) {
         const reviewerName = selectedReviewer ? selectedReviewer.full_name : 'selected reviewer';
         
         alert(`Successfully submitted to ${reviewerName}!`);
-        setFiles([]);
-        setSelectedReviewerId(reviewers.length === 1 ? reviewers[0].id.toString() : '');
+        // Reset form
+        resetForm();
       } else {
         setError(submitResult.error || 'Failed to submit document to reviewer');
       }
@@ -844,7 +888,32 @@ function SubmitForApproval({ user, onNavigate }) {
       }
       setError('Error: ' + errorMessage + '. Please check if the backend server is running.');
     } finally {
-      setConverting(false);
+      setSubmitting(false);
+    }
+  };
+
+  // Reset the entire form
+  const resetForm = () => {
+    setFiles([]);
+    setCurrentStep(1);
+    setConvertedDocumentId(null);
+    setConvertedFilePath(null);
+    setConvertedFileName(null);
+    setSelectedReviewerId(reviewers.length === 1 ? reviewers[0].id.toString() : '');
+    setError(null);
+    setSuccessMessage(null);
+  };
+
+  // Go back to step 1
+  const handleBackToStep1 = () => {
+    setCurrentStep(1);
+    setError(null);
+  };
+
+  // View the converted PDF
+  const handleViewPDF = () => {
+    if (convertedFilePath) {
+      window.open(`/static/${convertedFilePath}`, '_blank');
     }
   };
 
@@ -862,6 +931,55 @@ function SubmitForApproval({ user, onNavigate }) {
     </Icon>
   );
 
+  const FileCheckIcon = ({ className }) => (
+    <Icon className={className}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <polyline points="9 15 12 18 15 15" />
+      <line x1="12" y1="12" x2="12" y2="18" />
+    </Icon>
+  );
+
+  const EyeIcon = ({ className }) => (
+    <Icon className={className}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </Icon>
+  );
+
+  const ArrowLeftIcon = ({ className }) => (
+    <Icon className={className}>
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </Icon>
+  );
+
+  // Step indicator component
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center mb-6">
+      <div className="flex items-center">
+        {/* Step 1 */}
+        <div className={`flex items-center ${currentStep >= 1 ? 'text-indigo-600' : 'text-slate-300'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${currentStep >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+            {currentStep > 1 ? '✓' : '1'}
+          </div>
+          <span className="ml-2 text-sm font-medium">Attach Files</span>
+        </div>
+        
+        {/* Connector line */}
+        <div className={`w-16 h-0.5 mx-2 ${currentStep >= 2 ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+        
+        {/* Step 2 */}
+        <div className={`flex items-center ${currentStep >= 2 ? 'text-indigo-600' : 'text-slate-300'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${currentStep >= 2 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+            2
+          </div>
+          <span className="ml-2 text-sm font-medium">Submit for Approval</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
@@ -870,171 +988,271 @@ function SubmitForApproval({ user, onNavigate }) {
           <SendIcon className="w-7 h-7 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-slate-800">Submit for Approval</h2>
-        <p className="text-slate-500 text-sm mt-1">Attach files, select a reviewer, and submit for approval</p>
+        <p className="text-slate-500 text-sm mt-1">
+          {currentStep === 1 
+            ? "Step 1: Attach files and convert to PDF" 
+            : "Step 2: Review the PDF and submit to reviewer"}
+        </p>
       </div>
+
+      {/* Step Indicator */}
+      <StepIndicator />
 
       {/* Main Form Card */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
-        {/* File Drop Zone Section */}
-        <div className="p-6 border-b border-slate-100">
-          <h3 className="text-base font-semibold text-slate-800 mb-1 flex items-center gap-2">
-            <UploadIcon className="w-5 h-5 text-indigo-500" />
-            Attach Files
-          </h3>
-          <p className="text-sm text-slate-500 mb-4">
-            Attach multiple files. They will be converted to PDF and submitted to your reviewer.
-          </p>
+        
+        {/* STEP 1: Attach Files Section */}
+        {currentStep === 1 && (
+          <>
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-base font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                <UploadIcon className="w-5 h-5 text-indigo-500" />
+                Attach Files
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">
+                Attach multiple files. They will be converted to PDF. You can review the PDF before submitting to your reviewer.
+              </p>
 
-          <div 
-            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50'}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragging(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragging(false);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragging(false);
-              const droppedFiles = Array.from(e.dataTransfer.files);
-              if (droppedFiles.length > 0) {
-                setFiles([...files, ...droppedFiles]);
-              }
-            }}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png,.pdf,.txt"
-              onChange={(e) => {
-                const newFiles = Array.from(e.target.files);
-                if (newFiles.length > 0) {
-                  setFiles([...files, ...newFiles]);
-                }
-              }}
-              className="hidden"
-            />
-            <div className="w-14 h-14 mx-auto mb-3 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <UploadIcon className="w-6 h-6 text-indigo-600" />
-            </div>
-            <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">
-              Click to select files or drag and drop
-            </p>
-            <p className="text-xs text-slate-400 mt-2">
-              Excel (.xlsx, .xls) • Word (.doc, .docx) • Images (.jpg, .png) • PDF
-            </p>
-          </div>
-
-          {/* Selected Files List */}
-          {files.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-700">
-                  Selected Files <span className="text-indigo-600">({files.length})</span>
+              <div 
+                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50'}`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                  const droppedFiles = Array.from(e.dataTransfer.files);
+                  if (droppedFiles.length > 0) {
+                    setFiles([...files, ...droppedFiles]);
+                  }
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png,.pdf,.txt"
+                  onChange={(e) => {
+                    const newFiles = Array.from(e.target.files);
+                    if (newFiles.length > 0) {
+                      setFiles([...files, ...newFiles]);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <div className="w-14 h-14 mx-auto mb-3 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <UploadIcon className="w-6 h-6 text-indigo-600" />
+                </div>
+                <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">
+                  Click to select files or drag and drop
                 </p>
-                <button
-                  onClick={() => setFiles([])}
-                  className="text-xs text-slate-500 hover:text-red-500 transition-colors"
-                >
-                  Clear all
-                </button>
+                <p className="text-xs text-slate-400 mt-2">
+                  Excel (.xlsx, .xls) • Word (.doc, .docx) • Images (.jpg, .png) • PDF
+                </p>
               </div>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {files.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-indigo-200 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
-                        {getFileIcon(file.name)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{file.name}</p>
-                        <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
-                      </div>
-                    </div>
+
+              {/* Selected Files List */}
+              {files.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-700">
+                      Selected Files <span className="text-indigo-600">({files.length})</span>
+                    </p>
                     <button
-                      onClick={() => handleRemoveFile(index)}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      onClick={() => setFiles([])}
+                      className="text-xs text-slate-500 hover:text-red-500 transition-colors"
                     >
-                      <XIcon className="w-4 h-4" />
+                      Clear all
                     </button>
                   </div>
-                ))}
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {files.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-indigo-200 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
+                            {getFileIcon(file.name)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{file.name}</p>
+                            <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveFile(index)}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <XIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-100 rounded-xl">
+                <p className="text-sm text-red-600 flex items-center gap-2">
+                  <AlertCircleIcon className="w-4 h-4" />
+                  {error}
+                </p>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* Reviewer Selection Section */}
-        <div className="p-6 bg-slate-50/50">
-          <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-            <UserIcon className="w-5 h-5 text-indigo-500" />
-            Select Reviewer <span className="text-red-500">*</span>
-          </label>
-          {loadingReviewers ? (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-              Loading reviewers...
+            {/* Convert Button */}
+            <div className="p-6 border-t border-slate-100">
+              <button
+                onClick={handleConvertToPDF}
+                disabled={files.length === 0 || converting}
+                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl transition-all text-sm font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
+              >
+                {converting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Converting to PDF...
+                  </>
+                ) : (
+                  <>
+                    <FileCheckIcon className="w-5 h-5" />
+                    Convert to PDF
+                  </>
+                )}
+              </button>
             </div>
-          ) : reviewers.length === 0 ? (
-            <p className="text-sm text-red-500">No reviewers available. Please contact your administrator.</p>
-          ) : (
-            <select
-              value={selectedReviewerId}
-              onChange={(e) => setSelectedReviewerId(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm shadow-sm"
-            >
-              <option value="">-- Select a Reviewer --</option>
-              {reviewers.map(reviewer => (
-                <option key={reviewer.id} value={reviewer.id}>
-                  {reviewer.full_name} {reviewer.office_location ? `(${reviewer.office_location})` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-100 rounded-xl">
-            <p className="text-sm text-red-600 flex items-center gap-2">
-              <AlertCircleIcon className="w-4 h-4" />
-              {error}
-            </p>
-          </div>
+          </>
         )}
 
-        {/* Submit Button */}
-        <div className="p-6 border-t border-slate-100">
-          <button
-            onClick={handleConvertAndSubmit}
-            disabled={files.length === 0 || converting || !selectedReviewerId || loadingReviewers}
-            className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl transition-all text-sm font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
-          >
-            {converting ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Converting & Submitting...
-              </>
-            ) : (
-              <>
-                <SendIcon className="w-5 h-5" />
-                Convert & Submit for Approval
-              </>
+        {/* STEP 2: Submit for Approval Section */}
+        {currentStep === 2 && (
+          <>
+            {/* Success Message */}
+            {successMessage && (
+              <div className="mx-6 mt-4 p-4 bg-green-50 border border-green-100 rounded-xl">
+                <p className="text-sm text-green-600 flex items-center gap-2">
+                  <CheckCircleIcon className="w-4 h-4" />
+                  {successMessage}
+                </p>
+              </div>
             )}
-          </button>
-        </div>
+
+            {/* PDF Preview Section */}
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-base font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                <FileCheckIcon className="w-5 h-5 text-green-500" />
+                Converted PDF
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">
+                Review your converted PDF file before submitting to your reviewer.
+              </p>
+
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                      <FileTextIcon className="w-6 h-6 text-red-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">{convertedFileName}</p>
+                      <p className="text-xs text-slate-400">PDF Document</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleViewPDF}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <EyeIcon className="w-4 h-4" />
+                    View PDF
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={handleBackToStep1}
+                className="mt-4 text-sm text-slate-500 hover:text-indigo-600 flex items-center gap-1 transition-colors"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                Back to attach different files
+              </button>
+            </div>
+
+            {/* Reviewer Selection Section */}
+            <div className="p-6 bg-slate-50/50">
+              <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                <UserIcon className="w-5 h-5 text-indigo-500" />
+                Select Reviewer <span className="text-red-500">*</span>
+              </label>
+              {loadingReviewers ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  Loading reviewers...
+                </div>
+              ) : reviewers.length === 0 ? (
+                <p className="text-sm text-red-500">No reviewers available. Please contact your administrator.</p>
+              ) : (
+                <select
+                  value={selectedReviewerId}
+                  onChange={(e) => setSelectedReviewerId(e.target.value)}
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm shadow-sm"
+                >
+                  <option value="">-- Select a Reviewer --</option>
+                  {reviewers.map(reviewer => (
+                    <option key={reviewer.id} value={reviewer.id}>
+                      {reviewer.full_name} {reviewer.office_location ? `(${reviewer.office_location})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-100 rounded-xl">
+                <p className="text-sm text-red-600 flex items-center gap-2">
+                  <AlertCircleIcon className="w-4 h-4" />
+                  {error}
+                </p>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <div className="p-6 border-t border-slate-100">
+              <button
+                onClick={handleSubmitForApproval}
+                disabled={!selectedReviewerId || submitting}
+                className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl transition-all text-sm font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <SendIcon className="w-5 h-5" />
+                    Submit for Approval
+                  </>
+                )}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Help Text */}
       <p className="text-center text-xs text-slate-400">
-        Files will be automatically converted to PDF before submission
+        {currentStep === 1 
+          ? "Step 1 of 2: Convert your files to PDF first" 
+          : "Step 2 of 2: Review the PDF and submit to your reviewer"}
       </p>
     </div>
   );
