@@ -4,6 +4,7 @@ python-docx>=0.8.0
 openpyxl>=3.0.0
 PyPDF2>=3.0.0
 docx2pdf>=0.1.8
+pywin32>=300; platform_system=='Windows'
 
 # Flask and extensions
 flask>=2.0.0

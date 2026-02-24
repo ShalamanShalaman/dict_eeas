@@ -24,6 +24,14 @@ try:
 except ImportError:
     XLSX_AVAILABLE = False
 
+# For Excel to PDF using Microsoft Excel (preserves ALL formatting, logos, images)
+try:
+    import win32com.client
+    import pythoncom
+    WIN32_AVAILABLE = True
+except ImportError:
+    WIN32_AVAILABLE = False
+
 # For PDF processing
 try:
     from reportlab.lib.pagesizes import letter
@@ -151,9 +159,47 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
 
 
 def _convert_xlsx_to_pdf(xlsx_path, pdf_path):
-    """Convert Excel to PDF"""
+    """Convert Excel to PDF - tries win32com first (preserves ALL formatting), falls back to ReportLab"""
+    
+    # Try using win32com first - it uses Microsoft Excel to preserve ALL formatting, logos, images
+    if WIN32_AVAILABLE:
+        try:
+            import pythoncom
+            pythoncom.CoInitialize()
+            
+            # Create Excel application object
+            excel = win32com.client.Dispatch("Excel.Application")
+            excel.Visible = False
+            excel.DisplayAlerts = False
+            
+            try:
+                # Open the workbook
+                wb = excel.Workbooks.Open(xlsx_path)
+                
+                # Export to PDF using Excel's built-in export
+                # 0 = PDF format
+                wb.ExportAsFixedFormat(0, pdf_path)
+                
+                wb.Close(SaveChanges=False)
+                
+                if os.path.exists(pdf_path):
+                    print(f"Successfully converted Excel to PDF using Microsoft Excel: {pdf_path}")
+                    return pdf_path
+                    
+            except Exception as e:
+                print(f"win32com Excel conversion failed: {e}")
+            finally:
+                excel.Quit()
+                pythoncom.CoUninitialize()
+                
+        except Exception as e:
+            print(f"win32com Excel conversion error: {e}")
+    
+    # Fallback: Use ReportLab (loses formatting, images, logos)
     if not XLSX_AVAILABLE:
         raise Exception("openpyxl not available for Excel conversion")
+    
+    print("Falling back to ReportLab for Excel conversion (formatting will be lost)")
     
     wb = openpyxl.load_workbook(xlsx_path)
     
