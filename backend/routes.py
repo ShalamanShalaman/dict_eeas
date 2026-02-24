@@ -11,26 +11,19 @@ from datetime import datetime
 account_bp = Blueprint('account', __name__)
 document_bp = Blueprint('document', __name__)
 
-# Mock OTP Store (In-memory for testing - replace with Redis/DB in production)
-# Format: { 'user_id': '123456' }
 otp_store = {}
 
-# ---------------- HELPER FUNCTIONS ----------------
 def generate_temp_password(length=12):
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 def save_file(file, folder='uploads'):
-    # Ensure the directory exists
     os.makedirs(os.path.join(current_app.root_path, 'static', folder), exist_ok=True)
-    # Extract just the filename to avoid path duplication issues
     filename = os.path.basename(file.filename)
     filepath = os.path.join(current_app.root_path, 'static', folder, filename)
     file.save(filepath)
     return filepath
 
-
-# ---------------- POSITIONS ----------------
 @account_bp.route('/api/admin/positions', methods=['GET'])
 def get_positions():
     positions = Position.query.order_by(Position.created_at.desc()).all()
@@ -65,8 +58,6 @@ def delete_position(pos_id):
     db.session.commit()
     return jsonify({'message': 'Position deleted'})
 
-
-# ---------------- OFFICE LOCATIONS ----------------
 @account_bp.route('/api/admin/locations', methods=['GET'])
 def get_locations():
     locations = OfficeLocation.query.order_by(OfficeLocation.created_at.desc()).all()
@@ -100,8 +91,6 @@ def delete_location(loc_id):
     db.session.commit()
     return jsonify({'message': 'Location deleted'})
 
-
-# ---------------- USER MANAGEMENT ----------------
 @account_bp.route('/api/admin/create-user', methods=['POST'])
 def create_user():
     data = request.get_json()
@@ -174,7 +163,6 @@ def login():
         return jsonify({'error': 'Invalid credentials'}), 401
     return jsonify({'message': 'Login successful', 'user': user.to_dict()}), 200
 
-# ---------------- PROFILE EDIT (Own Account) ----------------
 @account_bp.route('/api/profile/<public_id>', methods=['GET'])
 def get_profile(public_id):
     user = User.query.filter_by(public_id=public_id).first_or_404()
@@ -185,40 +173,33 @@ def edit_own_profile(public_id):
     data = request.get_json()
     user = User.query.filter_by(public_id=public_id).first_or_404()
     
-    # Update basic fields
     user.first_name = data.get('first_name', user.first_name)
     user.middle_name = data.get('middle_name', user.middle_name)
     user.last_name = data.get('last_name', user.last_name)
     user.contact_no = data.get('contact_no', user.contact_no)
 
-    # Allow updating email as well; check for uniqueness if it changes
     new_email = data.get('email')
     if new_email and new_email != user.email:
         if User.query.filter_by(email=new_email).first():
             return jsonify({'error': 'Email already in use'}), 409
         user.email = new_email
     
-    # Password Change Logic with Old Password Verification OR OTP
     new_password = data.get('password')
     if new_password:
         old_password = data.get('old_password')
         otp = data.get('otp')
         
-        # Scenario 1: User provides OTP (Forgot password flow)
         if otp:
             stored_otp = otp_store.get(user.user_id)
             if not stored_otp or stored_otp != otp:
                 return jsonify({'error': 'Invalid or expired OTP'}), 400
             
-            # OTP is valid, proceed to change password
             user.set_password(new_password)
             user.force_change_password = False
             
-            # Clear used OTP
             if user.user_id in otp_store:
                 del otp_store[user.user_id]
         
-        # Scenario 2: User provides Old Password (Standard flow)
         elif old_password:
             if not user.check_password(old_password):
                 return jsonify({'error': 'Incorrect old password'}), 401
@@ -226,20 +207,14 @@ def edit_own_profile(public_id):
             user.set_password(new_password)
             user.force_change_password = False
             
-        # Scenario 3: Neither provided
         else:
             return jsonify({'error': 'Old password or OTP verification is required to set a new password'}), 400
 
     db.session.commit()
     return jsonify({'message': 'Profile updated', 'user': user.to_dict()})
 
-# ---------------- MOCK PHONE VERIFICATION ----------------
 @account_bp.route('/api/profile/send-otp', methods=['POST'])
 def send_otp():
-    """
-    Simulates sending an OTP to the user's phone.
-    Since we are local, we print the code to the console and return it in the response for debugging.
-    """
     data = request.get_json()
     user_id = data.get('user_id')
     contact_no = data.get('contact_no')
@@ -247,17 +222,15 @@ def send_otp():
     if not user_id or not contact_no:
         return jsonify({'error': 'Missing user_id or contact_no'}), 400
         
-    # Generate 6 digit code
     code = ''.join(random.choices(string.digits, k=6))
     
-    # Store in memory (mock DB/Redis)
     otp_store[user_id] = code
     
     print(f"\n[MOCK SMS GATEWAY] Sending OTP to {contact_no}: {code}\n")
     
     return jsonify({
         'message': 'OTP sent successfully',
-        'debug_otp': code # Returned only for testing convenience
+        'debug_otp': code 
     })
 
 @account_bp.route('/api/profile/verify-otp', methods=['POST'])
@@ -272,22 +245,12 @@ def verify_otp():
     stored_otp = otp_store.get(user_id)
     
     if stored_otp and stored_otp == otp:
-        # OTP is correct
-        del otp_store[user_id] # Clear OTP after use
-        
-        # Here you would typically update a 'verified' flag in the User model
-        # user = User.query.filter_by(user_id=user_id).first()
-        # user.phone_verified = True
-        # db.session.commit()
+        del otp_store[user_id] 
         
         return jsonify({'message': 'Phone verified successfully'})
     else:
         return jsonify({'error': 'Invalid or expired OTP'}), 400
 
-
-# ---------------- DOCUMENT WORKFLOW ----------------
-
-# Upload or create draft
 @document_bp.route('/api/document/upload', methods=['POST'])
 def upload_document():
     user_id = request.form.get('user_id')
@@ -317,7 +280,6 @@ def upload_document():
     db.session.commit()
     return jsonify({'message': 'Document uploaded as draft', 'document': doc.to_dict()}), 201
 
-# Autosave / update draft
 @document_bp.route('/api/document/autosave/<int:doc_id>', methods=['POST'])
 def autosave_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
@@ -336,7 +298,6 @@ def autosave_document(doc_id):
     db.session.commit()
     return jsonify({'message': 'Draft autosaved', 'document': doc.to_dict()})
 
-# Submit document to reviewer
 @document_bp.route('/api/document/submit/<int:doc_id>', methods=['POST'])
 def submit_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
@@ -345,16 +306,13 @@ def submit_document(doc_id):
     if doc.employee_id != user.id:
         return jsonify({'error': 'Unauthorized'}), 403
 
-    # Get reviewer_id from form data (if employee selects a specific reviewer)
     reviewer_id = request.form.get('reviewer_id')
     
     if reviewer_id:
-        # Employee selected a specific reviewer - verify the reviewer exists and is active
         reviewer = User.query.filter_by(id=int(reviewer_id), role='reviewer', is_active=True).first()
         if not reviewer:
             return jsonify({'error': 'Invalid or inactive reviewer selected'}), 400
     else:
-        # Fallback to office-assigned reviewer
         office = user.office_location
         if not office or not office.reviewer_id:
             return jsonify({'error': 'No reviewer assigned for your office. Please select a reviewer.'}), 400
@@ -369,19 +327,16 @@ def submit_document(doc_id):
     db.session.commit()
     return jsonify({'message': 'Document submitted', 'document': doc.to_dict()})
 
-# Reviewer approves or declines
 @document_bp.route('/api/document/review/<int:doc_id>', methods=['POST'])
 def review_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
     
-    # Accept either reviewer_id or user_id
     reviewer_id = request.form.get('reviewer_id') or request.form.get('user_id')
     reviewer = User.query.filter_by(user_id=reviewer_id).first_or_404()
 
     if doc.reviewer_id != reviewer.id:
         return jsonify({'error': 'Unauthorized - you are not assigned to review this document'}), 403
 
-    # Accept either status or action
     action = request.form.get('action') or request.form.get('status')
 
     if action == 'approve' or action == 'approved':
@@ -391,7 +346,6 @@ def review_document(doc_id):
         return jsonify({'message': 'Document approved', 'document': doc.to_dict()})
 
     elif action == 'decline' or action == 'declined':
-        # Accept either reason or note
         reason = request.form.get('reason') or request.form.get('note', '')
         doc.status = 'declined'
         doc.reviewer_note = reason
@@ -401,16 +355,10 @@ def review_document(doc_id):
 
     return jsonify({'error': 'Invalid action. Use action=approve or action=decline'}), 400
 
-# Load/Get Content of a Document (JSON) directly
 @document_bp.route('/api/document/content/<int:doc_id>', methods=['GET'])
 def get_document_content(doc_id):
-    """
-    Reads the content of the file from the server disk and returns it as JSON.
-    This allows the frontend to 'Load' state without the user downloading a file.
-    """
     doc = Document.query.get_or_404(doc_id)
      
-    # Security: Ensure only the owner (or potentially the reviewer) can read the raw content
     requesting_user_id = request.args.get('user_id')
     if requesting_user_id:
         user = User.query.filter_by(user_id=requesting_user_id).first()
@@ -420,7 +368,6 @@ def get_document_content(doc_id):
     if not os.path.exists(doc.file_path):
         return jsonify({'error': 'File not found on server'}), 404
 
-    # We only want to return JSON content this way. PDFs should still be downloaded.
     if doc.file_path.endswith('.json'):
         try:
             with open(doc.file_path, 'r') as f:
@@ -431,7 +378,6 @@ def get_document_content(doc_id):
      
     return jsonify({'error': 'File is not a JSON state file'}), 400
 
-# Download document (as attachment)
 @document_bp.route('/api/document/download/<int:doc_id>', methods=['GET'])
 def download_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
@@ -440,27 +386,22 @@ def download_document(doc_id):
         return jsonify({'error': 'File not found'}), 404
     return send_file(path, as_attachment=True, download_name=os.path.basename(path))
 
-# Delete Document (Added as requested)
 @document_bp.route('/api/document/<int:doc_id>', methods=['DELETE'])
 def delete_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
      
-    # Check authorization if user_id is provided
     user_id = request.args.get('user_id')
     if user_id:
         user = User.query.filter_by(user_id=user_id).first()
-        # Allow owner to delete
         if user and doc.employee_id != user.id:
              return jsonify({'error': 'Unauthorized'}), 403
 
-    # Attempt to remove the file from disk
     if doc.file_path and os.path.exists(doc.file_path):
         try:
             os.remove(doc.file_path)
         except OSError:
             pass 
              
-    # Also remove review file if it exists
     if hasattr(doc, 'review_file_path') and doc.review_file_path and os.path.exists(doc.review_file_path):
         try:
             os.remove(doc.review_file_path)
@@ -471,21 +412,18 @@ def delete_document(doc_id):
     db.session.commit()
     return jsonify({'message': 'Document deleted'})
 
-# Get all documents for a user
 @document_bp.route('/api/document/user/<string:user_id>', methods=['GET'])
 def get_user_documents(user_id):
     user = User.query.filter_by(user_id=user_id).first_or_404()
     docs = Document.query.filter_by(employee_id=user.id).order_by(Document.updated_at.desc()).all()
     return jsonify([d.to_dict() for d in docs])
 
-# Get all documents pending review for a reviewer
 @document_bp.route('/api/document/reviewer/<int:reviewer_id>', methods=['GET'])
 def get_reviewer_documents(reviewer_id):
     reviewer = User.query.get_or_404(reviewer_id)
     docs = Document.query.filter_by(reviewer_id=reviewer.id, status='submitted').order_by(Document.submitted_at.desc()).all()
     return jsonify([d.to_dict() for d in docs])
 
-# Get all reviewers (for employee to select)
 @document_bp.route('/api/document/reviewers', methods=['GET'])
 def get_reviewers():
     reviewers = User.query.filter_by(role='reviewer', is_active=True).all()
@@ -497,23 +435,16 @@ def get_reviewers():
         "office_location": r.office_location.location if r.office_location else None
     } for r in reviewers])
 
-# Upload signed document by reviewer
 @document_bp.route('/api/document/upload-review/<int:doc_id>', methods=['POST'])
 def upload_review_document(doc_id):
-    """
-    Allows reviewer to upload a signed/approved document.
-    This is separate from the review action - reviewer can upload first, then approve.
-    """
     doc = Document.query.get_or_404(doc_id)
     
-    # Get reviewer info
     user_id = request.form.get('user_id')
     if not user_id:
         return jsonify({'error': 'user_id is required'}), 400
     
     reviewer = User.query.filter_by(user_id=user_id).first_or_404()
     
-    # Verify the reviewer is assigned to this document
     if doc.reviewer_id != reviewer.id:
         return jsonify({'error': 'Unauthorized - you are not assigned to review this document'}), 403
     
@@ -524,7 +455,6 @@ def upload_review_document(doc_id):
     if file.filename == '':
         return jsonify({'error': 'Empty filename'}), 400
     
-    # Save the signed document
     filepath = save_file(file, folder='uploads')
     doc.review_file_path = filepath
     doc.updated_at = datetime.utcnow()
@@ -532,13 +462,8 @@ def upload_review_document(doc_id):
     
     return jsonify({'message': 'Signed document uploaded', 'document': doc.to_dict()}), 200
 
-# Upload multiple files and convert to single PDF
 @document_bp.route('/api/document/upload-attachments', methods=['POST'])
 def upload_attachments():
-    """
-    Accepts multiple files (Excel, Word, images, etc.) and converts them to a single PDF.
-    Returns the path to the merged PDF file.
-    """
     try:
         user_id = request.form.get('user_id')
         if not user_id:
@@ -546,7 +471,6 @@ def upload_attachments():
         
         user = User.query.filter_by(user_id=user_id).first_or_404()
         
-        # Check if files were uploaded
         if 'files' not in request.files:
             return jsonify({'error': 'No files uploaded'}), 400
         
@@ -554,14 +478,12 @@ def upload_attachments():
         if not files or len(files) == 0:
             return jsonify({'error': 'No files uploaded'}), 400
         
-        # Import the file converter
         try:
             from file_converter import convert_file_to_pdf, merge_pdfs_to_single
         except ImportError as e:
             print(f"Import error: {e}")
             return jsonify({'error': 'File conversion service not available. Please install required packages: pip install python-docx openpyxl reportlab PyPDF2'}), 500
         
-        # Create temporary directory for conversions
         import tempfile
         import shutil
         
@@ -570,17 +492,14 @@ def upload_attachments():
         conversion_errors = []
         
         try:
-            # Save and convert each file
             for file in files:
                 if file.filename == '':
                     continue
                 
-                # Save uploaded file
                 filename = file.filename
                 temp_input_path = os.path.join(temp_dir, filename)
                 file.save(temp_input_path)
                 
-                # Convert to PDF
                 output_dir = os.path.join(temp_dir, 'pdfs')
                 os.makedirs(output_dir, exist_ok=True)
                 try:
@@ -592,7 +511,6 @@ def upload_attachments():
                     error_msg = f"Error converting {filename}: {str(e)}"
                     print(error_msg)
                     conversion_errors.append(error_msg)
-                    # Continue with other files
             
             print(f"Conversion results: {len(converted_pdfs)} files converted, {len(conversion_errors)} errors")
             print(f"Conversion errors: {conversion_errors}")
@@ -601,22 +519,17 @@ def upload_attachments():
                 error_detail = "; ".join(conversion_errors) if conversion_errors else "No files could be converted to PDF. Please ensure you have .xlsx, .xls, .docx, .doc, .png, .jpg, .jpeg, or .txt files."
                 return jsonify({'error': error_detail}), 400
             
-            # Generate output filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             output_filename = f"attachments_{timestamp}.pdf"
             output_dir = os.path.join(current_app.root_path, 'static', 'documents')
             os.makedirs(output_dir, exist_ok=True)
             output_path = os.path.join(output_dir, output_filename)
             
-            # Merge all PDFs
             if len(converted_pdfs) == 1:
-                # Only one file, just rename
                 shutil.move(converted_pdfs[0], output_path)
             else:
-                # Merge multiple PDFs
                 merge_pdfs_to_single(converted_pdfs, output_path)
             
-            # Return the file path relative to static folder
             relative_path = os.path.join('documents', output_filename)
             
             return jsonify({
@@ -629,7 +542,6 @@ def upload_attachments():
             print(f"Conversion error: {str(e)}")
             return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
         finally:
-            # Clean up temp directory
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
     except Exception as e:

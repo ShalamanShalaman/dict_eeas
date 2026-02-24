@@ -18,10 +18,6 @@ from attendance_utils import (
 
 attendance_bp = Blueprint('attendance', __name__)
 
-
-# -------------------------------------------------
-# Web UI (optional / legacy)
-# -------------------------------------------------
 @attendance_bp.route('/', methods=['GET', 'POST'])
 def index():
     extracted_text = ""
@@ -70,10 +66,6 @@ def index():
         error_message=error_message
     )
 
-
-# -------------------------------------------------
-# API: Upload attendance PDF
-# -------------------------------------------------
 @attendance_bp.route('/api/upload-attendance', methods=['POST'])
 def api_upload_attendance():
     if 'attendanceFile' not in request.files:
@@ -109,15 +101,8 @@ def api_upload_attendance():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# -------------------------------------------------
-# API: Generate DTR-only PDF
-# -------------------------------------------------
 @attendance_bp.route('/api/download-dtr-pdf', methods=['POST'])
 def download_dtr_pdf():
-    """
-    Generates a PDF of the Daily Time Record (DTR)
-    """
     from reportlab.lib.pagesizes import letter, landscape
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet
@@ -136,17 +121,14 @@ def download_dtr_pdf():
         return jsonify({"error": "Invalid request data"}), 400
 
     try:
-        # Create PDF in memory (landscape for better table view)
         buffer = io.BytesIO()
         pdf_doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
         styles = getSampleStyleSheet()
 
-        # Title
         story.append(Paragraph("DAILY TIME RECORD", styles['Title']))
         story.append(Spacer(1, 10))
 
-        # Employee Info
         info_data = [
             ['Name:', employee_name],
             ['Period:', period_text],
@@ -162,10 +144,8 @@ def download_dtr_pdf():
         story.append(info_table)
         story.append(Spacer(1, 20))
 
-        # Daily Time Records table
         dtr_data = [['Day', 'AM In', 'AM Out', 'PM In', 'PM Out', 'UT (Hrs)', 'UT (Min)', 'Remarks']]
         
-        # Get month_name and year from employee_data if available
         month_name = employee_data.get('month_name', '')
         year = employee_data.get('year', '')
         
@@ -182,7 +162,6 @@ def download_dtr_pdf():
             
             dtr_data.append([day_str, am_in, am_out, pm_in, pm_out, ut_hrs, ut_min, remarks])
 
-        # Create table with appropriate column widths
         dtr_table = Table(dtr_data, colWidths=[
             0.5*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.6*inch, 0.6*inch, 2*inch
         ])
@@ -200,7 +179,6 @@ def download_dtr_pdf():
         ]))
         story.append(dtr_table)
 
-        # Build PDF
         pdf_doc.build(story)
         buffer.seek(0)
 
@@ -216,15 +194,8 @@ def download_dtr_pdf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# -------------------------------------------------
-# API: Generate AR-only PDF
-# -------------------------------------------------
 @attendance_bp.route('/api/generate-ar-pdf', methods=['POST'])
 def generate_ar_pdf():
-    """
-    Generates a PDF of the Accomplishment Report (AR)
-    """
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -248,13 +219,11 @@ def generate_ar_pdf():
         return jsonify({"error": "Missing employee data"}), 400
 
     try:
-        # Create PDF in memory
         buffer = io.BytesIO()
         pdf_doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
         styles = getSampleStyleSheet()
 
-        # Custom styles
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Title'],
@@ -270,11 +239,9 @@ def generate_ar_pdf():
             spaceAfter=10
         )
 
-        # Title
         story.append(Paragraph("ACCOMPLISHMENT REPORT", title_style))
         story.append(Spacer(1, 15))
 
-        # Employee Info Table
         info_data = [
             ['Name:', employee_name],
             ['Position:', position],
@@ -295,18 +262,15 @@ def generate_ar_pdf():
         story.append(info_table)
         story.append(Spacer(1, 20))
 
-        # Tasks/Accomplishments
         story.append(Paragraph("Tasks Accomplished", heading_style))
         story.append(Spacer(1, 10))
 
-        # Tasks table - only include days with tasks
         task_data = [['Date', 'Task Accomplished']]
         
         for day in range(1, 32):
             day_str = str(day)
             task = tasks.get(day_str, '')
             
-            # Check if there's attendance for this day
             day_data = employee_data.get(day_str, {})
             has_attendance = any([
                 day_data.get('am_in', ''),
@@ -315,14 +279,13 @@ def generate_ar_pdf():
                 day_data.get('pm_out', '')
             ])
             
-            # Only add rows with tasks
             if task and task.strip():
                 task_data.append([day_str, task])
 
         if len(task_data) > 1:
             task_table = Table(task_data, colWidths=[0.8*inch, 6*inch])
             task_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexArray([26, 70, 176])),  # #1e46b0
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexArray([26, 70, 176])), 
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('ALIGN', (0, 0), (0, -1), 'CENTER'),
                 ('ALIGN', (1, 0), (1, -1), 'LEFT'),
@@ -341,10 +304,8 @@ def generate_ar_pdf():
 
         story.append(Spacer(1, 40))
 
-        # Signature section
         story.append(Spacer(1, 20))
         
-        # Approver signature
         approver_data = [
             ['', ''],
             ['Certified By:', ''],
@@ -360,7 +321,6 @@ def generate_ar_pdf():
         ]))
         story.append(approver_table)
 
-        # Build PDF
         pdf_doc.build(story)
         buffer.seek(0)
 
@@ -376,10 +336,6 @@ def generate_ar_pdf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# -------------------------------------------------
-# API: Generate DTR Excel (editable data supported)
-# -------------------------------------------------
 @attendance_bp.route('/api/download-dtr', methods=['POST'])
 def download_dtr():
     data = request.json or {}
@@ -387,14 +343,12 @@ def download_dtr():
     employee_name = data.get("employee_name")
     employee_data = data.get("employee_data")
     approver_name = data.get("approver", "") 
-    period_text = data.get("period_text", "") # Re-added
+    period_text = data.get("period_text", "")
 
     if not employee_name or not employee_data:
         return jsonify({"error": "Invalid request data"}), 400
 
     try:
-        # Pass approver_name and period_text to generator
-        # Ensure your attendance_utils.py generate_dtr accepts period_text!
         output = generate_dtr(
             employee_name, 
             employee_data, 
@@ -417,31 +371,20 @@ def download_dtr():
         download_name=f'DTR_{clean_name}.xlsx'
     )
 
-
-# -------------------------------------------------
-# API: Generate AR DOCX
-# -------------------------------------------------
 @attendance_bp.route('/api/generate-ar', methods=['POST'])
 def generate_ar():
-    """
-    Generates AR from parsed PDF data + frontend overrides
-    """
-
     data = request.json or {}
 
     employee_name = data.get("employee_name")
     employee_data = data.get("employee_data")
 
-    # frontend editable fields
     position = data.get("position", "")
     office = data.get("office", "")
     project = data.get("project", "")
-    period_text = data.get("period_text", "") # Re-added
+    period_text = data.get("period_text", "")
 
-    # optional task overrides from frontend
     overrides = data.get("overrides", {})
     
-    # Inject period_text into overrides for ar_utils
     if period_text:
         overrides["period_text"] = period_text
 
@@ -474,15 +417,8 @@ def generate_ar():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# -------------------------------------------------
-# API: Generate PDF Report (DTR + AR combined)
-# -------------------------------------------------
 @attendance_bp.route('/api/generate-pdf', methods=['POST'])
 def generate_pdf():
-    """
-    Generates a PDF report containing both DTR and AR data
-    """
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet
@@ -502,17 +438,14 @@ def generate_pdf():
     tasks = data.get("tasks", {})
 
     try:
-        # Create PDF in memory
         buffer = io.BytesIO()
         pdf_doc = SimpleDocTemplate(buffer, pagesize=letter)
         story = []
         styles = getSampleStyleSheet()
 
-        # Title
         story.append(Paragraph("DAILY TIME RECORD & ACCOMPLISHMENT REPORT", styles['Title']))
         story.append(Spacer(1, 20))
 
-        # Employee Info
         info_data = [
             ['Name:', employee_name],
             ['Position:', position],
@@ -530,11 +463,9 @@ def generate_pdf():
         story.append(info_table)
         story.append(Spacer(1, 20))
 
-        # Daily Time Records
         story.append(Paragraph("Daily Time Record", styles['Heading2']))
         story.append(Spacer(1, 10))
 
-        # Create DTR table
         dtr_data = [['Day', 'AM In', 'AM Out', 'PM In', 'PM Out', 'UT (Hrs)', 'Remarks']]
         for day in range(1, 32):
             day_str = str(day)
@@ -546,7 +477,6 @@ def generate_pdf():
             ut = day_data.get('undertime_hrs', '')
             remarks = day_data.get('remarks', '')
             
-            # Only add rows with data
             if am_in or am_out or pm_in or pm_out or remarks:
                 dtr_data.append([day_str, am_in, am_out, pm_in, pm_out, ut, remarks])
 
@@ -567,7 +497,6 @@ def generate_pdf():
 
         story.append(Spacer(1, 20))
 
-        # Accomplishment Report
         story.append(Paragraph("Accomplishment Report", styles['Heading2']))
         story.append(Spacer(1, 10))
 
@@ -575,7 +504,6 @@ def generate_pdf():
             story.append(Paragraph(f"<b>Project:</b> {project}", styles['Normal']))
             story.append(Spacer(1, 10))
 
-        # Tasks table
         task_data = [['Date', 'Task Accomplished']]
         for day in range(1, 32):
             day_str = str(day)
@@ -600,7 +528,6 @@ def generate_pdf():
             ]))
             story.append(task_table)
 
-        # Build PDF
         pdf_doc.build(story)
         buffer.seek(0)
 

@@ -5,8 +5,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
-
-# ---------------- POSITIONS ----------------
 class Position(db.Model):
     __tablename__ = "positions"
 
@@ -29,15 +27,12 @@ class Position(db.Model):
             "created_at": self.created_at.isoformat()
         }
 
-
-# ---------------- OFFICE LOCATIONS ----------------
 class OfficeLocation(db.Model):
     __tablename__ = "office_locations"
 
     id = db.Column(db.Integer, primary_key=True)
     location = db.Column(db.String(100), nullable=False)
 
-    # Provincial officer (reviewer) assigned to this office
     reviewer_id = db.Column(
         db.Integer,
         db.ForeignKey("users.id"),
@@ -46,7 +41,6 @@ class OfficeLocation(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Employees assigned to this office
     employees = db.relationship(
         "User",
         foreign_keys="User.office_location_id",
@@ -54,7 +48,6 @@ class OfficeLocation(db.Model):
         lazy=True
     )
 
-    # Provincial officer relationship (explicit FK to avoid ambiguity)
     reviewer = db.relationship(
         "User",
         foreign_keys=[reviewer_id],
@@ -69,8 +62,6 @@ class OfficeLocation(db.Model):
             "reviewer_id": self.reviewer_id
         }
 
-
-# ---------------- USERS ----------------
 class User(db.Model):
     __tablename__ = 'users'
 
@@ -89,7 +80,7 @@ class User(db.Model):
         db.String(20),
         nullable=False,
         default='employee'
-    )  # admin, reviewer, employee
+    )  
 
     first_name = db.Column(db.String(50), nullable=False)
     middle_name = db.Column(db.String(50), nullable=True)
@@ -102,7 +93,6 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
 
-    # Foreign keys
     office_location_id = db.Column(
         db.Integer,
         db.ForeignKey("office_locations.id"),
@@ -115,7 +105,6 @@ class User(db.Model):
         nullable=True
     )
 
-    # Documents
     submitted_documents = db.relationship(
         "Document",
         foreign_keys="Document.employee_id",
@@ -130,7 +119,6 @@ class User(db.Model):
         lazy=True
     )
 
-    # Password helpers
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -142,11 +130,9 @@ class User(db.Model):
         return f"{self.first_name} {self.middle_name or ''} {self.last_name}".strip()
 
     def to_dict(self):
-        # Resolve relationships for frontend auto-population
         pos_name = self.position.name if self.position else ""
         off_name = self.office_location.location if self.office_location else ""
         
-        # Get the Provincial Officer (Reviewer) associated with this user's office
         provincial_officer = ""
         if self.office_location and self.office_location.reviewer:
             provincial_officer = self.office_location.reviewer.full_name
@@ -165,17 +151,12 @@ class User(db.Model):
             "is_active": self.is_active,
             "office_location_id": self.office_location_id,
             "position_id": self.position_id,
-            
-            # --- Extended Data for Forms ---
             "position_name": pos_name,
             "office_name": off_name,
             "provincial_officer": provincial_officer,
-            
             "created_at": self.created_at.isoformat()
         }
 
-
-# ---------------- DOCUMENTS (Merged DTR + AR Workflow) ----------------
 class Document(db.Model):
     __tablename__ = "documents"
 
@@ -199,7 +180,7 @@ class Document(db.Model):
     status = db.Column(
         db.String(20),
         default='draft'
-    )  # draft, submitted, approved, declined
+    )  
 
     reviewer_note = db.Column(db.Text, nullable=True)
 
