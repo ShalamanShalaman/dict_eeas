@@ -1,8 +1,6 @@
 import React, { useState } from 'react'
 
 const AdminDashboard = () => {
-  /* ---------------- STATE ---------------- */
-
   const [totalUsers, setTotalUsers] = useState(150)
   const [activeSessions] = useState(23)
   const [storage] = useState(45)
@@ -17,8 +15,6 @@ const AdminDashboard = () => {
     { time: '09:15 AM', user: 'John_D', action: 'Login', type: 'login', details: 'Successful login' },
     { time: '08:50 AM', user: 'Admin_01', action: 'Export', type: 'export', details: 'Downloaded report' },
   ])
-
-  /* ---------------- HELPERS ---------------- */
 
   const styles = {
     update: 'text-blue-600 bg-blue-50 border-blue-100',
@@ -58,12 +54,8 @@ const AdminDashboard = () => {
       log.details.toLowerCase().includes(search.toLowerCase())
   )
 
-  /* ---------------- UI ---------------- */
-
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-
-      {/* HEADER */}
       <div className="mb-8 flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">System Administration</h2>
@@ -79,7 +71,6 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {/* STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <Stat title="Total Users" value={totalUsers}>
           <p className="text-xs text-slate-400 mt-2">
@@ -114,7 +105,6 @@ const AdminDashboard = () => {
         </Stat>
       </div>
 
-      {/* AUDIT LOGS (FULL WIDTH NOW) */}
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b flex flex-col sm:flex-row justify-between gap-3">
           <h3 className="font-semibold">Audit Logs</h3>
@@ -170,7 +160,6 @@ const AdminDashboard = () => {
         </table>
       </div>
 
-      {/* MODAL */}
       {showModal && (
         <AddUserModal
           onClose={() => setShowModal(false)}
@@ -178,7 +167,6 @@ const AdminDashboard = () => {
         />
       )}
 
-      {/* TOAST */}
       {toast && (
         <div className="fixed bottom-4 right-4 bg-green-600 text-white px-5 py-3 rounded-lg shadow-lg">
           {toast}
@@ -187,8 +175,6 @@ const AdminDashboard = () => {
     </div>
   )
 }
-
-/* ---------------- COMPONENTS ---------------- */
 
 const Stat = ({ title, value, children }) => (
   <div className="bg-white p-6 rounded-xl border shadow-sm hover:-translate-y-0.5 transition">
