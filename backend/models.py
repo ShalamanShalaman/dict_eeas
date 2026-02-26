@@ -127,7 +127,14 @@ class User(db.Model):
 
     @property
     def full_name(self):
-        return f"{self.first_name} {self.middle_name or ''} {self.last_name}".strip()
+        return f"{self.first_name} {self.middle_name or ''} {self.last_name}".replace("  ", " ").strip()
+
+    @property
+    def adjustment_name(self):
+        mi = f"{self.middle_name.strip()[0].upper()}." if self.middle_name and self.middle_name.strip() else ""
+        if mi:
+            return f"{self.last_name}, {self.first_name} {mi}".strip()
+        return f"{self.last_name}, {self.first_name}".strip()
 
     def to_dict(self):
         pos_name = self.position.name if self.position else ""
@@ -144,6 +151,7 @@ class User(db.Model):
             "email": self.email,
             "role": self.role,
             "full_name": self.full_name,
+            "adjustment_name": self.adjustment_name,
             "first_name": self.first_name,
             "middle_name": self.middle_name,
             "last_name": self.last_name,

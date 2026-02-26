@@ -13,7 +13,8 @@ from datetime import datetime
 from attendance_utils import (
     parse_employees_data,
     generate_dtr,
-    generate_ar_from_employee_data
+    generate_ar_from_employee_data,
+    generate_dtr_adjustment_slip
 )
 
 attendance_bp = Blueprint('attendance', __name__)
@@ -344,6 +345,7 @@ def download_dtr():
     employee_data = data.get("employee_data")
     approver_name = data.get("approver", "") 
     period_text = data.get("period_text", "")
+    period_format = data.get("period_format", "full")
 
     if not employee_name or not employee_data:
         return jsonify({"error": "Invalid request data"}), 400
@@ -353,7 +355,8 @@ def download_dtr():
             employee_name, 
             employee_data, 
             approver_name=approver_name,
-            period_text=period_text
+            period_text=period_text,
+            period_format=period_format
         )
 
     except Exception as e:
@@ -412,6 +415,41 @@ def generate_ar():
             output_path,
             as_attachment=True,
             download_name=f"AR_{employee_name}.docx"
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@attendance_bp.route('/api/generate-dtr-adjustment', methods=['POST'])
+def generate_dtr_adjustment():
+    data = request.json or {}
+
+    # We don't strictly need employee_data for this if it's manually filled, 
+    # but we might use it for defaults if needed.
+    overrides = data.get("overrides", {})
+    employee_name = overrides.get("name", "Employee")
+
+    try:
+        output_dir = current_app.config['UPLOAD_FOLDER']
+        os.makedirs(output_dir, exist_ok=True)
+
+        filename = f"DTR_ADJUSTMENT_{employee_name.replace(' ', '_')}_{datetime.now().timestamp()}.docx"
+        output_path = os.path.join(output_dir, filename)
+
+        generate_dtr_adjustment_slip(
+            employee_data={}, # Not strictly used, data comes from overrides
+            output_path=output_path,
+            overrides=overrides
+        )
+
+        return send_file(
+            output_path,
+            mimetype=(
+                'application/vnd.openxmlformats-officedocument.'
+                'wordprocessingml.document'
+            ),
+            as_attachment=True,
+            download_name=f"DTR_ADJUSTMENT_{employee_name}.docx"
         )
 
     except Exception as e:

@@ -136,6 +136,21 @@ const FileSignatureIcon = ({ className }) => (
     </Icon>
 );
 
+const FileWarningIcon = ({ className }) => (
+    <Icon className={className}>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+    </Icon>
+);
+
+const PlusIcon = ({ className }) => (
+  <Icon className={className}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </Icon>
+);
+
 export default function UploadAttendance({ onNavigate }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -164,6 +179,7 @@ export default function UploadAttendance({ onNavigate }) {
 
   const [arMeta, setArMeta] = useState({
     name: "",
+    adjustmentName: "",
     position: "",
     office: "",
     project: "",
@@ -171,6 +187,14 @@ export default function UploadAttendance({ onNavigate }) {
     approverTitle: "PROVINCIAL OFFICER, ISABELA - CAUAYAN II",
     periodFormat: "full",
     tasks: {}, 
+    employeeNo: "",
+    controlNo: "",
+    filingDate: "",
+    adjustmentReason: "",
+    adjustmentDetails: "",
+    obWith: "",
+    obAt: "",
+    adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" })
   });
 
   const fileInputRef = useRef(null);
@@ -208,6 +232,7 @@ export default function UploadAttendance({ onNavigate }) {
        setArMeta(prev => ({
            ...prev,
            name: prev.name || currentUser.full_name || "", 
+           adjustmentName: prev.adjustmentName || "",
            position: prev.position || currentUser.position_name || "",
            office: prev.office || currentUser.office_name || "",
            approver: prev.approver || currentUser.provincial_officer || ""
@@ -408,6 +433,7 @@ const handleSaveConfirmed = async () => {
         setArMeta(prev => ({
             ...prev,
             name: currentUser?.full_name || first,
+            adjustmentName: "",
             position: currentUser?.position_name || "",
             office: currentUser?.office_name || "",
             approver: currentUser?.provincial_officer || "",
@@ -473,6 +499,7 @@ const handleSaveConfirmed = async () => {
     setHasUnsavedChanges(false);
     setArMeta({ 
         name: currentUser?.full_name || "", 
+        adjustmentName: "",
         position: currentUser?.position_name || "", 
         office: currentUser?.office_name || "", 
         approver: currentUser?.provincial_officer || "",
@@ -533,12 +560,45 @@ const handleSaveConfirmed = async () => {
     setHasUnsavedChanges(true);
   };
 
+  const getFilteredPayload = () => {
+    const fullData = employees[selectedEmployee] || {};
+    const fullTasks = arMeta.tasks || {};
+    
+    if (arMeta.periodFormat === "full") {
+        return { filteredData: fullData, filteredTasks: fullTasks };
+    }
+
+    const start = arMeta.periodFormat === "1-15" ? 1 : 16;
+    const end = arMeta.periodFormat === "1-15" ? 15 : 31;
+    
+    const filteredData = { ...fullData };
+    const filteredTasks = {};
+    
+    Object.keys(filteredData).forEach(key => {
+        if (key === 'month_name' || key === 'year') return;
+        const day = parseInt(key);
+        if (!isNaN(day) && (day < start || day > end)) {
+            delete filteredData[key];
+        }
+    });
+    
+    Object.keys(fullTasks).forEach(key => {
+        const day = parseInt(key);
+        if (!isNaN(day) && (day >= start && day <= end)) {
+            filteredTasks[key] = fullTasks[key];
+        }
+    });
+    
+    return { filteredData, filteredTasks };
+  };
+
   const downloadExcel = async () => {
     if (!selectedEmployee) return;
 
     try {
       const finalName = arMeta.name || selectedEmployee;
       const finalPeriod = getPeriodText();
+      const { filteredData } = getFilteredPayload();
 
       const response = await fetch("http://127.0.0.1:5000/api/download-dtr", {
         method: "POST",
@@ -546,9 +606,10 @@ const handleSaveConfirmed = async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employee_name: finalName,
-          employee_data: employees[selectedEmployee],
+          employee_data: filteredData,
           approver: arMeta.approver,
-          period_text: finalPeriod
+          period_text: finalPeriod,
+          period_format: arMeta.periodFormat
         }),
       });
 
@@ -586,6 +647,7 @@ const handleSaveConfirmed = async () => {
     try {
       const finalName = arMeta.name || selectedEmployee;
       const finalPeriod = getPeriodText();
+      const { filteredData, filteredTasks } = getFilteredPayload();
 
       const response = await fetch("http://127.0.0.1:5000/api/generate-ar", {
         method: "POST",
@@ -593,20 +655,20 @@ const handleSaveConfirmed = async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employee_name: finalName,
-          employee_data: employees[selectedEmployee],
+          employee_data: filteredData,
           position: arMeta.position,
           office: arMeta.office,
           project: arMeta.project,
           period_text: finalPeriod,
           approver: arMeta.approver,
           approver_title: arMeta.approverTitle,
-          tasks: arMeta.tasks,
+          tasks: filteredTasks,
           overrides: {
             name: finalName, 
             position: arMeta.position,
             office: arMeta.office,
             project: arMeta.project,
-            tasks: arMeta.tasks,
+            tasks: filteredTasks,
             approved_by: arMeta.approver,
             approver_title: arMeta.approverTitle
           }
@@ -647,6 +709,7 @@ const handleSaveConfirmed = async () => {
     try {
       const finalName = arMeta.name || selectedEmployee;
       const finalPeriod = getPeriodText();
+      const { filteredData, filteredTasks } = getFilteredPayload();
 
       const response = await fetch("http://127.0.0.1:5000/api/generate-merged-report", {
         method: "POST",
@@ -654,7 +717,7 @@ const handleSaveConfirmed = async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employee_name: finalName,
-          employee_data: employees[selectedEmployee],
+          employee_data: filteredData,
           position: arMeta.position,
           office: arMeta.office,
           project: arMeta.project,
@@ -665,7 +728,7 @@ const handleSaveConfirmed = async () => {
             position: arMeta.position,
             office: arMeta.office,
             project: arMeta.project,
-            tasks: arMeta.tasks,
+            tasks: filteredTasks,
             approved_by: arMeta.approver,
             approver_title: arMeta.approverTitle
           }
@@ -694,6 +757,50 @@ const handleSaveConfirmed = async () => {
       } else {
         const err = await response.json();
         alert("Error downloading Merged Report: " + err.error);
+      }
+    } catch (error) {
+      alert("Download failed: " + error.message);
+    }
+  };
+
+  const downloadDtrAdjustment = async () => {
+    try {
+      const finalName = arMeta.name || selectedEmployee || currentUser?.full_name;
+
+      const response = await fetch("http://127.0.0.1:5000/api/generate-dtr-adjustment", {
+        method: "POST",
+        mode: 'cors',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          overrides: {
+            name: finalName,
+            adjustment_name: arMeta.adjustmentName,
+            employee_no: arMeta.employeeNo,
+            control_no: arMeta.controlNo,
+            filing_date: arMeta.filingDate,
+            reason: arMeta.adjustmentReason,
+            ob_with: arMeta.adjustmentReason === 'ob' ? arMeta.obWith : '',
+            ob_at: arMeta.adjustmentReason === 'ob' ? arMeta.obAt : '',
+            personal_details: arMeta.adjustmentReason === 'personal' ? arMeta.adjustmentDetails : '',
+            other_details: arMeta.adjustmentReason === 'other' ? arMeta.adjustmentDetails : '',
+            adjustment_rows: arMeta.adjustmentRows,
+            approver: arMeta.approver
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `DTR_ADJUSTMENT_${finalName.replace(/\s+/g, '_')}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else {
+        const err = await response.json().catch(() => ({ error: "An unknown error occurred." }));
+        alert("Error downloading Adjustment Slip: " + (err.error || "Unknown error"));
       }
     } catch (error) {
       alert("Download failed: " + error.message);
@@ -821,6 +928,16 @@ const handleSaveConfirmed = async () => {
               >
                 Accomplishment Report
               </button>
+              <button
+                onClick={() => handleTabChange("dtr_adjustment")}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
+                  viewMode === "dtr_adjustment"
+                    ? "bg-blue-50 text-blue-700 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                DTR Adjustment Slip
+              </button>
             </div>
           </div>
 
@@ -828,6 +945,7 @@ const handleSaveConfirmed = async () => {
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-800">
                     {viewMode === "dtr" ? "Edit Attendance Log" : "Edit Accomplishment Report"}
+                    {viewMode === "dtr_adjustment" && "DTR Adjustment Slip Details"}
                 </h3>
                 <div className="text-sm text-gray-500 flex items-center gap-1">
                     <Edit3Icon className="w-4 h-4" />
@@ -901,12 +1019,21 @@ const handleSaveConfirmed = async () => {
                     data={employees[selectedEmployee]} 
                     onUpdate={handleDtrUpdate} 
                     onBatchUpdate={handleBatchUpdate}
+                    periodFormat={arMeta.periodFormat}
                 />
-                ) : (
+                ) : viewMode === "ar" ? (
                 <AccomplishmentTable
                     attendance={employees[selectedEmployee]}
                     arMeta={arMeta}
                     setArMeta={setArMeta}
+                    periodFormat={arMeta.periodFormat}
+                />
+                ) : (
+                <DTRAdjustmentSlip
+                    arMeta={arMeta}
+                    setArMeta={setArMeta}
+                    setHasUnsavedChanges={setHasUnsavedChanges}
+                    currentUser={currentUser}
                 />
                 )}
             </div>
@@ -932,6 +1059,15 @@ const handleSaveConfirmed = async () => {
               >
                 <FileSignatureIcon className="w-4 h-4" /> Download Merged Report
               </button>
+
+              {viewMode === 'dtr_adjustment' && (
+                <button
+                  onClick={downloadDtrAdjustment}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg shadow-md font-bold transition-all flex items-center gap-2 text-sm"
+                >
+                  <FileWarningIcon className="w-4 h-4" /> Download Adjustment Slip
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1019,6 +1155,246 @@ const handleSaveConfirmed = async () => {
   );
 }
 
+function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUser }) {
+  const handleFieldChange = (field, value) => {
+    setArMeta(prev => ({ ...prev, [field]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleRowChange = (index, field, value) => {
+    const newRows = [...arMeta.adjustmentRows];
+    newRows[index] = { ...newRows[index], [field]: value };
+    setArMeta(prev => ({ ...prev, adjustmentRows: newRows }));
+    setHasUnsavedChanges(true);
+  };
+
+  const addRow = () => {
+    setArMeta(prev => ({
+        ...prev,
+        adjustmentRows: [...prev.adjustmentRows, { date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" }]
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const removeRow = (index) => {
+    const newRows = arMeta.adjustmentRows.filter((_, i) => i !== index);
+    setArMeta(prev => ({ ...prev, adjustmentRows: newRows }));
+    setHasUnsavedChanges(true);
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+        setArMeta(prev => {
+            const newName = prev.name || currentUser.full_name || "";
+            const newApprover = prev.approver || currentUser.provincial_officer || "";
+            if (prev.name !== newName || prev.approver !== newApprover) {
+                return { ...prev, name: newName, approver: newApprover };
+            }
+            return prev;
+        });
+    }
+  }, [currentUser, setArMeta]);
+
+  return (
+    <div className="p-4 bg-gray-50 overflow-x-auto">
+      <div className="bg-white border-2 border-black text-black max-w-6xl mx-auto shadow-lg">
+        
+        <div className="flex border-b border-black">
+            <div className="flex-1 border-r border-black p-2 flex items-center gap-2">
+                <span className="font-bold text-sm whitespace-nowrap">Employee No.:</span>
+                <input 
+                    className="flex-1 min-w-0 border-b border-gray-300 focus:border-blue-500 outline-none px-1 text-sm bg-transparent"
+                    value={arMeta.employeeNo}
+                    onChange={(e) => handleFieldChange('employeeNo', e.target.value)}
+                />
+            </div>
+            <div className="flex-1 p-2 flex items-center gap-2">
+                <span className="font-bold text-sm whitespace-nowrap">Control No.:</span>
+                <input 
+                    className="flex-1 min-w-0 border-b border-gray-300 focus:border-blue-500 outline-none px-1 text-sm bg-transparent"
+                    value={arMeta.controlNo}
+                    onChange={(e) => handleFieldChange('controlNo', e.target.value)}
+                />
+            </div>
+        </div>
+
+        <div className="flex border-b border-black">
+            <div className="flex-1 border-r border-black p-2">
+                <div className="font-bold text-sm mb-1">Name:</div>
+                <input 
+                    className="w-full min-w-0 border-b border-gray-300 focus:border-blue-500 outline-none px-1 text-sm font-medium bg-transparent"
+                    value={arMeta.adjustmentName}
+                    onChange={(e) => handleFieldChange('adjustmentName', e.target.value)}
+                    placeholder="LAST, FIRST M.I."
+                />
+            </div>
+            <div className="flex-1 p-2">
+                <div className="font-bold text-sm mb-1">Date/Time of Filing:</div>
+                <input 
+                    type="datetime-local"
+                    className="w-full min-w-0 border-b border-gray-300 focus:border-blue-500 outline-none px-1 text-sm bg-transparent"
+                    value={arMeta.filingDate}
+                    onChange={(e) => handleFieldChange('filingDate', e.target.value)}
+                />
+            </div>
+        </div>
+
+        <div className="text-center font-bold border-b border-black py-1 bg-gray-200 text-sm">
+            DETAILS OF DTR ADJUSTMENT
+        </div>
+
+        <div className="border-b border-black">
+          <table className="w-full text-sm text-center border-collapse">
+            <thead>
+              <tr>
+                <th className="border-r border-b border-black px-1 py-1 w-[15%]">DATES</th>
+                <th colSpan="2" className="border-r border-b border-black px-1 py-1 w-[25%]">AM</th>
+                <th colSpan="2" className="border-r border-b border-black px-1 py-1 w-[25%]">PM</th>
+                <th colSpan="2" className="border-b border-black px-1 py-1 w-[35%]">EVENING</th>
+                <th className="border-b border-black w-8"></th>
+              </tr>
+              <tr>
+                <th className="border-r border-b border-black px-1 py-1 h-8"></th>
+                <th className="border-r border-b border-black px-1 py-1">IN</th>
+                <th className="border-r border-b border-black px-1 py-1">OUT</th>
+                <th className="border-r border-b border-black px-1 py-1">IN</th>
+                <th className="border-r border-b border-black px-1 py-1">OUT</th>
+                <th className="border-r border-b border-black px-1 py-1">IN</th>
+                <th className="border-b border-black px-1 py-1"></th>
+                <th className="border-b border-black"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {arMeta.adjustmentRows.map((row, idx) => (
+                <tr key={idx} className="border-b border-black last:border-0">
+                  <td className="border-r border-black p-0"><input type="date" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.date} onChange={(e) => handleRowChange(idx, 'date', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="time" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.am_in} onChange={(e) => handleRowChange(idx, 'am_in', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="time" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.am_out} onChange={(e) => handleRowChange(idx, 'am_out', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="time" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.pm_in} onChange={(e) => handleRowChange(idx, 'pm_in', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="time" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.pm_out} onChange={(e) => handleRowChange(idx, 'pm_out', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="time" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.evening_in} onChange={(e) => handleRowChange(idx, 'evening_in', e.target.value)} /></td>
+                  <td className="p-0"><input type="text" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.evening_out} onChange={(e) => handleRowChange(idx, 'evening_out', e.target.value)} /></td>
+                  <td className="p-0 text-center bg-gray-50">
+                    <button 
+                        onClick={() => removeRow(idx)}
+                        disabled={arMeta.adjustmentRows.length <= 1}
+                        className="text-red-500 hover:text-red-700 disabled:opacity-30"
+                    >
+                        <Trash2Icon className="w-3 h-3" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="bg-gray-100 p-1 flex justify-center border-t border-black">
+              <button onClick={addRow} className="text-xs flex items-center gap-1 text-blue-600 font-bold hover:underline">
+                  <PlusIcon className="w-3 h-3" /> Add Row
+              </button>
+          </div>
+        </div>
+
+        <div className="border-b border-black p-2">
+            <div className="font-bold text-sm mb-2">REASON FOR ADJUSTMENT:</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 pr-2">
+             <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="radio" 
+                name="adjustmentReason" 
+                checked={arMeta.adjustmentReason === 'fingerprint'} 
+                onChange={() => handleFieldChange('adjustmentReason', 'fingerprint')}
+                className="w-4 h-4 text-black focus:ring-black"
+              />
+              <span className="text-sm">Fingerprint not recognized</span>
+             </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="adjustmentReason" 
+                  checked={arMeta.adjustmentReason === 'ob'} 
+                  onChange={() => handleFieldChange('adjustmentReason', 'ob')}
+                  className="w-4 h-4 text-black focus:ring-black"
+                />
+                <span className="text-sm">On Official Business / Pass Slip</span>
+              </label>
+              {arMeta.adjustmentReason === 'ob' && (
+                <div className="pl-6 mt-1 space-y-2 pr-2">
+                    <input 
+                      className="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm bg-transparent" 
+                      placeholder="With..." 
+                      value={arMeta.obWith}
+                      onChange={(e) => handleFieldChange('obWith', e.target.value)}
+                    />
+                    <input 
+                      className="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm bg-transparent" 
+                      placeholder="At..." 
+                      value={arMeta.obAt}
+                      onChange={(e) => handleFieldChange('obAt', e.target.value)}
+                    />
+                </div>
+              )}
+             </div>
+
+             <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="adjustmentReason" checked={arMeta.adjustmentReason === 'personal'} onChange={() => handleFieldChange('adjustmentReason', 'personal')} className="w-4 h-4 text-black focus:ring-black" />
+                <span className="text-sm">Personal Reason</span>
+              </label>
+              {arMeta.adjustmentReason === 'personal' && (
+                <div className="pl-6 mt-1 pr-2">
+                    <textarea 
+                        rows="2"
+                        className="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm resize-y bg-transparent" 
+                        placeholder="Specify reason..." 
+                        value={arMeta.adjustmentDetails} 
+                        onChange={(e) => handleFieldChange('adjustmentDetails', e.target.value)} 
+                    />
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="adjustmentReason" checked={arMeta.adjustmentReason === 'other'} onChange={() => handleFieldChange('adjustmentReason', 'other')} className="w-4 h-4 text-black focus:ring-black" />
+                <span className="text-sm">Other reasons</span>
+              </label>
+              {arMeta.adjustmentReason === 'other' && (
+                <div className="pl-6 mt-1 pr-2">
+                    <textarea 
+                        rows="2"
+                        className="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm resize-y bg-transparent" 
+                        placeholder="Specify reason..." 
+                        value={arMeta.adjustmentDetails} 
+                        onChange={(e) => handleFieldChange('adjustmentDetails', e.target.value)} 
+                    />
+                </div>
+              )}
+             </div>
+            </div>
+        </div>
+
+        <div className="flex border-b border-black">
+            <div className="flex-1 border-r border-black p-2">
+                <div className="font-bold text-sm mb-8">CERTIFIED TRUE AND CORRECT:</div>
+                <div className="text-center font-bold uppercase underline">{arMeta.name || "Employee Name"}</div>
+                <div className="text-center text-xs">SIGNATURE OF EMPLOYEE</div>
+            </div>
+            <div className="flex-1 p-2">
+                <div className="font-bold text-sm mb-8">APPROVED BY:</div>
+                <input 
+                    className="w-full min-w-0 text-center font-bold uppercase underline border-none focus:ring-0 p-0 bg-transparent"
+                    value={arMeta.approver || ""}
+                    onChange={(e) => handleFieldChange('approver', e.target.value)}
+                    placeholder="APPROVER NAME"
+                />
+                <div className="text-center text-xs">SIGNATURE OVER PRINTED NAME OF IMMEDIATE SUPERVISOR</div>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const InputCell = ({ day, field, value, onUpdate }) => (
     <input 
         type="text" 
@@ -1029,8 +1405,12 @@ const InputCell = ({ day, field, value, onUpdate }) => (
     />
 );
 
-function DTRTable({ data, onUpdate, onBatchUpdate }) {
-  const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
+function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat }) {
+  let start = 1;
+  let end = 31;
+  if (periodFormat === "1-15") end = 15;
+  if (periodFormat === "16-end") start = 16;
+  const days = Array.from({ length: end - start + 1 }, (_, i) => String(start + i));
   
   const [selectedDays, setSelectedDays] = useState(new Set());
   const [batchReason, setBatchReason] = useState("Work Suspension");
@@ -1191,8 +1571,12 @@ function DTRTable({ data, onUpdate, onBatchUpdate }) {
   );
 }
 
-function AccomplishmentTable({ attendance, arMeta, setArMeta }) {
-  const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
+function AccomplishmentTable({ attendance, arMeta, setArMeta, periodFormat }) {
+  let start = 1;
+  let end = 31;
+  if (periodFormat === "1-15") end = 15;
+  if (periodFormat === "16-end") start = 16;
+  const days = Array.from({ length: end - start + 1 }, (_, i) => String(start + i));
 
   const addBullet = (day) => {
     const currentText = arMeta.tasks[day] || "";
