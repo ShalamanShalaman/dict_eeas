@@ -98,7 +98,8 @@ def parse_employees_data(text):
             cleaned_logs = clean_daily_logs(raw_logs)
 
             for idx, (action, time) in enumerate(cleaned_logs):
-                display_time = ':'.join(time.split(':')[:2])
+                # USE THE 12-HOUR FORMAT HELPER INSTEAD OF JUST SPLITTING THE STRING
+                display_time = to_12h(time)
 
                 if action == 'C/IN':
                     if idx == 0: 
