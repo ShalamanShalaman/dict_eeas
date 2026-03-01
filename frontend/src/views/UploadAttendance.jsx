@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSearchParams, useBlocker, useNavigate } from "react-router-dom";
+import SuccessModal from "../components/SuccessModal";
 
 const Icon = ({ children, className }) => (
   <svg 
@@ -168,6 +169,7 @@ export default function UploadAttendance({ onNavigate }) {
   const [targetNavigatePath, setTargetNavigatePath] = useState(null);
   const [showNameModal, setShowNameModal] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -379,7 +381,7 @@ const handleSaveConfirmed = async () => {
         const result = await response.json();
         
         setShowNameModal(false);
-        alert("Progress Saved to Cloud!");
+        setShowSuccessModal(true);
 
         if (pendingAction === 'navigate' && blocker.state === "blocked") {
              blocker.proceed();
@@ -944,7 +946,8 @@ const handleSaveConfirmed = async () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-800">
-                    {viewMode === "dtr" ? "Edit Attendance Log" : "Edit Accomplishment Report"}
+                    {viewMode === "dtr" && "Edit Attendance Log"}
+                    {viewMode === "ar" && "Edit Accomplishment Report"}
                     {viewMode === "dtr_adjustment" && "DTR Adjustment Slip Details"}
                 </h3>
                 <div className="text-sm text-gray-500 flex items-center gap-1">
@@ -1038,33 +1041,27 @@ const handleSaveConfirmed = async () => {
                 )}
             </div>
 
-            <div className="flex justify-end mt-6 pt-4 border-t border-gray-100 gap-3">
-              {viewMode === 'dtr' && (
-                <button
-                  onClick={downloadExcel}
-                  className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg shadow-md font-medium transition-all flex items-center gap-2 text-sm"
-                >
-                  <DownloadIcon className="w-4 h-4" /> Download DTR
-                </button>
-              )}
+            <div className="flex flex-wrap justify-end mt-6 pt-4 border-t border-gray-100 gap-3">
+              <button
+                onClick={downloadExcel}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
+              >
+                <DownloadIcon className="w-4 h-4" /> Download DTR (Excel)
+              </button>
 
-              {viewMode === 'ar' && (
-                <button
-                  onClick={downloadAR}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg shadow-md font-medium transition-all flex items-center gap-2 text-sm"
-                >
-                  <DownloadIcon className="w-4 h-4" /> Download AR
-                </button>
-              )}
+              <button
+                onClick={downloadAR}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
+              >
+                <DownloadIcon className="w-4 h-4" /> Generate AR (Word)
+              </button>
 
-              {viewMode === 'dtr_adjustment' && (
-                <button
-                  onClick={downloadDtrAdjustment}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg shadow-md font-medium transition-all flex items-center gap-2 text-sm"
-                >
-                  <FileWarningIcon className="w-4 h-4" /> Download Adjustment Slip
-                </button>
-              )}
+              <button
+                onClick={downloadDtrAdjustment}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg shadow-md font-bold transition-all flex items-center gap-2 text-sm"
+              >
+                <FileWarningIcon className="w-4 h-4" /> Download Adjustment Slip
+              </button>
             </div>
           </div>
         </div>
@@ -1148,6 +1145,15 @@ const handleSaveConfirmed = async () => {
           </div>
         </div>
       )}
+
+      {/* success modal for actions */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        message="Draft Saved"
+        subMessage="Saved to cloud"
+        autoCloseDelay={5000}
+        onClose={() => setShowSuccessModal(false)}
+      />
     </div>
   );
 }
