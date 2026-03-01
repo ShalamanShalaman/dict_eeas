@@ -139,7 +139,7 @@ export default function LoginForm({ onLogin }) {
         .animate-marquee {
           display: inline-block;
           white-space: nowrap;
-          animation: marquee 40s linear infinite;
+          animation: marquee 500s linear infinite;
         }
         .mask-fade {
           -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%);

@@ -33,7 +33,6 @@ export default function Sidebar({ role, onLogout }) {
       { label: "Dashboard", icon: Home, path: "/" },
       { label: "Pending Reviews", icon: Clock, path: "/pending-reviews" },
       { label: "Archive", icon: Archive, path: "/archive" },
-      { label: "My Signature", icon: Edit3, path: "/signature" },
       { label: "My Profile", icon: User, path: "/profile" },
     ],
     admin: [
