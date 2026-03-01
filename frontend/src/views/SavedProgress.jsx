@@ -56,7 +56,10 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
   const [search, setSearch] = useState("");
   const [currentUser, setCurrentUser] = useState(propUser || null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [deleteTargetIds, setDeleteTargetIds] = useState([]);
+  const [markedIds, setMarkedIds] = useState([]);
+  const [markMode, setMarkMode] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -113,28 +116,66 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
     }
   }, [currentUser]);
 
+  // No cross-component auto-removal of submitted drafts (previous listener removed)
+
   const handleDeleteClick = (id) => {
-    setDeleteTargetId(id);
+    setDeleteTargetIds([id]);
     setShowDeleteConfirm(true);
   };
 
+  const toggleMark = (id) => {
+    setMarkedIds(prev => {
+      const exists = prev.find(x => String(x) === String(id));
+      if (exists) return prev.filter(x => String(x) !== String(id));
+      return [...prev, id];
+    });
+  };
+
+  const togglePin = (id) => {
+    setPinnedIds(prev => {
+      const exists = prev.find(x => String(x) === String(id));
+      if (exists) return prev.filter(x => String(x) !== String(id));
+      return [id, ...prev];
+    });
+  };
+
+  const pinMarked = () => {
+    if (!markedIds || markedIds.length === 0) return;
+    setPinnedIds(prev => {
+      const set = new Set(prev.map(String));
+      markedIds.forEach(id => set.add(String(id)));
+      return Array.from(set);
+    });
+    setMarkedIds([]);
+    setMarkMode(false); // turn off after bulk action
+  };
+
+  const markAll = () => setMarkedIds(savedDocs.map(d => d.id));
+  const unmarkAll = () => setMarkedIds([]);
+
   const confirmDelete = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteTargetIds || deleteTargetIds.length === 0) return;
 
     const userId = currentUser?.user_id || currentUser?.id;
-    
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/document/${deleteTargetId}?user_id=${userId}`, { method: "DELETE" });
-      if (response.ok) {
-        setSavedDocs(savedDocs.filter(doc => doc.id !== deleteTargetId));
-      } else {
-        alert("Failed to delete document from server.");
+      const responses = await Promise.all(
+        deleteTargetIds.map((id) => fetch(`http://127.0.0.1:5000/api/document/${id}?user_id=${userId}`, { method: "DELETE" }))
+      );
+
+      // remove deleted from UI regardless of individual failures
+      setSavedDocs(prev => prev.filter(doc => !deleteTargetIds.map(String).includes(String(doc.id))));
+
+      const failed = responses.some(r => !r.ok);
+      if (failed) {
+        alert("Some deletes failed. Refresh the list to verify.");
       }
     } catch (err) {
       alert("Delete failed: " + err.message);
     } finally {
       setShowDeleteConfirm(false);
-      setDeleteTargetId(null);
+      setDeleteTargetIds([]);
+      setMarkedIds([]);
+      setMarkMode(false); // exit mark mode after deletion
     }
   };
 
@@ -149,6 +190,13 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
   const filteredDocs = savedDocs.filter(doc => 
     getDisplayFilename(doc).toLowerCase().includes(search.toLowerCase())
   );
+
+  // pinned docs should appear first
+  const displayedDocs = [...filteredDocs].sort((a, b) => {
+    const aPinned = pinnedIds.find(x => String(x) === String(a.id)) ? 1 : 0;
+    const bPinned = pinnedIds.find(x => String(x) === String(b.id)) ? 1 : 0;
+    return bPinned - aPinned;
+  });
 
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen">
@@ -178,6 +226,64 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
           >
             <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+
+          <div className="flex items-center gap-3">
+            <div>
+              <button
+                onClick={() => { if (markMode) setMarkedIds([]); setMarkMode(prev => !prev); }}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${markMode ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
+                title="Select drafts"
+              >
+                Select
+              </button>
+            </div>
+
+            {markMode && (
+              <>
+                <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+                  <button
+                    onClick={markAll}
+                    className="text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 transition-colors font-medium"
+                    title="Mark all visible drafts"
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={unmarkAll}
+                    className="text-xs px-2.5 py-1.5 bg-slate-100 text-slate-600 border border-slate-200 rounded hover:bg-slate-200 transition-colors font-medium"
+                    title="Clear all marks"
+                  >
+                    None
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 ml-3">
+                  <button
+                    onClick={() => pinMarked()}
+                    disabled={markedIds.length === 0}
+                    title="Pin selected drafts"
+                    className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                    </svg>
+                    <span className="sr-only">Pin</span>
+                  </button>
+                  <button
+                    onClick={() => { if (markedIds.length) { setDeleteTargetIds(markedIds); setShowDeleteConfirm(true); } }}
+                    disabled={markedIds.length === 0}
+                    title="Delete selected drafts"
+                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    <span className="sr-only">Delete</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -214,11 +320,38 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDocs.map((doc) => (
-            <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-lg hover:border-indigo-200 transition-all group relative">
+          {displayedDocs.map((doc) => {
+            const isMarked = markedIds.find(x => String(x) === String(doc.id)) ? true : false;
+            const isPinned = pinnedIds.find(x => String(x) === String(doc.id)) ? true : false;
+            return (
+            <div 
+              key={doc.id} 
+              className={`bg-white rounded-xl p-5 hover:shadow-lg transition-all group relative cursor-pointer ${
+                markMode && isMarked 
+                  ? 'border-2 border-blue-500 shadow-md' 
+                  : 'border border-slate-200 hover:border-indigo-200'
+              }`}
+              onClick={() => markMode && toggleMark(doc.id)}
+            >
+              {markMode && isMarked && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-blue-500/5 pointer-events-none">
+                  <div className="w-12 h-12 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-blue-500">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex justify-between items-start mb-4">
-                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 flex items-center gap-2">
                    <Icon className="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></Icon>
+                   {!markMode && isPinned && (
+                     <svg className="w-4 h-4 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                       <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                     </svg>
+                   )}
                 </div>
                 <div className="flex items-center gap-1">
                     <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
@@ -229,13 +362,32 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
                     }`}>
                         {doc.status}
                     </span>
-                    <button 
-                    onClick={() => handleDeleteClick(doc.id)}
-                    className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
-                    title="Delete Draft"
+                    {!markMode && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); togglePin(doc.id); }}
+                      className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
+                      title={isPinned ? 'Unpin' : 'Pin'}
                     >
-                    <Trash2Icon className="w-4 h-4" />
+                      {isPinned ? (
+                        <svg className="w-4 h-4 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                        </svg>
+                      )}
                     </button>
+                    )}
+                    {!markMode && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(doc.id); }}
+                      className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
+                      title="Delete Draft"
+                    >
+                      <Trash2Icon className="w-4 h-4" />
+                    </button>
+                    )}
                 </div>
               </div>
 
@@ -250,14 +402,15 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
               </div>
 
               <button 
-                onClick={() => navigate(`/upload?doc_id=${doc.id}`)}
+                onClick={(e) => { e.stopPropagation(); navigate(`/upload?doc_id=${doc.id}`); }}
                 className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
               >
                 <ExternalLinkIcon className="w-4 h-4" />
                 Resume Work
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -270,9 +423,13 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
                 <Trash2Icon className="w-8 h-8 text-red-600" />
               </div>
               
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Draft?</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                {deleteTargetIds.length > 1 ? `Delete ${deleteTargetIds.length} Drafts?` : 'Delete Draft?'}
+              </h3>
               <p className="text-gray-600 mb-6">
-                Are you sure you want to delete this draft? This action cannot be undone.
+                {deleteTargetIds.length > 1
+                  ? 'Are you sure you want to delete these drafts? This action cannot be undone.'
+                  : 'Are you sure you want to delete this draft? This action cannot be undone.'}
               </p>
               
               <div className="flex gap-3">

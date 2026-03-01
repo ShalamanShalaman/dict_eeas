@@ -4,6 +4,7 @@ from flask_cors import CORS
 from models import db, User, Position, OfficeLocation
 from routes import account_bp, document_bp 
 from attendance_routes import attendance_bp
+from sqlalchemy.exc import IntegrityError
 
 def create_app():
     app = Flask(__name__)
@@ -53,45 +54,52 @@ def create_app():
     return app
 
 def seed_basic_data():
-    if Position.query.count() == 0:
-        positions = [
-            Position(name="Employee"),
-            Position(name="Provincial Officer"),
-            Position(name="Reviewer"),
-            Position(name="Admin")
-        ]
-        db.session.add_all(positions)
-        db.session.commit()
+    try:
+        if Position.query.count() == 0:
+            positions = [
+                Position(name="Employee"),
+                Position(name="Provincial Officer"),
+                Position(name="Reviewer"),
+                Position(name="Admin")
+            ]
+            db.session.add_all(positions)
+            db.session.commit()
 
-    if OfficeLocation.query.count() == 0:
-        loc = OfficeLocation(
-            location="Cauayan Office, Isabela"
-        )
-        db.session.add(loc)
-        db.session.commit()
+        if OfficeLocation.query.count() == 0:
+            loc = OfficeLocation(
+                location="Cauayan Office, Isabela"
+            )
+            db.session.add(loc)
+            db.session.commit()
+    except IntegrityError as e:
+        db.session.rollback()
+        print(f"Skipped seeding positions/locations due to integrity error: {e}")
 
     existing_admin = User.query.filter(
         (User.email == "admin@system.local") | (User.user_id == "ADMIN001")
     ).first()
     
     if not existing_admin:
-        admin_position = Position.query.filter_by(name="Admin").first()
-
-        admin = User(
-            email="admin@system.local",
-            user_id="ADMIN001",
-            first_name="System",
-            last_name="Admin",
-            role="admin",
-            position_id=admin_position.id if admin_position else None
-        )
-        admin.set_password("admin123")
-        db.session.add(admin)
         try:
+            admin_position = Position.query.filter_by(name="Admin").first()
+
+            admin = User(
+                email="admin@system.local",
+                user_id="ADMIN001",
+                first_name="System",
+                last_name="Admin",
+                role="admin",
+                position_id=admin_position.id if admin_position else None
+            )
+            admin.set_password("admin123")
+            db.session.add(admin)
             db.session.commit()
+        except IntegrityError as ex:
+            db.session.rollback()
+            print(f"Admin user already exists or integrity constraint failed: {ex}")
         except Exception as ex:
             db.session.rollback()
-            print(ex)
+            print(f"An unexpected error occurred while creating admin: {ex}")
 
 if __name__ == "__main__":
     app = create_app()
