@@ -13,7 +13,11 @@ def create_app():
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
     app.config["SECRET_KEY"] = "dev-secret-key"
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+    
+    app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:root@localhost/attendance_db"
+    
+    app.config["SQLALCHEMY_POOL_RECYCLE"] = 3600 
+    
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     
     app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  

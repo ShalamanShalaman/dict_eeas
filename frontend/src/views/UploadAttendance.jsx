@@ -1,6 +1,45 @@
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams, useBlocker, useNavigate } from "react-router-dom";
-import SuccessModal from "../components/SuccessModal";
+
+const SuccessModal = ({ isOpen, message, subMessage, onClose, autoCloseDelay }) => {
+  useEffect(() => {
+    if (isOpen && autoCloseDelay) {
+      const timer = setTimeout(() => onClose(), autoCloseDelay);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoCloseDelay, onClose]);
+
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50" onClick={onClose} style={{ zIndex: 999999 }}>
+      <div className="bg-white p-6 rounded-xl text-center shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+        <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <h3 className="font-bold text-lg text-gray-900 mb-1">{message}</h3>
+        <p className="text-sm text-gray-500 mb-4">{subMessage}</p>
+        <button onClick={onClose} className="w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors">Close</button>
+      </div>
+    </div>
+  );
+};
+
+const AlertModal = ({ isOpen, message, onClose }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50" onClick={onClose} style={{ zIndex: 999999 }}>
+      <div className="bg-white p-6 rounded-xl text-center shadow-xl max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <AlertCircleIcon className="w-6 h-6" />
+        </div>
+        <h3 className="font-bold text-lg text-gray-900 mb-2">Notice</h3>
+        <p className="text-sm text-gray-500 mb-6">{message}</p>
+        <button onClick={onClose} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">Okay, got it</button>
+      </div>
+    </div>
+  );
+};
 
 const Icon = ({ children, className }) => (
   <svg 
@@ -145,10 +184,25 @@ const FileWarningIcon = ({ className }) => (
     </Icon>
 );
 
+const AlertCircleIcon = ({ className }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </Icon>
+);
+
 const PlusIcon = ({ className }) => (
   <Icon className={className}>
     <line x1="12" y1="5" x2="12" y2="19" />
     <line x1="5" y1="12" x2="19" y2="12" />
+  </Icon>
+);
+
+const XIcon = ({ className }) => (
+  <Icon className={className}>
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </Icon>
 );
 
@@ -157,6 +211,7 @@ export default function UploadAttendance({ onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState({});
   const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
   const [viewMode, setViewMode] = useState("dtr");
   const [isDragging, setIsDragging] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -170,6 +225,7 @@ export default function UploadAttendance({ onNavigate }) {
   const [showNameModal, setShowNameModal] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [appAlert, setAppAlert] = useState("");
 
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -189,6 +245,7 @@ export default function UploadAttendance({ onNavigate }) {
     approverTitle: "PROVINCIAL OFFICER, ISABELA - CAUAYAN II",
     periodFormat: "full",
     tasks: {}, 
+    manualHighlights: {},
     employeeNo: "",
     controlNo: "",
     filingDate: "",
@@ -243,6 +300,21 @@ export default function UploadAttendance({ onNavigate }) {
   }, [currentUser]);
 
   useEffect(() => {
+    if (selectedEmployee && employees[selectedEmployee]) {
+        const months = Object.keys(employees[selectedEmployee]);
+        if (months.length > 0) {
+            if (!selectedMonth || !months.includes(selectedMonth)) {
+                setSelectedMonth(months[0]);
+            }
+        } else {
+            setSelectedMonth("");
+        }
+    } else {
+        setSelectedMonth("");
+    }
+  }, [selectedEmployee, employees]);
+
+  useEffect(() => {
     const docId = searchParams.get('doc_id');
     
     if (docId && currentUser && docId !== savedDocId) {
@@ -289,16 +361,35 @@ export default function UploadAttendance({ onNavigate }) {
         }
 
         const stateData = await response.json();
-        
-        if (stateData.employees) setEmployees(stateData.employees);
-        if (stateData.arMeta) setArMeta(stateData.arMeta);
+        let loadedEmployees = stateData.employees || {};
+        let loadedSelectedMonth = stateData.selectedMonth || "";
+
+        Object.keys(loadedEmployees).forEach(empName => {
+            const empData = loadedEmployees[empName];
+            if (empData.month_name && empData.year) {
+                const monthKey = `${empData.month_name} ${empData.year}`;
+                loadedEmployees[empName] = { [monthKey]: empData };
+                if (!loadedSelectedMonth) loadedSelectedMonth = monthKey;
+            }
+        });
+
+        if (Object.keys(loadedEmployees).length > 0) setEmployees(loadedEmployees);
         if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
+        if (loadedSelectedMonth) setSelectedMonth(loadedSelectedMonth);
+
+        if (stateData.arMeta) {
+            let loadedArMeta = stateData.arMeta;
+            if (loadedArMeta.tasks && Object.keys(loadedArMeta.tasks).some(k => !isNaN(parseInt(k)))) {
+                loadedArMeta.tasks = { [loadedSelectedMonth]: loadedArMeta.tasks };
+            }
+            setArMeta(loadedArMeta);
+        }
+
         if (stateData.viewMode) setViewMode(stateData.viewMode);
-        
         setSavedDocId(docId);
     } catch (err) {
         console.error("Load Error:", err);
-        alert("Failed to load saved document: " + err.message);
+        setAppAlert("Failed to load saved document: " + err.message);
     } finally {
         setLoading(false);
     }
@@ -312,13 +403,34 @@ export default function UploadAttendance({ onNavigate }) {
         reader.onload = (e) => {
             try {
                 const stateData = JSON.parse(e.target.result);
-                if (stateData.employees) setEmployees(stateData.employees);
-                if (stateData.arMeta) setArMeta(stateData.arMeta);
+                let loadedEmployees = stateData.employees || {};
+                let loadedSelectedMonth = stateData.selectedMonth || "";
+
+                Object.keys(loadedEmployees).forEach(empName => {
+                    const empData = loadedEmployees[empName];
+                    if (empData.month_name && empData.year) {
+                        const monthKey = `${empData.month_name} ${empData.year}`;
+                        loadedEmployees[empName] = { [monthKey]: empData };
+                        if (!loadedSelectedMonth) loadedSelectedMonth = monthKey;
+                    }
+                });
+
+                if (Object.keys(loadedEmployees).length > 0) setEmployees(loadedEmployees);
                 if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
+                if (loadedSelectedMonth) setSelectedMonth(loadedSelectedMonth);
+
+                if (stateData.arMeta) {
+                    let loadedArMeta = stateData.arMeta;
+                    if (loadedArMeta.tasks && Object.keys(loadedArMeta.tasks).some(k => !isNaN(parseInt(k)))) {
+                        loadedArMeta.tasks = { [loadedSelectedMonth]: loadedArMeta.tasks };
+                    }
+                    setArMeta(loadedArMeta);
+                }
+
                 if (stateData.viewMode) setViewMode(stateData.viewMode);
-                alert("Progress Restored from File!");
+                setAppAlert("Progress Restored from File!");
             } catch (err) {
-                alert("Failed to load saved state: " + err.message);
+                setAppAlert("Failed to load saved state: " + err.message);
             }
         };
         reader.readAsText(f);
@@ -332,7 +444,7 @@ export default function UploadAttendance({ onNavigate }) {
 
   const openSaveModal = () => {
     if (!currentUser) {
-        alert("Please log in to save your progress.");
+        setAppAlert("Please log in to save your progress.");
         return;
     }
     const defaultName = `attendance_${selectedEmployee || 'draft'}`;
@@ -343,7 +455,7 @@ export default function UploadAttendance({ onNavigate }) {
 const handleSaveConfirmed = async () => {
     let finalFilename = draftName.trim();
     if (!finalFilename) {
-        alert("Filename cannot be empty.");
+        setAppAlert("Filename cannot be empty.");
         return;
     }
 
@@ -356,6 +468,7 @@ const handleSaveConfirmed = async () => {
         const stateData = JSON.stringify({
             employees,
             selectedEmployee,
+            selectedMonth,
             arMeta,
             viewMode
         });
@@ -397,7 +510,7 @@ const handleSaveConfirmed = async () => {
         setPendingAction(null);
 
     } catch (err) {
-        alert("Failed to save progress: " + err.message);
+        setAppAlert("Failed to save progress: " + err.message);
     } finally {
         setLoading(false);
     }
@@ -426,28 +539,36 @@ const handleSaveConfirmed = async () => {
       const result = await response.json();
 
       if (response.ok) {
-        setEmployees(result.data || {});
-        const first = Object.keys(result.data || {})[0] || "";
-        setSelectedEmployee(first);
+        const data = result.data || {};
+        setEmployees(data);
+        const firstEmp = Object.keys(data)[0] || "";
+        setSelectedEmployee(firstEmp);
+        let firstMonth = "";
+        if (firstEmp && data[firstEmp]) {
+            firstMonth = Object.keys(data[firstEmp])[0] || "";
+            setSelectedMonth(firstMonth);
+        }
+
         setSavedDocId(null); 
         setSearchParams({}); 
         
         setArMeta(prev => ({
             ...prev,
-            name: currentUser?.full_name || first,
+            name: currentUser?.full_name || firstEmp,
             adjustmentName: "",
             position: currentUser?.position_name || "",
             office: currentUser?.office_name || "",
             approver: currentUser?.provincial_officer || "",
             project: prev.project || "",
             periodFormat: "full",
-            tasks: {}
+            tasks: {},
+            manualHighlights: {}
         }));
       } else {
-        alert(result.error || "Failed to process PDF.");
+        setAppAlert(result.error || "Failed to process PDF.");
       }
     } catch (err) {
-      alert("Error: " + err.message);
+      setAppAlert("Error: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -497,6 +618,7 @@ const handleSaveConfirmed = async () => {
     setFile(null);
     setEmployees({});
     setSelectedEmployee("");
+    setSelectedMonth("");
     setSavedDocId(null);
     setHasUnsavedChanges(false);
     setArMeta({ 
@@ -508,16 +630,20 @@ const handleSaveConfirmed = async () => {
         approverTitle: "PROVINCIAL OFFICER, ISABELA - CAUAYAN II",
         project: "", 
         periodFormat: "full",
-        tasks: {} 
+        tasks: {},
+        manualHighlights: {}
     });
     if (fileInputRef.current) fileInputRef.current.value = null;
     setSearchParams({});
   };
 
+  const currentEmployeeData = selectedEmployee && selectedMonth && employees[selectedEmployee] && employees[selectedEmployee][selectedMonth]
+      ? employees[selectedEmployee][selectedMonth]
+      : {};
+
   const getPeriodText = () => {
-      if (!selectedEmployee || !employees[selectedEmployee]) return "";
-      
-      const { month_name, year } = employees[selectedEmployee];
+      if (!currentEmployeeData) return "";
+      const { month_name, year } = currentEmployeeData;
       if (!month_name || !year) return "";
 
       switch (arMeta.periodFormat) {
@@ -535,10 +661,13 @@ const handleSaveConfirmed = async () => {
       ...prev,
       [selectedEmployee]: {
         ...prev[selectedEmployee],
-        [day]: {
-          ...prev[selectedEmployee][day],
-          [field]: value,
-        },
+        [selectedMonth]: {
+            ...prev[selectedEmployee][selectedMonth],
+            [day]: {
+                ...prev[selectedEmployee][selectedMonth][day],
+                [field]: value,
+            }
+        }
       },
     }));
     setHasUnsavedChanges(true);
@@ -546,28 +675,59 @@ const handleSaveConfirmed = async () => {
 
   const handleBatchUpdate = (daysToUpdate, field, value) => {
     setEmployees((prev) => {
-      const updatedEmployeeData = { ...prev[selectedEmployee] };
+      const updatedMonthData = { ...prev[selectedEmployee][selectedMonth] };
       daysToUpdate.forEach(day => {
-        updatedEmployeeData[day] = {
-            ...updatedEmployeeData[day],
+        updatedMonthData[day] = {
+            ...updatedMonthData[day],
             [field]: value
         };
       });
 
       return {
         ...prev,
-        [selectedEmployee]: updatedEmployeeData
+        [selectedEmployee]: {
+            ...prev[selectedEmployee],
+            [selectedMonth]: updatedMonthData
+        }
       };
     });
     setHasUnsavedChanges(true);
   };
 
+  const handleTaskChange = (day, value) => {
+    setArMeta(prev => ({
+        ...prev,
+        tasks: {
+            ...prev.tasks,
+            [selectedMonth]: {
+                ...(prev.tasks[selectedMonth] || {}),
+                [day]: value
+            }
+        }
+    }));
+    setHasUnsavedChanges(true);
+  };
+
   const getFilteredPayload = () => {
-    const fullData = employees[selectedEmployee] || {};
-    const fullTasks = arMeta.tasks || {};
+    const fullData = currentEmployeeData || {};
+    const fullTasks = arMeta.tasks[selectedMonth] || {};
+    const manualHighlights = arMeta.manualHighlights?.[selectedMonth] || {};
     
     if (arMeta.periodFormat === "full") {
-        return { filteredData: fullData, filteredTasks: fullTasks };
+        const finalData = { ...fullData };
+        const finalTasks = {};
+        
+        Object.keys(fullTasks).forEach(key => {
+            const hasAttendance = fullData[key] && (fullData[key].am_in || fullData[key].am_out || fullData[key].pm_in || fullData[key].pm_out);
+            const isManual = manualHighlights[key];
+            if (hasAttendance || isManual) {
+                finalTasks[key] = fullTasks[key];
+                if (isManual && !finalData[key]) {
+                    finalData[key] = { remarks: "Manual Inclusion" };
+                }
+            }
+        });
+        return { filteredData: finalData, filteredTasks: finalTasks };
     }
 
     const start = arMeta.periodFormat === "1-15" ? 1 : 16;
@@ -587,7 +747,14 @@ const handleSaveConfirmed = async () => {
     Object.keys(fullTasks).forEach(key => {
         const day = parseInt(key);
         if (!isNaN(day) && (day >= start && day <= end)) {
-            filteredTasks[key] = fullTasks[key];
+            const hasAttendance = fullData[key] && (fullData[key].am_in || fullData[key].am_out || fullData[key].pm_in || fullData[key].pm_out);
+            const isManual = manualHighlights[key];
+            if (hasAttendance || isManual) {
+                filteredTasks[key] = fullTasks[key];
+                if (isManual && !filteredData[key]) {
+                    filteredData[key] = { remarks: "Manual Inclusion" };
+                }
+            }
         }
     });
     
@@ -595,7 +762,7 @@ const handleSaveConfirmed = async () => {
   };
 
   const downloadExcel = async () => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployee || !selectedMonth) return;
 
     try {
       const finalName = arMeta.name || selectedEmployee;
@@ -636,15 +803,15 @@ const handleSaveConfirmed = async () => {
         a.remove();
       } else {
         const err = await response.json();
-        alert("Error downloading DTR: " + err.error);
+        setAppAlert("Error downloading DTR: " + err.error);
       }
     } catch (error) {
-      alert("Download failed: " + error.message);
+      setAppAlert("Download failed: " + error.message);
     }
   };
 
   const downloadAR = async () => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployee || !selectedMonth) return;
 
     try {
       const finalName = arMeta.name || selectedEmployee;
@@ -698,70 +865,10 @@ const handleSaveConfirmed = async () => {
         a.remove();
       } else {
         const err = await response.json();
-        alert("Error downloading AR: " + err.error);
+        setAppAlert("Error downloading AR: " + err.error);
       }
     } catch (error) {
-      alert("Download failed: " + error.message);
-    }
-  };
-
-  const downloadMerged = async () => {
-    if (!selectedEmployee) return;
-
-    try {
-      const finalName = arMeta.name || selectedEmployee;
-      const finalPeriod = getPeriodText();
-      const { filteredData, filteredTasks } = getFilteredPayload();
-
-      const response = await fetch("http://127.0.0.1:5000/api/generate-merged-report", {
-        method: "POST",
-        mode: 'cors',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employee_name: finalName,
-          employee_data: filteredData,
-          position: arMeta.position,
-          office: arMeta.office,
-          project: arMeta.project,
-          period_text: finalPeriod,
-          approver: arMeta.approver,
-          overrides: {
-            name: finalName, 
-            position: arMeta.position,
-            office: arMeta.office,
-            project: arMeta.project,
-            tasks: filteredTasks,
-            approved_by: arMeta.approver,
-            approver_title: arMeta.approverTitle
-          }
-        }),
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/vnd"))) {
-          if (!response.ok) {
-             const text = await response.text();
-             console.error("Merged Report Generation Error:", text);
-             throw new Error(`Server returned ${response.status}. See console.`);
-          }
-      }
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        const filename = finalName.replace(/\s+/g, '_');
-        a.download = `Merged_Report_${filename}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } else {
-        const err = await response.json();
-        alert("Error downloading Merged Report: " + err.error);
-      }
-    } catch (error) {
-      alert("Download failed: " + error.message);
+      setAppAlert("Download failed: " + error.message);
     }
   };
 
@@ -802,15 +909,15 @@ const handleSaveConfirmed = async () => {
         a.remove();
       } else {
         const err = await response.json().catch(() => ({ error: "An unknown error occurred." }));
-        alert("Error downloading Adjustment Slip: " + (err.error || "Unknown error"));
+        setAppAlert("Error downloading Adjustment Slip: " + (err.error || "Unknown error"));
       }
     } catch (error) {
-      alert("Download failed: " + error.message);
+      setAppAlert("Download failed: " + error.message);
     }
   };
 
   return (
-    <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen">
+    <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen relative pb-32 z-[90]">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
           <FileTextIcon className="w-6 h-6 text-blue-600" />
@@ -886,27 +993,47 @@ const handleSaveConfirmed = async () => {
             </button>
 
             {Object.keys(employees).length > 0 && (
-                <div className="mt-2">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Log Source</label>
-                    <div className="relative">
-                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <select
-                        value={selectedEmployee}
-                        onChange={(e) => setSelectedEmployee(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        >
-                        {Object.keys(employees).map((name) => (
-                            <option key={name} value={name}>{name}</option>
-                        ))}
-                        </select>
+                <div className="mt-2 space-y-3">
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Log Source</label>
+                        <div className="relative">
+                            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <select
+                            value={selectedEmployee}
+                            onChange={(e) => setSelectedEmployee(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            >
+                            {Object.keys(employees).map((name) => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                            </select>
+                        </div>
                     </div>
+
+                    {selectedEmployee && employees[selectedEmployee] && Object.keys(employees[selectedEmployee]).length > 0 && (
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Month</label>
+                            <div className="relative">
+                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                >
+                                {Object.keys(employees[selectedEmployee]).map((monthKey) => (
+                                    <option key={monthKey} value={monthKey}>{monthKey}</option>
+                                ))}
+                                </select>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
           </div>
         </div>
       </div>
 
-      {selectedEmployee && (
+      {selectedEmployee && selectedMonth && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex justify-center mb-6">
             <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-100">
@@ -943,7 +1070,7 @@ const handleSaveConfirmed = async () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-800">
                     {viewMode === "dtr" && "Edit Attendance Log"}
@@ -1016,28 +1143,37 @@ const handleSaveConfirmed = async () => {
                 </div>
             </div>
 
-            <div className="overflow-x-auto border rounded-lg bg-gray-50/50">
+            <div className="rounded-lg w-full">
                 {viewMode === "dtr" ? (
                 <DTRTable 
-                    data={employees[selectedEmployee]} 
+                    data={currentEmployeeData} 
                     onUpdate={handleDtrUpdate} 
                     onBatchUpdate={handleBatchUpdate}
                     periodFormat={arMeta.periodFormat}
+                    setAppAlert={setAppAlert}
                 />
                 ) : viewMode === "ar" ? (
-                <AccomplishmentTable
-                    attendance={employees[selectedEmployee]}
-                    arMeta={arMeta}
-                    setArMeta={setArMeta}
-                    periodFormat={arMeta.periodFormat}
-                />
+                <div className="overflow-x-auto border border-gray-100 bg-gray-50/50 rounded-lg">
+                    <AccomplishmentTable
+                        attendance={currentEmployeeData}
+                        tasks={arMeta.tasks[selectedMonth] || {}}
+                        onTaskChange={handleTaskChange}
+                        arMeta={arMeta}
+                        setArMeta={setArMeta}
+                        periodFormat={arMeta.periodFormat}
+                        selectedMonth={selectedMonth}
+                        setHasUnsavedChanges={setHasUnsavedChanges}
+                    />
+                </div>
                 ) : (
-                <DTRAdjustmentSlip
-                    arMeta={arMeta}
-                    setArMeta={setArMeta}
-                    setHasUnsavedChanges={setHasUnsavedChanges}
-                    currentUser={currentUser}
-                />
+                <div className="overflow-x-auto border border-gray-100 bg-gray-50/50 rounded-lg">
+                    <DTRAdjustmentSlip
+                        arMeta={arMeta}
+                        setArMeta={setArMeta}
+                        setHasUnsavedChanges={setHasUnsavedChanges}
+                        currentUser={currentUser}
+                    />
+                </div>
                 )}
             </div>
 
@@ -1068,7 +1204,7 @@ const handleSaveConfirmed = async () => {
       )}
 
       {showConfirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 999999 }}>
           <div className="absolute inset-0 bg-black/50" onClick={handleCancelConfirm}></div>
           
           <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
@@ -1108,7 +1244,7 @@ const handleSaveConfirmed = async () => {
       )}
 
       {showNameModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 999999 }}>
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowNameModal(false)}></div>
           <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Save Draft</h3>
@@ -1146,13 +1282,17 @@ const handleSaveConfirmed = async () => {
         </div>
       )}
 
-      {/* success modal for actions */}
       <SuccessModal
         isOpen={showSuccessModal}
         message="Draft Saved"
         subMessage="Saved to cloud"
         autoCloseDelay={5000}
         onClose={() => setShowSuccessModal(false)}
+      />
+      <AlertModal 
+        isOpen={!!appAlert} 
+        message={appAlert} 
+        onClose={() => setAppAlert("")} 
       />
     </div>
   );
@@ -1199,7 +1339,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
   }, [currentUser, setArMeta]);
 
   return (
-    <div className="p-4 bg-gray-50 overflow-x-auto">
+    <div className="p-4 bg-gray-50">
       <div className="bg-white border-2 border-black text-black max-w-6xl mx-auto shadow-lg">
         
         <div className="flex border-b border-black">
@@ -1408,7 +1548,63 @@ const InputCell = ({ day, field, value, onUpdate }) => (
     />
 );
 
-function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat }) {
+const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReason, setBatchReason, customReason, setCustomReason, isWeekendValid, applyBatch, clearBatchRemarks, className, style }, ref) => (
+  <div ref={ref} className={className} style={style}>
+    <div className="flex items-center justify-between">
+      <div className="text-sm bg-blue-100 text-blue-800 font-bold px-3 py-1.5 rounded-lg whitespace-nowrap">
+          {selectedDays.size} days selected
+      </div>
+      <button onClick={() => setSelectedDays(new Set())} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-md transition-colors" title="Clear selection">
+          <XIcon className="w-4 h-4" />
+      </button>
+    </div>
+    <div className="flex flex-col gap-3">
+        <label className="text-xs text-slate-500 font-semibold uppercase">Merge/Set Reason:</label>
+        <select 
+            value={batchReason}
+            onChange={(e) => setBatchReason(e.target.value)}
+            className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white w-full"
+        >
+            <option value="Saturday">Saturday</option>
+            <option value="Sunday">Sunday</option>
+            <option value="Weekend" disabled={!isWeekendValid}>Weekend (Requires 2 consecutive days)</option>
+            <option value="Work Suspension">Work Suspension</option>
+            <option value="Holiday">Holiday</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="Vacation Leave">Vacation Leave</option>
+            <option value="Others">Others</option>
+        </select>
+        
+        {batchReason === "Others" && (
+            <input 
+                placeholder="Type reason..."
+                value={customReason}
+                onChange={(e) => setCustomReason(e.target.value)}
+                className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-full"
+            />
+        )}
+
+        <button 
+            onClick={applyBatch}
+            className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 shadow-sm transition-colors w-full"
+        >
+            Apply to Selected
+        </button>
+
+        <button 
+            onClick={clearBatchRemarks}
+            className="bg-white border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 shadow-sm transition-colors w-full"
+            title="Remove remarks and restore time columns"
+        >
+            Clear Remarks
+        </button>
+    </div>
+  </div>
+));
+
+ToolContent.displayName = "ToolContent";
+
+function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) {
   let start = 1;
   let end = 31;
   if (periodFormat === "1-15") end = 15;
@@ -1418,6 +1614,9 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat }) {
   const [selectedDays, setSelectedDays] = useState(new Set());
   const [batchReason, setBatchReason] = useState("Work Suspension");
   const [customReason, setCustomReason] = useState("");
+  const tableRef = useRef(null);
+  const toolRef = useRef(null);
+  const [toolStyle, setToolStyle] = useState({ top: -9999, left: 16, opacity: 0, pointerEvents: 'none' });
 
   const toggleDay = (day) => {
     const newSelected = new Set(selectedDays);
@@ -1437,9 +1636,29 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat }) {
     }
   };
 
+  const sortedDays = Array.from(selectedDays).map(Number).sort((a, b) => a - b);
+  const isWeekendValid = sortedDays.length === 2 && sortedDays[1] === sortedDays[0] + 1;
+
+  useEffect(() => {
+    if (batchReason === 'Weekend' && !isWeekendValid) {
+        setBatchReason('Saturday');
+    }
+  }, [selectedDays.size, isWeekendValid, batchReason]);
+
   const applyBatch = () => {
-      const reasonToApply = batchReason === "Others" ? customReason : batchReason;
-      onBatchUpdate(Array.from(selectedDays), "remarks", reasonToApply);
+      if (batchReason === "Weekend") {
+          if (isWeekendValid) {
+              onBatchUpdate([String(sortedDays[0])], "remarks", "Saturday");
+              onBatchUpdate([String(sortedDays[1])], "remarks", "Sunday");
+          } else {
+              if (setAppAlert) setAppAlert("Please select exactly 2 consecutive days to apply the 'Weekend' reason.");
+              else alert("Please select exactly 2 consecutive days to apply the 'Weekend' reason.");
+              return;
+          }
+      } else {
+          const reasonToApply = batchReason === "Others" ? customReason : batchReason;
+          onBatchUpdate(Array.from(selectedDays), "remarks", reasonToApply);
+      }
       setSelectedDays(new Set());
   };
 
@@ -1448,148 +1667,252 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat }) {
       setSelectedDays(new Set());
   };
 
+  useEffect(() => {
+    if (selectedDays.size === 0) return;
+
+    const updatePos = () => {
+        if (!tableRef.current) return;
+        const rect = tableRef.current.getBoundingClientRect();
+        const toolHeight = toolRef.current ? toolRef.current.getBoundingClientRect().height : 320; 
+        const stickyOffset = 100;
+        
+        let calculatedTop = Math.max(rect.top, stickyOffset);
+        
+        if (calculatedTop + toolHeight > rect.bottom) {
+            calculatedTop = rect.bottom - toolHeight;
+        }
+        
+        let isVisible = true;
+        if (rect.bottom < stickyOffset || rect.top > window.innerHeight) {
+            isVisible = false;
+        }
+
+        let calculatedLeft = rect.left - 270;
+        if (calculatedLeft < 16) calculatedLeft = 16; 
+
+        setToolStyle({
+            top: calculatedTop,
+            left: calculatedLeft,
+            opacity: isVisible ? 1 : 0,
+            pointerEvents: isVisible ? 'auto' : 'none'
+        });
+    };
+
+    const mainEl = tableRef.current.closest('main') || document.querySelector('main');
+    if (mainEl) {
+        mainEl.addEventListener('scroll', updatePos, { passive: true });
+    }
+    window.addEventListener('scroll', updatePos, { passive: true });
+    window.addEventListener('resize', updatePos);
+    
+    const timeoutId = setTimeout(updatePos, 0);
+
+    return () => {
+        clearTimeout(timeoutId);
+        if (mainEl) mainEl.removeEventListener('scroll', updatePos);
+        window.removeEventListener('scroll', updatePos);
+        window.removeEventListener('resize', updatePos);
+    };
+  }, [selectedDays.size]);
+
   return (
-    <div>
-        {selectedDays.size > 0 && (
-            <div className="bg-blue-50 p-3 border-b flex items-center justify-between gap-4 sticky top-0 z-10">
-                <div className="text-sm text-blue-800 font-medium">
-                    {selectedDays.size} days selected
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-blue-600 font-semibold uppercase">Merge/Set Reason:</span>
-                    <select 
-                        value={batchReason}
-                        onChange={(e) => setBatchReason(e.target.value)}
-                        className="text-sm border-gray-300 rounded px-2 py-1"
-                    >
-                        <option>Saturday</option>
-                        <option>Sunday</option>
-                        <option>Work Suspension</option>
-                        <option>Holiday</option>
-                        <option>Sick Leave</option>
-                        <option>Vacation Leave</option>
-                        <option>Others</option>
-                    </select>
-                    
-                    {batchReason === "Others" && (
-                        <input 
-                            placeholder="Type reason..."
-                            value={customReason}
-                            onChange={(e) => setCustomReason(e.target.value)}
-                            className="text-sm border-gray-300 rounded px-2 py-1"
-                        />
-                    )}
+    <div className="relative w-full" ref={tableRef}>
+        {selectedDays.size > 0 && typeof document !== 'undefined' && createPortal(
+            <>
+                <ToolContent 
+                    className="md:hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex flex-col gap-4 w-[90vw] animate-in slide-in-from-bottom-4"
+                    style={{ zIndex: 999999 }}
+                    selectedDays={selectedDays} 
+                    setSelectedDays={setSelectedDays}
+                    batchReason={batchReason} 
+                    setBatchReason={setBatchReason}
+                    customReason={customReason} 
+                    setCustomReason={setCustomReason}
+                    isWeekendValid={isWeekendValid}
+                    applyBatch={applyBatch}
+                    clearBatchRemarks={clearBatchRemarks}
+                />
 
-                    <button 
-                        onClick={applyBatch}
-                        className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700"
-                    >
-                        Apply to Selected
-                    </button>
-
-                    <button 
-                        onClick={clearBatchRemarks}
-                        className="bg-white border border-gray-300 text-gray-700 text-xs px-3 py-1.5 rounded hover:bg-gray-100 ml-2"
-                        title="Remove remarks and restore time columns"
-                    >
-                        Clear Remarks
-                    </button>
-                </div>
-            </div>
+                <ToolContent 
+                    ref={toolRef}
+                    className="hidden md:flex fixed bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex-col gap-4 w-[16rem] transition-opacity duration-75"
+                    style={{ 
+                        zIndex: 999999, 
+                        top: `${toolStyle.top}px`, 
+                        left: `${toolStyle.left}px`, 
+                        opacity: toolStyle.opacity, 
+                        pointerEvents: toolStyle.pointerEvents 
+                    }}
+                    selectedDays={selectedDays} 
+                    setSelectedDays={setSelectedDays}
+                    batchReason={batchReason} 
+                    setBatchReason={setBatchReason}
+                    customReason={customReason} 
+                    setCustomReason={setCustomReason}
+                    isWeekendValid={isWeekendValid}
+                    applyBatch={applyBatch}
+                    clearBatchRemarks={clearBatchRemarks}
+                />
+            </>,
+            document.body
         )}
 
-        <table className="w-full text-sm text-left">
-        <thead className="bg-gray-100 text-gray-600 font-semibold uppercase text-xs">
-            <tr>
-            <th className="px-3 py-3 border-b w-10">
-                <input 
-                    type="checkbox" 
-                    checked={selectedDays.size === days.length && days.length > 0}
-                    onChange={toggleAll}
-                />
-            </th>
-            <th className="px-4 py-3 border-b">Day</th>
-            <th className="px-2 py-3 border-b text-center">AM IN</th>
-            <th className="px-2 py-3 border-b text-center">AM OUT</th>
-            <th className="px-2 py-3 border-b text-center">PM IN</th>
-            <th className="px-2 py-3 border-b text-center">PM OUT</th>
-            <th className="px-2 py-3 border-b text-center text-red-500">UT (HRS)</th>
-            <th className="px-2 py-3 border-b text-center text-red-500">UT (MIN)</th>
-            <th className="px-2 py-3 border-b text-center w-40">Remarks / Reason</th>
-            </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 bg-white">
-            {days.map((day) => {
-                const rowData = data?.[day] || {};
-                const hasRemark = !!rowData.remarks;
-
-                return (
-                <tr key={day} className={`hover:bg-blue-50/50 transition-colors group ${selectedDays.has(day) ? "bg-blue-50" : ""}`}>
-                    <td className="px-3 py-2 border-r text-center">
-                        <input 
-                            type="checkbox" 
-                            checked={selectedDays.has(day)}
-                            onChange={() => toggleDay(day)}
-                        />
-                    </td>
-                    <td className="px-4 py-2 font-medium text-gray-500 bg-gray-50 border-r w-16 text-center">{day}</td>
-                    
-                    {hasRemark ? (
-                        <td colSpan={4} className="border-r px-2 py-1 text-center font-medium text-gray-600 italic bg-gray-50/50">
-                            {rowData.remarks}
-                        </td>
-                    ) : (
-                        <>
-                            <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="am_in" value={rowData.am_in} onUpdate={onUpdate} />
-                            </td>
-                            <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="am_out" value={rowData.am_out} onUpdate={onUpdate} />
-                            </td>
-                            <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="pm_in" value={rowData.pm_in} onUpdate={onUpdate} />
-                            </td>
-                            <td className="border-r min-w-[80px]">
-                                <InputCell day={day} field="pm_out" value={rowData.pm_out} onUpdate={onUpdate} />
-                            </td>
-                        </>
-                    )}
-
-                    <td className={`border-r min-w-[60px] bg-red-50/30 ${hasRemark ? 'opacity-40' : ''}`}>
-                        <InputCell day={day} field="undertime_hrs" value={rowData.undertime_hrs} onUpdate={onUpdate} />
-                    </td>
-                    <td className={`min-w-[60px] bg-red-50/30 border-r ${hasRemark ? 'opacity-40' : ''}`}>
-                        <InputCell day={day} field="undertime_min" value={rowData.undertime_min} onUpdate={onUpdate} />
-                    </td>
-                    
-                    <td className="min-w-[150px] bg-yellow-50/30">
-                        <InputCell day={day} field="remarks" value={rowData.remarks} onUpdate={onUpdate} />
-                    </td>
+        <div className="overflow-x-auto w-full bg-white rounded-lg border border-gray-200 shadow-sm relative z-10">
+            <table className="w-full text-sm text-left">
+            <thead className="bg-gray-100 text-gray-600 font-semibold uppercase text-xs">
+                <tr>
+                <th className="px-3 py-3 border-b w-10">
+                    <input 
+                        type="checkbox" 
+                        checked={selectedDays.size === days.length && days.length > 0}
+                        onChange={toggleAll}
+                    />
+                </th>
+                <th className="px-4 py-3 border-b">Day</th>
+                <th className="px-2 py-3 border-b text-center">AM IN</th>
+                <th className="px-2 py-3 border-b text-center">AM OUT</th>
+                <th className="px-2 py-3 border-b text-center">PM IN</th>
+                <th className="px-2 py-3 border-b text-center">PM OUT</th>
+                <th className="px-2 py-3 border-b text-center text-red-500">UT (HRS)</th>
+                <th className="px-2 py-3 border-b text-center text-red-500">UT (MIN)</th>
+                <th className="px-2 py-3 border-b text-center w-40">Remarks / Reason</th>
                 </tr>
-                );
-            })}
-        </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+                {days.map((day) => {
+                    const rowData = data?.[day] || {};
+                    const hasRemark = !!rowData.remarks;
+
+                    return (
+                    <tr key={day} className={`hover:bg-blue-50/50 transition-colors group ${selectedDays.has(day) ? "bg-blue-50" : ""}`}>
+                        <td className="px-3 py-2 border-r text-center">
+                            <input 
+                                type="checkbox" 
+                                checked={selectedDays.has(day)}
+                                onChange={() => toggleDay(day)}
+                            />
+                        </td>
+                        <td className="px-4 py-2 font-medium text-gray-500 bg-gray-50 border-r w-16 text-center">{day}</td>
+                        
+                        {hasRemark ? (
+                            <td colSpan={4} className="border-r px-2 py-1 text-center font-medium text-gray-600 italic bg-gray-50/50">
+                                {rowData.remarks}
+                            </td>
+                        ) : (
+                            <>
+                                <td className="border-r min-w-[80px]">
+                                    <InputCell day={day} field="am_in" value={rowData.am_in} onUpdate={onUpdate} />
+                                </td>
+                                <td className="border-r min-w-[80px]">
+                                    <InputCell day={day} field="am_out" value={rowData.am_out} onUpdate={onUpdate} />
+                                </td>
+                                <td className="border-r min-w-[80px]">
+                                    <InputCell day={day} field="pm_in" value={rowData.pm_in} onUpdate={onUpdate} />
+                                </td>
+                                <td className="border-r min-w-[80px]">
+                                    <InputCell day={day} field="pm_out" value={rowData.pm_out} onUpdate={onUpdate} />
+                                </td>
+                            </>
+                        )}
+
+                        <td className={`border-r min-w-[60px] bg-red-50/30 ${hasRemark ? 'opacity-40' : ''}`}>
+                            <InputCell day={day} field="undertime_hrs" value={rowData.undertime_hrs} onUpdate={onUpdate} />
+                        </td>
+                        <td className={`min-w-[60px] bg-red-50/30 border-r ${hasRemark ? 'opacity-40' : ''}`}>
+                            <InputCell day={day} field="undertime_min" value={rowData.undertime_min} onUpdate={onUpdate} />
+                        </td>
+                        
+                        <td className="min-w-[150px] bg-yellow-50/30">
+                            <InputCell day={day} field="remarks" value={rowData.remarks} onUpdate={onUpdate} />
+                        </td>
+                    </tr>
+                    );
+                })}
+            </tbody>
+            </table>
+        </div>
     </div>
   );
 }
 
-function AccomplishmentTable({ attendance, arMeta, setArMeta, periodFormat }) {
+function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMeta, periodFormat, selectedMonth, setHasUnsavedChanges }) {
   let start = 1;
   let end = 31;
   if (periodFormat === "1-15") end = 15;
   if (periodFormat === "16-end") start = 16;
   const days = Array.from({ length: end - start + 1 }, (_, i) => String(start + i));
 
-  const addBullet = (day) => {
-    const currentText = arMeta.tasks[day] || "";
-    setArMeta({
-        ...arMeta,
-        tasks: { 
-            ...arMeta.tasks, 
-            [day]: currentText + (currentText ? "\n• " : "• ") 
-        }
-    });
+  const handleKeyDown = (e, day, currentValue) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      
+      const cursorPosition = e.target.selectionStart;
+      const textBeforeCursor = currentValue.slice(0, cursorPosition);
+      const textAfterCursor = currentValue.slice(cursorPosition);
+      
+      const lines = textBeforeCursor.split('\n');
+      const lastLine = lines[lines.length - 1];
+      
+      const isBulleted = lastLine.trim().startsWith('•');
+      
+      if (isBulleted && lastLine.trim() === '•') {
+        const newText = textBeforeCursor.slice(0, -lastLine.length) + textAfterCursor;
+        onTaskChange(day, newText);
+      } else if (isBulleted) {
+        const newText = textBeforeCursor + '\n• ' + textAfterCursor;
+        onTaskChange(day, newText);
+        
+        setTimeout(() => {
+          e.target.selectionStart = cursorPosition + 3; 
+          e.target.selectionEnd = cursorPosition + 3;
+        }, 0);
+      } else {
+        const newText = textBeforeCursor + '\n' + textAfterCursor;
+        onTaskChange(day, newText);
+        
+        setTimeout(() => {
+          e.target.selectionStart = cursorPosition + 1;
+          e.target.selectionEnd = cursorPosition + 1;
+        }, 0);
+      }
+    }
+  };
+
+  const handleChange = (e, day) => {
+      let value = e.target.value;
+      
+      const cursorPosition = e.target.selectionStart;
+      
+      const lines = value.split('\n');
+      let modified = false;
+      
+      const newLines = lines.map(line => {
+          if (line.match(/^[-*]\s/)) {
+              modified = true;
+              return line.replace(/^[-*]\s/, '• ');
+          }
+          return line;
+      });
+      
+      if (modified) {
+          value = newLines.join('\n');
+      }
+
+      onTaskChange(day, value);
+  };
+
+  const toggleManualHighlight = (day) => {
+      setArMeta(prev => ({
+          ...prev,
+          manualHighlights: {
+              ...prev.manualHighlights,
+              [selectedMonth]: {
+                  ...(prev.manualHighlights?.[selectedMonth] || {}),
+                  [day]: !(prev.manualHighlights?.[selectedMonth]?.[day])
+              }
+          }
+      }));
+      if (setHasUnsavedChanges) setHasUnsavedChanges(true);
   };
 
   return (
@@ -1604,6 +1927,14 @@ function AccomplishmentTable({ attendance, arMeta, setArMeta, periodFormat }) {
             />
         </div>
 
+      <div className="text-sm bg-green-50/80 text-green-800 p-4 rounded-lg border border-green-200 mb-4">
+          <p className="font-semibold mb-1 text-green-900">Legend & Instructions:</p>
+          <ul className="list-disc list-inside space-y-1 text-xs">
+              <li>Dates highlighted in green are reflected by the dates with recorded time in/time out.</li>
+              <li>To include non-highlighted dates to accomplishment report, please manually highlight them by clicking on the date number block.</li>
+          </ul>
+      </div>
+
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm font-semibold text-gray-600 px-2">
             <span>Date</span>
@@ -1617,32 +1948,28 @@ function AccomplishmentTable({ attendance, arMeta, setArMeta, periodFormat }) {
                     attendance[day].pm_in ||
                     attendance[day].pm_out
                 );
+                
+                const isManual = arMeta.manualHighlights?.[selectedMonth]?.[day];
+                const isHighlighted = hasAttendance || isManual;
 
                 return (
-                    <div key={day} className={`flex gap-4 p-3 border rounded-lg hover:shadow-sm transition-shadow items-start ${hasAttendance ? "bg-green-50 border-green-200" : "bg-white border-gray-200"}`}>
-                        <div className={`w-12 h-10 flex flex-col items-center justify-center font-bold rounded-md shrink-0 ${hasAttendance ? "bg-green-100 text-green-700" : "bg-indigo-50 text-indigo-700"}`}>
+                    <div key={day} className={`flex gap-4 p-3 border rounded-lg hover:shadow-sm transition-shadow items-start ${isHighlighted ? "bg-green-50 border-green-200" : "bg-white border-gray-200"}`}>
+                        <div 
+                            onClick={() => !hasAttendance && toggleManualHighlight(day)}
+                            className={`w-12 h-10 flex flex-col items-center justify-center font-bold rounded-md shrink-0 transition-colors ${!hasAttendance ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300' : ''} ${isHighlighted ? "bg-green-100 text-green-700" : "bg-indigo-50 text-indigo-700"}`}
+                            title={!hasAttendance ? "Click to manually include this date" : "Included via attendance log"}
+                        >
                             {day}
-                            {hasAttendance && <CheckIcon className="w-3 h-3 mt-0.5" />}
+                            {isHighlighted && <CheckIcon className="w-3 h-3 mt-0.5" />}
                         </div>
                         <div className="flex-1 relative">
                             <textarea
                                 className="w-full min-h-[80px] bg-transparent border border-gray-200 rounded p-2 text-sm text-gray-700 placeholder-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y"
-                                placeholder={hasAttendance ? "Type accomplished task here..." : "No attendance log for this day..."}
-                                value={arMeta.tasks[day] || ""}
-                                onChange={(e) =>
-                                setArMeta({
-                                    ...arMeta,
-                                    tasks: { ...arMeta.tasks, [day]: e.target.value },
-                                })
-                                }
+                                placeholder={isHighlighted ? "Type accomplished task here...\nTip: Type '-' or '*' then space to start a bulleted list." : "No attendance log for this day..."}
+                                value={tasks[day] || ""}
+                                onChange={(e) => handleChange(e, day)}
+                                onKeyDown={(e) => handleKeyDown(e, day, tasks[day] || "")}
                             />
-                            <button 
-                                onClick={() => addBullet(day)}
-                                className="absolute right-2 bottom-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded flex items-center gap-1"
-                                title="Add Bullet Point"
-                            >
-                                <ListIcon className="w-3 h-3" /> Bullet
-                            </button>
                         </div>
                     </div>
                 );

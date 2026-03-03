@@ -76,42 +76,31 @@ def parse_employees_data(text):
     lines = text.split('\n')
 
     current_employee = None
-    employee_data = {}
+    employee_data = {} 
     day_checkins = {} 
 
-    current_month_name = ""
-    current_year = ""
-
-    def process_employee_data(emp_name, emp_data, day_checks, month_name, year):
+    def process_employee_data(emp_name, emp_data, day_checks):
         if not emp_name or not day_checks:
             return
 
-        if month_name:
-            emp_data['month_name'] = month_name
-        if year:
-            emp_data['year'] = year
-
-        for day, raw_logs in day_checks.items():
-            if day not in emp_data:
-                continue
-
-            cleaned_logs = clean_daily_logs(raw_logs)
-
-            for idx, (action, time) in enumerate(cleaned_logs):
-                # USE THE 12-HOUR FORMAT HELPER INSTEAD OF JUST SPLITTING THE STRING
-                display_time = to_12h(time)
-
-                if action == 'C/IN':
-                    if idx == 0: 
-                        emp_data[day]['am_in'] = display_time
-                    else: 
-                        emp_data[day]['pm_in'] = display_time
-
-                elif action == 'C/OUT':
-                    if idx == 1 or (idx > 0 and not emp_data[day]['am_out']):
-                        emp_data[day]['am_out'] = display_time
-                    else:
-                        emp_data[day]['pm_out'] = display_time
+        for m_key, m_checks in day_checks.items():
+            for day, raw_logs in m_checks.items():
+                if day not in emp_data[m_key]:
+                    continue
+                
+                cleaned_logs = clean_daily_logs(raw_logs)
+                for idx, (action, time) in enumerate(cleaned_logs):
+                    display_time = to_12h(time)
+                    if action == 'C/IN':
+                        if idx == 0: 
+                            emp_data[m_key][day]['am_in'] = display_time
+                        else: 
+                            emp_data[m_key][day]['pm_in'] = display_time
+                    elif action == 'C/OUT':
+                        if idx == 1 or (idx > 0 and not emp_data[m_key][day]['am_out']):
+                            emp_data[m_key][day]['am_out'] = display_time
+                        else:
+                            emp_data[m_key][day]['pm_out'] = display_time
 
     for line in lines:
         line = line.strip()
@@ -121,13 +110,7 @@ def parse_employees_data(text):
         try:
             match = re.match(r'^([A-Za-z0-9\s,]+)\((\d+)\)$', line)
             if match:
-                process_employee_data(
-                    current_employee,
-                    employee_data,
-                    day_checkins,
-                    current_month_name,
-                    current_year
-                )
+                process_employee_data(current_employee, employee_data, day_checkins)
 
                 if current_employee and employee_data:
                     employees[current_employee] = employee_data
@@ -135,8 +118,6 @@ def parse_employees_data(text):
                 current_employee = match.group(1).strip()
                 employee_data = {}
                 day_checkins = {}
-                current_month_name = ""
-                current_year = ""
                 continue
 
             if not current_employee:
@@ -151,7 +132,6 @@ def parse_employees_data(text):
                 time_part = parts[1] 
                 
                 rest_of_line = " ".join(parts[2:]).lower()
-                
                 is_pm = 'pm' in rest_of_line
                 is_am = 'am' in rest_of_line
                 
@@ -165,34 +145,33 @@ def parse_employees_data(text):
 
                 day_str, month_str, year_str = date_str.split('/')
 
-                if not current_month_name:
-                    current_month_name = calendar.month_name[int(month_str)]
-                if not current_year:
-                    current_year = year_str
+                m_name = calendar.month_name[int(month_str)]
+                m_key = f"{m_name} {year_str}"
+
+                if m_key not in employee_data:
+                    employee_data[m_key] = {
+                        'month_name': m_name,
+                        'year': year_str
+                    }
+                    day_checkins[m_key] = {}
 
                 day_num = int(day_str)
                 day_key = str(day_num)
 
-                if day_key not in employee_data:
-                    employee_data[day_key] = {
+                if day_key not in employee_data[m_key]:
+                    employee_data[m_key][day_key] = {
                         'am_in': '', 'am_out': '', 'pm_in': '', 'pm_out': '',
                         'undertime_hrs': '', 'undertime_min': '', 'remarks': ''
                     }
-                    day_checkins[day_key] = []
+                    day_checkins[m_key][day_key] = []
 
                 if action != 'UNKNOWN':
-                    day_checkins[day_key].append((action, time_part_24))
+                    day_checkins[m_key][day_key].append((action, time_part_24))
 
         except Exception:
             continue
 
-    process_employee_data(
-        current_employee,
-        employee_data,
-        day_checkins,
-        current_month_name,
-        current_year
-    )
+    process_employee_data(current_employee, employee_data, day_checkins)
 
     if current_employee and employee_data:
         employees[current_employee] = employee_data

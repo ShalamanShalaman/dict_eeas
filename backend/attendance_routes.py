@@ -51,10 +51,11 @@ def index():
                     if not employees:
                         error_message = "No valid attendance data found"
                     else:
-                        for name, data in employees.items():
-                            counts[name] = sum(
-                                1 for k in data.keys() if k.isdigit()
-                            )
+                        for name, months_data in employees.items():
+                            total_days = 0
+                            for m_key, m_data in months_data.items():
+                                total_days += sum(1 for k in m_data.keys() if k.isdigit())
+                            counts[name] = total_days
 
                 except Exception as e:
                     error_message = f"PDF processing error: {str(e)}"
@@ -424,8 +425,6 @@ def generate_ar():
 def generate_dtr_adjustment():
     data = request.json or {}
 
-    # We don't strictly need employee_data for this if it's manually filled, 
-    # but we might use it for defaults if needed.
     overrides = data.get("overrides", {})
     employee_name = overrides.get("name", "Employee")
 
@@ -437,7 +436,7 @@ def generate_dtr_adjustment():
         output_path = os.path.join(output_dir, filename)
 
         generate_dtr_adjustment_slip(
-            employee_data={}, # Not strictly used, data comes from overrides
+            employee_data={},
             output_path=output_path,
             overrides=overrides
         )

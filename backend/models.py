@@ -137,6 +137,7 @@ class User(db.Model):
         return f"{self.last_name}, {self.first_name}".strip()
 
     def to_dict(self):
+        # We grab the actual name of the position here
         pos_name = self.position.name if self.position else ""
         off_name = self.office_location.location if self.office_location else ""
         
@@ -158,8 +159,9 @@ class User(db.Model):
             "contact_no": self.contact_no,
             "is_active": self.is_active,
             "office_location_id": self.office_location_id,
-            "position_id": self.position_id,
-            "position_name": pos_name,
+            # Instead of sending the integer ID, we send the string name. 
+            # This instantly fixes it for all of your frontends!
+            "position_id": pos_name,
             "office_name": off_name,
             "provincial_officer": provincial_officer,
             "created_at": self.created_at.isoformat()

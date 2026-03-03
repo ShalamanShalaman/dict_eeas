@@ -104,6 +104,33 @@ def create_user():
         return jsonify({'error': 'Email already exists'}), 409
 
     temp_password = generate_temp_password()
+    
+    pos_id = None
+    pos_raw = data.get('position_id')
+    if pos_raw:
+        if str(pos_raw).isdigit():
+            pos_id = int(pos_raw)
+        else:
+            pos = Position.query.filter_by(name=str(pos_raw)).first()
+            if not pos:
+                pos = Position(name=str(pos_raw))
+                db.session.add(pos)
+                db.session.flush()
+            pos_id = pos.id
+                
+    off_id = None
+    off_raw = data.get('office_location_id')
+    if off_raw:
+        if str(off_raw).isdigit():
+            off_id = int(off_raw)
+        else:
+            loc = OfficeLocation.query.filter_by(location=str(off_raw)).first()
+            if not loc:
+                loc = OfficeLocation(location=str(off_raw))
+                db.session.add(loc)
+                db.session.flush()
+            off_id = loc.id
+
     user = User(
         user_id=data['user_id'],
         email=data['email'],
@@ -112,8 +139,8 @@ def create_user():
         last_name=data['last_name'],
         contact_no=data.get('contact_no'),
         role=data['role'],
-        office_location_id=data.get('office_location_id'),
-        position_id=data.get('position_id'),
+        office_location_id=off_id,
+        position_id=pos_id,
         force_change_password=True
     )
     user.set_password(temp_password)
@@ -139,8 +166,37 @@ def edit_user(public_id):
     user.email = data.get('email', user.email)
     user.role = data.get('role', user.role)
     user.contact_no = data.get('contact_no', user.contact_no)
-    user.office_location_id = data.get('office_location_id', user.office_location_id)
-    user.position_id = data.get('position_id', user.position_id)
+    
+    if 'office_location_id' in data:
+        off_raw = data.get('office_location_id')
+        if off_raw:
+            if str(off_raw).isdigit():
+                user.office_location_id = int(off_raw)
+            else:
+                loc = OfficeLocation.query.filter_by(location=str(off_raw)).first()
+                if not loc:
+                    loc = OfficeLocation(location=str(off_raw))
+                    db.session.add(loc)
+                    db.session.flush()
+                user.office_location_id = loc.id
+        else:
+            user.office_location_id = None
+
+    if 'position_id' in data:
+        pos_raw = data.get('position_id')
+        if pos_raw:
+            if str(pos_raw).isdigit():
+                user.position_id = int(pos_raw)
+            else:
+                pos = Position.query.filter_by(name=str(pos_raw)).first()
+                if not pos:
+                    pos = Position(name=str(pos_raw))
+                    db.session.add(pos)
+                    db.session.flush()
+                user.position_id = pos.id
+        else:
+            user.position_id = None
+            
     db.session.commit()
     return jsonify({'message': 'User updated', 'user': user.to_dict()})
 

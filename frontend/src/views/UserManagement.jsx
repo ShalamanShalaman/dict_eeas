@@ -16,7 +16,6 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // New state for UI Modals (Alerts/Confirms) and Unsaved Changes
   const [uiModal, setUiModal] = useState({ show: false, type: '', title: '', message: '', onConfirm: null });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -29,10 +28,9 @@ export default function UserManagement() {
     role: "employee",
     contact_no: "",
     office_location_id: "",
-    position_id: "" // Added Position ID
+    position_id: "" 
   });
 
-  // Updated to use reviewer_id instead of string manager
   const [locationForm, setLocationForm] = useState({
     location: "",
     reviewer_id: "" 
@@ -40,7 +38,6 @@ export default function UserManagement() {
 
   const API_URL = "http://127.0.0.1:5000/api";
 
-  // ---------------- FETCH DATA ----------------
   useEffect(() => {
     fetchUsers();
     fetchLocations();
@@ -80,7 +77,6 @@ export default function UserManagement() {
     }
   };
 
-  // ---------------- HELPERS ----------------
   const handleInputChange = (setter, data, field, value) => {
     setter({ ...data, [field]: value });
     setHasUnsavedChanges(true);
@@ -90,7 +86,6 @@ export default function UserManagement() {
     setUiModal({ show: false, type: '', title: '', message: '', onConfirm: null });
   };
 
-  // ---------------- USER CRUD ----------------
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -114,8 +109,9 @@ export default function UserManagement() {
             message: result.message,
             onConfirm: () => closeUiModal()
         });
-        closeUserModal(true); // Force close without check
+        closeUserModal(true); 
         fetchUsers();
+        fetchPositions();
       } else {
         setUiModal({ 
             show: true, 
@@ -215,7 +211,6 @@ export default function UserManagement() {
     });
   };
 
-  // ---------------- OFFICE LOCATION CRUD ----------------
   const handleLocationSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -233,7 +228,6 @@ export default function UserManagement() {
 
       if (res.ok) {
         fetchLocations();
-        // If editing, close modal. If adding, keep open but reset form (unless specific UX desired)
         if (editingLocation) {
             closeLocationModal(true);
             setUiModal({ show: true, type: 'success', title: 'Success', message: 'Location updated successfully', onConfirm: () => closeUiModal() });
@@ -309,7 +303,6 @@ export default function UserManagement() {
     setLocationForm({ location: "", reviewer_id: "" });
   };
 
-  // ---------------- PAGINATION ----------------
   const itemsPerPage = 10;
   const filteredUsers = users.filter((u) =>
     `${u.full_name} ${u.user_id} ${u.email}`.toLowerCase().includes(searchTerm.toLowerCase())
@@ -320,12 +313,10 @@ export default function UserManagement() {
     currentPage * itemsPerPage
   );
 
-  // Helper to filter users who are reviewers
   const reviewers = users.filter(u => u.role === 'reviewer');
 
   return (
     <div className="space-y-6 p-6 max-w-[1400px] mx-auto">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -350,7 +341,6 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* Search & Filter */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
         <input
             type="text"
@@ -361,7 +351,6 @@ export default function UserManagement() {
         />
       </div>
 
-      {/* USERS TABLE */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -383,9 +372,7 @@ export default function UserManagement() {
                 <tr><td colSpan="7" className="text-center py-8 text-gray-500">No users found matching your search.</td></tr>
                 ) : (
                 paginatedUsers.map((user) => {
-                    // Find relations
                     const loc = locations.find(l => l.id === user.office_location_id);
-                    const pos = positions.find(p => p.id === user.position_id);
                     
                     return (
                     <tr key={user.public_id} className="hover:bg-blue-50/50 transition-colors group">
@@ -402,7 +389,7 @@ export default function UserManagement() {
                                 {user.role}
                             </span>
                         </td>
-                        <td className="px-6 py-3 text-gray-600">{pos ? pos.name : user.position_id || <span className="text-gray-300 italic">None</span>}</td>
+                        <td className="px-6 py-3 text-gray-600">{user.position_id || <span className="text-gray-300 italic">None</span>}</td>
                         <td className="px-6 py-3 text-gray-600">{loc ? loc.location : <span className="text-gray-300 italic">None</span>}</td>
                         <td className="px-6 py-3">
                             <span className={`inline-block w-2 h-2 rounded-full mr-2 ${user.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
@@ -425,7 +412,6 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-4">
             {Array.from({ length: totalPages }, (_, i) => (
@@ -440,7 +426,6 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* ---------------- USER MODAL (Full Featured) ---------------- */}
       {isUserModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -450,7 +435,6 @@ export default function UserManagement() {
             </div>
             
             <form onSubmit={handleUserSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Account Info */}
               <div className="md:col-span-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-[-10px]">Account</div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">User ID / Employee No.</label>
@@ -475,7 +459,6 @@ export default function UserManagement() {
                 </select>
               </div>
 
-              {/* Personal Info */}
               <div className="md:col-span-2 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2 mb-[-10px]">Personal Information</div>
               <div className="md:col-span-2 grid grid-cols-3 gap-3">
                   <input
@@ -519,7 +502,6 @@ export default function UserManagement() {
                 />
               </div>
 
-              {/* Assignments */}
               <div className="md:col-span-2 text-xs font-bold text-gray-400 uppercase tracking-wider mt-2 mb-[-10px]">Assignments</div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Job Position</label>
@@ -559,7 +541,6 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* ---------------- OFFICE LOCATION MODAL (Compact & Stylized) ---------------- */}
       {isLocationModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -569,7 +550,6 @@ export default function UserManagement() {
             </div>
 
             <div className="p-5 max-h-[70vh] flex flex-col">
-                {/* Form Section */}
                 <form onSubmit={handleLocationSubmit} className="space-y-3 mb-6 border-b border-gray-100 pb-6">
                     <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase">Office Name</label>
@@ -600,11 +580,9 @@ export default function UserManagement() {
                     </button>
                 </form>
 
-                {/* List Section */}
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                     {locations.length === 0 && <p className="text-center text-xs text-gray-400 py-4">No locations added yet.</p>}
                     {locations.map((loc) => {
-                        // Find reviewer name for display
                         const revName = users.find(u => u.id === loc.reviewer_id)?.full_name || "Unassigned";
                         return (
                             <div key={loc.id} className="group flex justify-between items-start p-3 bg-gray-50 border border-gray-100 rounded-lg hover:border-blue-200 transition-colors">
@@ -627,7 +605,6 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* ---------------- UI FEEDBACK MODAL (Replaces Alerts/Confirms) ---------------- */}
       {uiModal.show && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
