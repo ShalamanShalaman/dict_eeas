@@ -1,10 +1,23 @@
 import os
+import sqlalchemy
 from flask import Flask, jsonify
 from flask_cors import CORS
 from models import db, User, Position, OfficeLocation
 from routes import account_bp, document_bp 
 from attendance_routes import attendance_bp
 from sqlalchemy.exc import IntegrityError
+
+def get_database_uri():
+    primary_uri = "mysql+pymysql://root:root@localhost/attendance_db"
+    fallback_uri = "mysql+pymysql://root:root@localhost:3308/attendance_db"
+
+    try:
+        engine = sqlalchemy.create_engine(primary_uri, connect_args={'connect_timeout': 2})
+        with engine.connect():
+            pass
+        return primary_uri
+    except sqlalchemy.exc.OperationalError:
+        return fallback_uri
 
 def create_app():
     app = Flask(__name__)
@@ -14,7 +27,7 @@ def create_app():
 
     app.config["SECRET_KEY"] = "dev-secret-key"
     
-    app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:root@localhost/attendance_db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = get_database_uri()
     
     app.config["SQLALCHEMY_POOL_RECYCLE"] = 3600 
     

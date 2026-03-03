@@ -1178,26 +1178,32 @@ const handleSaveConfirmed = async () => {
             </div>
 
             <div className="flex flex-wrap justify-end mt-6 pt-4 border-t border-gray-100 gap-3">
-              <button
-                onClick={downloadExcel}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
-              >
-                <DownloadIcon className="w-4 h-4" /> Download DTR (Excel)
-              </button>
+              {viewMode === "dtr" && (
+                <button
+                  onClick={downloadExcel}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
+                >
+                  <DownloadIcon className="w-4 h-4" /> Download Daily Time Record 
+                </button>
+              )}
 
-              <button
-                onClick={downloadAR}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
-              >
-                <DownloadIcon className="w-4 h-4" /> Generate AR (Word)
-              </button>
+              {viewMode === "ar" && (
+                <button
+                  onClick={downloadAR}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg shadow-sm font-medium transition-colors flex items-center gap-2 text-sm"
+                >
+                  <DownloadIcon className="w-4 h-4" /> Download Accomplishment Report
+                </button>
+              )}
 
-              <button
-                onClick={downloadDtrAdjustment}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg shadow-md font-bold transition-all flex items-center gap-2 text-sm"
-              >
-                <FileWarningIcon className="w-4 h-4" /> Download Adjustment Slip
-              </button>
+              {viewMode === "dtr_adjustment" && (
+                <button
+                  onClick={downloadDtrAdjustment}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg shadow-md font-bold transition-all flex items-center gap-2 text-sm"
+                >
+                  <DownloadIcon className="w-4 h-4" /> Download DTR - Adjustment Slip
+                </button>
+              )}
             </div>
           </div>
         </div>
