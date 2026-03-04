@@ -6,6 +6,7 @@ import string
 import json
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
 
 account_bp = Blueprint('account', __name__)
@@ -203,6 +204,27 @@ def edit_user(public_id):
 @account_bp.route('/api/admin/delete-user/<public_id>', methods=['DELETE'])
 def delete_user(public_id):
     user = User.query.filter_by(public_id=public_id).first_or_404()
+    
+    if user.profile_picture:
+        old_filepath = os.path.join(current_app.config['PROFILE_PICTURES_FOLDER'], user.profile_picture)
+        if os.path.exists(old_filepath):
+            try:
+                os.remove(old_filepath)
+            except OSError:
+                pass
+
+    for doc in user.submitted_documents:
+        if doc.file_path and os.path.exists(doc.file_path):
+            try:
+                os.remove(doc.file_path)
+            except OSError:
+                pass
+        if doc.review_file_path and os.path.exists(doc.review_file_path):
+            try:
+                os.remove(doc.review_file_path)
+            except OSError:
+                pass
+                
     db.session.delete(user)
     db.session.commit()
     return jsonify({'message': 'User deleted'})
@@ -218,6 +240,115 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid credentials'}), 401
     return jsonify({'message': 'Login successful', 'user': user.to_dict()}), 200
+
+@account_bp.route('/api/profile/send-otp', methods=['POST'])
+def send_otp():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    contact_no = data.get('contact_no')
+    
+    if not user_id or not contact_no:
+        return jsonify({'error': 'Missing user_id or contact_no'}), 400
+        
+    code = ''.join(random.choices(string.digits, k=6))
+    
+    otp_store[user_id] = code
+    
+    print(f"\n[MOCK SMS GATEWAY] Sending OTP to {contact_no}: {code}\n")
+    
+    return jsonify({
+        'message': 'OTP sent successfully',
+        'debug_otp': code 
+    })
+
+@account_bp.route('/api/profile/verify-otp', methods=['POST'])
+def verify_otp():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    otp = data.get('otp')
+    
+    if not user_id or not otp:
+        return jsonify({'error': 'Missing data'}), 400
+        
+    stored_otp = otp_store.get(user_id)
+    
+    if stored_otp and stored_otp == otp:
+        del otp_store[user_id] 
+        
+        return jsonify({'message': 'Phone verified successfully'})
+    else:
+        return jsonify({'error': 'Invalid or expired OTP'}), 400
+
+@account_bp.route('/api/profile/<public_id>/upload-picture', methods=['POST'])
+def upload_profile_picture(public_id):
+    user = User.query.filter_by(public_id=public_id).first_or_404()
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    
+    if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS):
+        return jsonify({'error': 'Invalid file type. Only PNG, JPG, JPEG, GIF, and WEBP are allowed'}), 400
+    
+    if user.profile_picture:
+        old_filepath = os.path.join(current_app.config['PROFILE_PICTURES_FOLDER'], user.profile_picture)
+        if os.path.exists(old_filepath):
+            os.remove(old_filepath)
+    
+    file_extension = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"{public_id}.{file_extension}"
+    filepath = os.path.join(current_app.config['PROFILE_PICTURES_FOLDER'], filename)
+    
+    file.save(filepath)
+    
+    user.profile_picture = filename
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Profile picture uploaded successfully',
+        'profile_picture': filename,
+        'user': user.to_dict()
+    }), 200
+
+@account_bp.route('/api/profile/<public_id>/picture', methods=['GET'])
+def get_profile_picture(public_id):
+    user = User.query.filter_by(public_id=public_id).first_or_404()
+    
+    if not user.profile_picture:
+        return jsonify({'error': 'No profile picture found'}), 404
+    
+    filepath = os.path.join(current_app.config['PROFILE_PICTURES_FOLDER'], user.profile_picture)
+    
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Profile picture file not found'}), 404
+    
+    return send_file(filepath, mimetype='image/jpeg')
+
+@account_bp.route('/api/profile/<public_id>/picture', methods=['DELETE'])
+def delete_profile_picture(public_id):
+    user = User.query.filter_by(public_id=public_id).first_or_404()
+    
+    if user.profile_picture:
+        filepath = os.path.join(current_app.config['PROFILE_PICTURES_FOLDER'], user.profile_picture)
+        
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        user.profile_picture = None
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Profile picture deleted successfully',
+            'user': user.to_dict()
+        }), 200
+    
+    return jsonify({'error': 'No profile picture to delete'}), 404
 
 @account_bp.route('/api/profile/<public_id>', methods=['GET'])
 def get_profile(public_id):
@@ -268,44 +399,6 @@ def edit_own_profile(public_id):
 
     db.session.commit()
     return jsonify({'message': 'Profile updated', 'user': user.to_dict()})
-
-@account_bp.route('/api/profile/send-otp', methods=['POST'])
-def send_otp():
-    data = request.get_json()
-    user_id = data.get('user_id')
-    contact_no = data.get('contact_no')
-    
-    if not user_id or not contact_no:
-        return jsonify({'error': 'Missing user_id or contact_no'}), 400
-        
-    code = ''.join(random.choices(string.digits, k=6))
-    
-    otp_store[user_id] = code
-    
-    print(f"\n[MOCK SMS GATEWAY] Sending OTP to {contact_no}: {code}\n")
-    
-    return jsonify({
-        'message': 'OTP sent successfully',
-        'debug_otp': code 
-    })
-
-@account_bp.route('/api/profile/verify-otp', methods=['POST'])
-def verify_otp():
-    data = request.get_json()
-    user_id = data.get('user_id')
-    otp = data.get('otp')
-    
-    if not user_id or not otp:
-        return jsonify({'error': 'Missing data'}), 400
-        
-    stored_otp = otp_store.get(user_id)
-    
-    if stored_otp and stored_otp == otp:
-        del otp_store[user_id] 
-        
-        return jsonify({'message': 'Phone verified successfully'})
-    else:
-        return jsonify({'error': 'Invalid or expired OTP'}), 400
 
 @document_bp.route('/api/document/upload', methods=['POST'])
 def upload_document():
@@ -442,6 +535,23 @@ def download_document(doc_id):
         return jsonify({'error': 'File not found'}), 404
     return send_file(path, as_attachment=True, download_name=os.path.basename(path))
 
+@document_bp.route('/api/document/view/<int:doc_id>', methods=['GET'])
+def view_document(doc_id):
+    doc = Document.query.get_or_404(doc_id)
+    path = doc.review_file_path if doc.review_file_path else doc.file_path
+    if not os.path.exists(path):
+        return jsonify({'error': 'File not found'}), 404
+    
+    file_ext = os.path.splitext(path)[1].lower()
+    
+    if file_ext == '.pdf':
+        return send_file(path, mimetype='application/pdf')
+    
+    return jsonify({
+        'message': 'View not supported for this file type',
+        'download_url': f'/api/document/download/{doc_id}'
+    }), 400
+
 @document_bp.route('/api/document/<int:doc_id>', methods=['DELETE'])
 def delete_document(doc_id):
     doc = Document.query.get_or_404(doc_id)
@@ -480,6 +590,13 @@ def get_reviewer_documents(reviewer_id):
     docs = Document.query.filter_by(reviewer_id=reviewer.id, status='submitted').order_by(Document.submitted_at.desc()).all()
     return jsonify([d.to_dict() for d in docs])
 
+@document_bp.route('/api/document/reviewer-archive/<int:reviewer_id>', methods=['GET'])
+def get_reviewer_archive(reviewer_id):
+    docs = Document.query.filter_by(reviewer_id=reviewer_id).filter(
+        Document.status.in_(['approved', 'declined'])
+    ).order_by(Document.updated_at.desc()).all()
+    return jsonify([d.to_dict() for d in docs])
+
 @document_bp.route('/api/document/reviewers', methods=['GET'])
 def get_reviewers():
     reviewers = User.query.filter_by(role='reviewer', is_active=True).all()
@@ -513,10 +630,38 @@ def upload_review_document(doc_id):
     
     filepath = save_file(file, folder='uploads')
     doc.review_file_path = filepath
+    doc.status = 'approved'  # Auto-approve when signed doc is uploaded
+    doc.reviewed_at = datetime.utcnow()
     doc.updated_at = datetime.utcnow()
     db.session.commit()
     
-    return jsonify({'message': 'Signed document uploaded', 'document': doc.to_dict()}), 200
+    return jsonify({'message': 'Signed document uploaded and approved', 'document': doc.to_dict()}), 200
+
+@document_bp.route('/api/document/notifications/<string:user_id>', methods=['GET'])
+def get_notifications(user_id):
+    """Get notifications for an employee (documents that have been declined with reviewer notes)"""
+    user = User.query.filter_by(user_id=user_id).first_or_404()
+    
+    # Get all documents submitted by this employee that have been declined
+    # and have a reviewer note (rejection reason)
+    declined_docs = Document.query.filter(
+        Document.employee_id == user.id,
+        Document.status == 'declined',
+        Document.reviewer_note.isnot(None),
+        Document.reviewer_note != ''
+    ).order_by(Document.reviewed_at.desc()).all()
+    
+    notifications = []
+    for doc in declined_docs:
+        notifications.append({
+            "id": doc.id,
+            "document_name": f"Document #{doc.id}",
+            "reviewer_note": doc.reviewer_note,
+            "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None,
+            "status": doc.status
+        })
+    
+    return jsonify(notifications), 200
 
 @document_bp.route('/api/document/upload-attachments', methods=['POST'])
 def upload_attachments():

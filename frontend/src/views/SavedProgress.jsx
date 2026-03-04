@@ -42,11 +42,32 @@ const RefreshIcon = ({ className }) => (
   </Icon>
 );
 
+const SendIcon = ({ className }) => (
+  <Icon className={className}>
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </Icon>
+);
+
 const AlertCircleIcon = ({ className }) => (
   <Icon className={className}>
     <circle cx="12" cy="12" r="10" />
     <line x1="12" y1="8" x2="12" y2="12" />
     <line x1="12" y1="16" x2="12.01" y2="16" />
+  </Icon>
+);
+
+const UserIcon = ({ className }) => (
+  <Icon className={className}>
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </Icon>
+);
+
+const CheckCircleIcon = ({ className }) => (
+  <Icon className={className}>
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
   </Icon>
 );
 
@@ -62,6 +83,14 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
   const [pinnedIds, setPinnedIds] = useState([]);
   const navigate = useNavigate();
 
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [reviewers, setReviewers] = useState([]);
+  const [loadingReviewers, setLoadingReviewers] = useState(false);
+  const [selectedReviewerId, setSelectedReviewerId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
   useEffect(() => {
     if (propUser) {
       setCurrentUser(propUser);
@@ -72,6 +101,30 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       }
     }
   }, [propUser]);
+
+  useEffect(() => {
+    const fetchReviewers = async () => {
+      try {
+        setLoadingReviewers(true);
+        const response = await fetch('http://127.0.0.1:5000/api/document/reviewers');
+        if (response.ok) {
+          const data = await response.json();
+          setReviewers(data);
+          if (data.length === 1) {
+            setSelectedReviewerId(data[0].id.toString());
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch reviewers:", err);
+      } finally {
+        setLoadingReviewers(false);
+      }
+    };
+
+    if (showSubmitModal) {
+      fetchReviewers();
+    }
+  }, [showSubmitModal]);
 
   const fetchDocs = async () => {
     if (!currentUser) return;
@@ -88,15 +141,14 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       const response = await fetch(`http://127.0.0.1:5000/api/document/user/${userId}`);
       
       if (!response.ok) {
-         if(response.status === 404) {
-             console.warn("Backend returned 404. Ensure routes.py accepts <string:user_id>");
-         }
          throw new Error(`Error: ${response.status}`);
       }
 
       const result = await response.json();
       
-      const sorted = (result || []).sort((a, b) => {
+      const drafts = (result || []).filter(doc => doc.is_draft || doc.status === 'draft');
+      
+      const sorted = drafts.sort((a, b) => {
           const dateA = new Date(b.updated_at || b.created_at);
           const dateB = new Date(a.updated_at || a.created_at);
           return dateA - dateB;
@@ -115,8 +167,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
         fetchDocs();
     }
   }, [currentUser]);
-
-  // No cross-component auto-removal of submitted drafts (previous listener removed)
 
   const handleDeleteClick = (id) => {
     setDeleteTargetIds([id]);
@@ -147,7 +197,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       return Array.from(set);
     });
     setMarkedIds([]);
-    setMarkMode(false); // turn off after bulk action
+    setMarkMode(false);
   };
 
   const markAll = () => setMarkedIds(savedDocs.map(d => d.id));
@@ -162,7 +212,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
         deleteTargetIds.map((id) => fetch(`http://127.0.0.1:5000/api/document/${id}?user_id=${userId}`, { method: "DELETE" }))
       );
 
-      // remove deleted from UI regardless of individual failures
       setSavedDocs(prev => prev.filter(doc => !deleteTargetIds.map(String).includes(String(doc.id))));
 
       const failed = responses.some(r => !r.ok);
@@ -175,7 +224,166 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       setShowDeleteConfirm(false);
       setDeleteTargetIds([]);
       setMarkedIds([]);
-      setMarkMode(false); // exit mark mode after deletion
+      setMarkMode(false);
+    }
+  };
+
+  const handleOpenSubmitModal = () => {
+    if (markedIds.length === 0) {
+      alert("Please select at least one draft to submit.");
+      return;
+    }
+    setShowSubmitModal(true);
+    setSubmitError(null);
+    setSubmitSuccess(false);
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (!selectedReviewerId) {
+      setSubmitError("Please select a reviewer");
+      return;
+    }
+
+    if (markedIds.length === 0) {
+      setSubmitError("Please select at least one draft");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      let submittedCount = 0;
+      let failedCount = 0;
+
+      for (const docId of markedIds) {
+        const contentResponse = await fetch(`http://127.0.0.1:5000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
+        
+        if (!contentResponse.ok) {
+          console.error(`Failed to get content for doc ${docId}`);
+          failedCount++;
+          continue;
+        }
+
+        const stateData = await contentResponse.json();
+        
+        const employeeName = stateData.arMeta?.name || currentUser.full_name || "Employee";
+        const selectedMonth = stateData.selectedMonth || "";
+        
+        const finalName = employeeName;
+        const finalPeriod = selectedMonth;
+        const filteredData = stateData.employees?.[Object.keys(stateData.employees)[0]]?.[selectedMonth] || {};
+
+        const dtrResponse = await fetch("http://127.0.0.1:5000/api/download-dtr", {
+          method: "POST",
+          mode: 'cors',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            employee_name: finalName,
+            employee_data: filteredData,
+            approver: stateData.arMeta?.approver || "",
+            period_text: finalPeriod,
+            period_format: stateData.arMeta?.periodFormat || "full"
+          }),
+        });
+
+        if (!dtrResponse.ok) {
+          console.error(`Failed to generate DTR for doc ${docId}`);
+          failedCount++;
+          continue;
+        }
+
+        const dtrBlob = await dtrResponse.blob();
+        const dtrFile = new File([dtrBlob], `${finalName.replace(/\s+/g, '_')}_DTR.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+        const formData = new FormData();
+        formData.append('user_id', currentUser.user_id);
+        formData.append('files', dtrFile);
+
+        const uploadResponse = await fetch('/api/document/upload-attachments', {
+          method: 'POST',
+          body: formData
+        });
+
+        let uploadResult;
+        const contentType = uploadResponse.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          uploadResult = await uploadResponse.json();
+        } else {
+          const text = await uploadResponse.text();
+          console.error('Non-JSON response:', text);
+          failedCount++;
+          continue;
+        }
+
+        if (!uploadResponse.ok) {
+          console.error(`Failed to convert DTR to PDF for doc ${docId}`, uploadResult.error);
+          failedCount++;
+          continue;
+        }
+
+        const defaultFileName = `${currentUser.last_name}, ${currentUser.first_name}.pdf`;
+        
+        const createDocFormData = new FormData();
+        createDocFormData.append('user_id', currentUser.user_id);
+        createDocFormData.append('filename', defaultFileName);
+        
+        const fileResponse = await fetch(`/static/${uploadResult.file_path}`);
+        const fileBlob = await fileResponse.blob();
+        const convertedFile = new File([fileBlob], defaultFileName, { type: 'application/pdf' });
+        createDocFormData.append('file', convertedFile);
+
+        const createDocResponse = await fetch('/api/document/upload', {
+          method: 'POST',
+          body: createDocFormData
+        });
+
+        if (!createDocResponse.ok) {
+          console.error(`Failed to create document for doc ${docId}`);
+          failedCount++;
+          continue;
+        }
+
+        const createDocResult = await createDocResponse.json();
+        const newDocId = createDocResult.document.id;
+
+        const submitFormData = new FormData();
+        submitFormData.append('user_id', currentUser.user_id);
+        submitFormData.append('reviewer_id', selectedReviewerId);
+
+        const submitResponse = await fetch(`/api/document/submit/${newDocId}`, {
+          method: 'POST',
+          body: submitFormData
+        });
+
+        if (submitResponse.ok) {
+          submittedCount++;
+          setSavedDocs(prev => prev.filter(doc => String(doc.id) !== String(docId)));
+        } else {
+          failedCount++;
+        }
+      }
+
+      if (submittedCount > 0) {
+        setSubmitSuccess(true);
+        setMarkedIds([]);
+        setMarkMode(false);
+        
+        setTimeout(() => {
+          setShowSubmitModal(false);
+          setSubmitSuccess(false);
+        }, 2000);
+      }
+
+      if (failedCount > 0) {
+        setSubmitError(`${failedCount} submission(s) failed. Please try again.`);
+      }
+
+    } catch (err) {
+      console.error("Submit error:", err);
+      setSubmitError("Failed to submit: " + err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -187,11 +395,11 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       return doc.filename || "Untitled Document";
   };
 
-  const filteredDocs = savedDocs.filter(doc => 
-    getDisplayFilename(doc).toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredDocs = savedDocs.filter(doc => {
+    const filename = getDisplayFilename(doc).toLowerCase();
+    return filename.endsWith('.json') && filename.toLowerCase().includes(search.toLowerCase());
+  });
 
-  // pinned docs should appear first
   const displayedDocs = [...filteredDocs].sort((a, b) => {
     const aPinned = pinnedIds.find(x => String(x) === String(a.id)) ? 1 : 0;
     const bPinned = pinnedIds.find(x => String(x) === String(b.id)) ? 1 : 0;
@@ -267,6 +475,15 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
                       <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                     </svg>
                     <span className="sr-only">Pin</span>
+                  </button>
+                  <button
+                    onClick={handleOpenSubmitModal}
+                    disabled={markedIds.length === 0}
+                    title="Submit selected drafts for approval"
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <SendIcon className="w-4 h-4" />
+                    Submit
                   </button>
                   <button
                     onClick={() => { if (markedIds.length) { setDeleteTargetIds(markedIds); setShowDeleteConfirm(true); } }}
@@ -447,6 +664,106 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !submitting && setShowSubmitModal(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+            
+            {submitSuccess ? (
+              <div className="text-center py-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircleIcon className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  Submitted Successfully!
+                </h3>
+                <p className="text-gray-600">
+                  Your documents have been submitted for approval.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <SendIcon className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Submit for Approval
+                  </h3>
+                  <p className="text-gray-600 text-sm mt-1">
+                    {markedIds.length} draft(s) selected
+                  </p>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <UserIcon className="w-4 h-4 text-indigo-500" />
+                    Select Reviewer <span className="text-red-500">*</span>
+                  </label>
+                  {loadingReviewers ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                      Loading reviewers...
+                    </div>
+                  ) : reviewers.length === 0 ? (
+                    <p className="text-sm text-red-500">No reviewers available. Please contact your administrator.</p>
+                  ) : (
+                    <select
+                      value={selectedReviewerId}
+                      onChange={(e) => setSelectedReviewerId(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm shadow-sm"
+                    >
+                      <option value="">-- Select a Reviewer --</option>
+                      {reviewers.map(reviewer => (
+                        <option key={reviewer.id} value={reviewer.id}>
+                          {reviewer.full_name} {reviewer.office_location ? `(${reviewer.office_location})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {submitError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600 flex items-center gap-2">
+                      <AlertCircleIcon className="w-4 h-4" />
+                      {submitError}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowSubmitModal(false)}
+                    disabled={submitting}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmitForApproval}
+                    disabled={submitting || !selectedReviewerId}
+                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <SendIcon className="w-4 h-4" />
+                        Submit
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

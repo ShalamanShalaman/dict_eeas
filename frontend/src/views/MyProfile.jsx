@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { 
   User, Mail, Phone, Briefcase, MapPin, Shield, Key, Save, 
   AlertCircle, CheckCircle, Eye, EyeOff, UserCheck, Clock, 
   Calendar, Activity, Pencil, X, Smartphone, MessageSquare,
-  RefreshCw
+  RefreshCw, Camera
 } from "lucide-react";
-
-// --- HELPER COMPONENTS ---
 
 const TabButton = ({ icon: Icon, label, active, onClick }) => (
   <button
@@ -54,30 +53,42 @@ export default function MyProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-   
-  // UI State
-  const [activeTab, setActiveTab] = useState("personal");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get("tab");
+    return tab === "personal" || tab === "security" || tab === "account" ? tab : "personal";
+  });
+
+  useEffect(() => {
+    setSearchParams({ tab: activeTab });
+  }, [activeTab, setSearchParams]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [uiModal, setUiModal] = useState({ show: false, type: '', title: '', message: '', onConfirm: null });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
-  // Phone Verification State (Personal Tab)
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false); 
 
-  // Password Reset State (Security Tab)
   const [usingOtpForPassword, setUsingOtpForPassword] = useState(false);
   const [passwordResetOtp, setPasswordResetOtp] = useState("");
   const [resetOtpLoading, setResetOtpLoading] = useState(false);
+  
+  const [profilePicturePreview, setProfilePicturePreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [pictureInputKey, setPictureInputKey] = useState(0);
+  const [pictureMenuOpen, setPictureMenuOpen] = useState(false);
+  const [deletePictureConfirm, setDeletePictureConfirm] = useState(false);
+  const fileInputRef = useRef(null);
    
-  // Confirmation Dialog State
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
    
-  // Edit Form State
   const [formData, setFormData] = useState({
     first_name: "",
     middle_name: "",
@@ -92,7 +103,6 @@ export default function MyProfile() {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
     
-    // If phone number changes, reset verification status
     if (field === "contact_no" && profile && value !== profile.contact_no) {
         setPhoneVerified(false);
     }
@@ -154,7 +164,6 @@ export default function MyProfile() {
     }
   };
 
-  // --- PHONE VERIFICATION HANDLERS (PERSONAL TAB) ---
   const handleSendOtp = async () => {
     if (!formData.contact_no) {
         setUiModal({ show: true, type: 'error', title: 'Error', message: 'Please enter a phone number first.' });
@@ -214,7 +223,6 @@ export default function MyProfile() {
     }
   };
 
-  // --- PASSWORD RESET HANDLERS (SECURITY TAB) ---
   const handleStartPasswordReset = async () => {
       if (!profile.contact_no) {
           setUiModal({ show: true, type: 'error', title: 'No Phone Number', message: 'You need a registered phone number to reset your password via SMS.' });
@@ -223,7 +231,6 @@ export default function MyProfile() {
 
       setResetOtpLoading(true);
       try {
-          // Send OTP to the SAVED profile number, not the formData number (which might be edited)
           const response = await fetch('http://127.0.0.1:5000/api/profile/send-otp', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -236,10 +243,9 @@ export default function MyProfile() {
           if (!response.ok) throw new Error("Failed to send OTP");
           
           const data = await response.json();
-          // Switch UI to OTP mode
           setUsingOtpForPassword(true);
-          setFormData(prev => ({ ...prev, old_password: "" })); // Clear old password
-          console.log("Password Reset OTP:", data.debug_otp); // For testing
+          setFormData(prev => ({ ...prev, old_password: "" }));
+          console.log("Password Reset OTP:", data.debug_otp);
           
           setUiModal({ show: true, type: 'success', title: 'Code Sent', message: `Verification code sent to ${profile.contact_no}. Check your console.` });
 
@@ -317,14 +323,11 @@ export default function MyProfile() {
     e.preventDefault();
     if (!profile) return;
 
-    // Validation for Password Change
     if (formData.password) {
-        // If NOT using OTP, must have old password
         if (!usingOtpForPassword && !formData.old_password) {
             setUiModal({ show: true, type: 'error', title: 'Authentication Required', message: 'Please enter your old password or use the "Forgot Password" option.' });
             return;
         }
-        // If USING OTP, must have OTP
         if (usingOtpForPassword && !passwordResetOtp) {
              setUiModal({ show: true, type: 'error', title: 'Authentication Required', message: 'Please enter the verification code sent to your phone.' });
              return;
@@ -345,9 +348,9 @@ export default function MyProfile() {
             payload.password = formData.password;
             
             if (usingOtpForPassword) {
-                payload.otp = passwordResetOtp; // Send OTP
+                payload.otp = passwordResetOtp;
             } else {
-                payload.old_password = formData.old_password; // Send Old Password
+                payload.old_password = formData.old_password;
             }
         }
 
@@ -365,6 +368,7 @@ export default function MyProfile() {
 
         setProfile(result.user);
         localStorage.setItem("user", JSON.stringify(result.user));
+        window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }));
         
         setFormData(prev => ({ ...prev, password: "", old_password: "" }));
         setUsingOtpForPassword(false);
@@ -395,6 +399,132 @@ export default function MyProfile() {
     }
   };
 
+  const handlePictureSelect = (e) => {
+    const file = e.target.files?.[0];
+    console.log("File selected:", file);
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUiModal({ 
+        show: true, 
+        type: 'error', 
+        title: 'File Too Large', 
+        message: 'Profile picture must be less than 5MB.' 
+      });
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setUiModal({ 
+        show: true, 
+        type: 'error', 
+        title: 'Invalid File Type', 
+        message: 'Only PNG, JPG, JPEG, GIF, and WEBP images are allowed.' 
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      console.log("Preview set");
+      setProfilePicturePreview(reader.result);
+      setSelectedFile(file);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadPicture = async (file) => {
+    console.log("Upload started. File:", file, "Profile:", profile);
+    if (!file || !profile) {
+      console.log("Missing file or profile");
+      return;
+    }
+
+    setUploadingPicture(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      console.log("Sending to:", `http://127.0.0.1:5000/api/profile/${profile.public_id}/upload-picture`);
+      const response = await fetch(`http://127.0.0.1:5000/api/profile/${profile.public_id}/upload-picture`, {
+        method: 'POST',
+        body: formData
+      });
+
+      console.log("Response status:", response.status);
+      const result = await response.json();
+      console.log("Response data:", result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      console.log("Upload successful, updating profile");
+      setProfile(result.user);
+      localStorage.setItem("user", JSON.stringify(result.user));
+      window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }));
+      setProfilePicturePreview(null);
+      setSelectedFile(null);
+      setPictureInputKey(prev => prev + 1);
+      
+      setUiModal({
+        show: true,
+        type: 'success',
+        title: 'Success',
+        message: 'Profile picture uploaded successfully!'
+      });
+    } catch (err) {
+      console.error("Upload error:", err);
+      setUiModal({
+        show: true,
+        type: 'error',
+        title: 'Upload Failed',
+        message: err.message || 'Failed to upload profile picture'
+      });
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
+
+  const handleDeletePicture = async () => {
+    if (!profile) return;
+
+    setUploadingPicture(true);
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/api/profile/${profile.public_id}/picture`, {
+        method: 'DELETE'
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Delete failed');
+      }
+
+      setProfile(result.user || profile);
+      localStorage.setItem("user", JSON.stringify(result.user || profile));
+      window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user || profile }));
+      setProfilePicturePreview(null);
+      
+      setUiModal({
+        show: true,
+        type: 'success',
+        title: 'Success',
+        message: 'Profile picture deleted successfully!'
+      });
+    } catch (err) {
+      setUiModal({
+        show: true,
+        type: 'error',
+        title: 'Delete Failed',
+        message: err.message || 'Failed to delete profile picture'
+      });
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
+
   if (loading) {
       return (
         <div className="flex h-96 items-center justify-center">
@@ -422,11 +552,22 @@ export default function MyProfile() {
       <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <ProfileAvatar 
-              firstName={profile.first_name} 
-              lastName={profile.last_name} 
-              size="xl" 
-            />
+            {profile.profile_picture ? (
+              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
+                <img
+                  src={`http://127.0.0.1:5000/api/profile/${profile.public_id}/picture?t=${new Date(profile.profile_picture_updated || profile.updated_at).getTime()}`}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
+            ) : (
+              <ProfileAvatar 
+                firstName={profile.first_name} 
+                lastName={profile.last_name} 
+                size="xl" 
+              />
+            )}
             <div>
               <h2 className="text-2xl font-bold text-slate-800">
                 {profile.full_name}
@@ -440,7 +581,7 @@ export default function MyProfile() {
               </div>
             </div>
           </div>
-           
+            
           <div className="flex gap-3">
             <div className="text-center px-4 py-2 bg-indigo-50 rounded-xl">
               <p className="text-xs text-indigo-500 font-semibold uppercase">User ID</p>
@@ -473,7 +614,6 @@ export default function MyProfile() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Column - Quick Info Cards */}
         <div className="lg:col-span-1 space-y-4">
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-sm hover:shadow-md transition-shadow duration-200">
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -531,7 +671,6 @@ export default function MyProfile() {
           </div>
         </div>
 
-        {/* Right Column - Tab Content */}
         <div className="lg:col-span-2">
           {activeTab === "personal" && (
             <form id="personal-info-form" onSubmit={handleSave} className="bg-white rounded-2xl shadow-lg border border-white/50 p-6">
@@ -580,6 +719,127 @@ export default function MyProfile() {
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+              
+              <div className="mb-8">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative w-32">
+                    {profilePicturePreview ? (
+                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg">
+                        <img src={profilePicturePreview} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    ) : profile.profile_picture ? (
+                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
+                        <img 
+                          src={`http://127.0.0.1:5000/api/profile/${profile.public_id}/picture?t=${new Date(profile.profile_picture_updated || profile.updated_at).getTime()}`} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg flex items-center justify-center bg-indigo-50">
+                        <ProfileAvatar firstName={profile.first_name} lastName={profile.last_name} size="xl" />
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={uploadingPicture}
+                      onClick={() => setPictureMenuOpen(!pictureMenuOpen)}
+                      className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white shadow-lg flex items-center justify-center transition-all hover:shadow-xl disabled:cursor-not-allowed"
+                    >
+                      <Camera className="w-5 h-5" />
+                    </button>
+
+                    {pictureMenuOpen && (
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-white rounded-lg shadow-lg border border-slate-200 z-50 w-48">
+                        <label className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors flex items-center gap-2 border-b border-slate-200">
+                          <Camera className="w-4 h-4" />
+                          Upload From Device
+                          <input 
+                            ref={fileInputRef}
+                            key={pictureInputKey}
+                            type="file" 
+                            disabled={uploadingPicture}
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={(e) => {
+                              handlePictureSelect(e);
+                              setPictureMenuOpen(false);
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeletePictureConfirm(true);
+                            setPictureMenuOpen(false);
+                          }}
+                          disabled={uploadingPicture || !profile.profile_picture}
+                          className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors rounded-b-lg ${
+                            profile.profile_picture
+                              ? 'text-red-600 hover:bg-red-50 disabled:text-slate-300 disabled:cursor-not-allowed'
+                              : 'text-slate-400 cursor-not-allowed bg-slate-50'
+                          }`}
+                        >
+                          Remove Photo
+                        </button>
+                      </div>
+                    )}
+
+                    {pictureMenuOpen && (
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setPictureMenuOpen(false)}
+                      />
+                    )}
+                  </div>
+
+                  {profilePicturePreview && (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        disabled={uploadingPicture}
+                        onClick={() => {
+                          if (selectedFile) {
+                            handleUploadPicture(selectedFile);
+                          }
+                        }}
+                        className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {uploadingPicture ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Changes
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={uploadingPicture}
+                        onClick={() => {
+                          setProfilePicturePreview(null);
+                          setSelectedFile(null);
+                          setPictureInputKey(prev => prev + 1);
+                        }}
+                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-slate-500 text-center">Max 5MB • PNG, JPG, JPEG, GIF, WEBP</p>
                 </div>
               </div>
                
@@ -633,7 +893,6 @@ export default function MyProfile() {
                   />
                 </div>
                 
-                {/* Contact Number with Verification Logic */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-600 flex items-center justify-between">
                     <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> Contact No.</span>
@@ -694,7 +953,6 @@ export default function MyProfile() {
                
               <div className="space-y-4 max-w-md">
                 
-                {/* Old Password Field with Forgot Password Toggle */}
                 <div className="space-y-1">
                     <div className="flex justify-between items-center">
                          <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
@@ -762,7 +1020,6 @@ export default function MyProfile() {
                     )}
                 </div>
 
-                {/* New Password Field */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
                     <Key className="w-3 h-3" /> New Password
@@ -904,7 +1161,6 @@ export default function MyProfile() {
         </div>
       )}
 
-      {/* OTP Modal (Used for Personal Info Verification only) */}
       {otpModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOtpModalOpen(false)} />
@@ -947,6 +1203,48 @@ export default function MyProfile() {
                     </div>
                 </div>
              </div>
+        </div>
+      )}
+
+      {deletePictureConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeletePictureConfirm(false)} />
+           
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-red-100">
+                  <AlertCircle size={24} className="text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Remove Profile Picture?</h3>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-gray-600 text-base leading-relaxed">
+                Are you sure you want to remove your profile picture? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeletePictureConfirm(false)}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleDeletePicture();
+                  setDeletePictureConfirm(false);
+                }}
+                disabled={uploadingPicture}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              >
+                {uploadingPicture ? 'Removing...' : 'Remove Picture'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

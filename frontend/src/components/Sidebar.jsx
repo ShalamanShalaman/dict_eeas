@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Home,
@@ -18,7 +18,30 @@ import ConfirmDialog from "./ConfirmDialog";
 
 export default function Sidebar({ role, onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
   const location = useLocation();
+  
+  // Listen for localStorage changes from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "user") {
+        setUser(JSON.parse(e.newValue || "{}"));
+      }
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+  
+  // Also listen for changes within the same tab using a custom event
+  useEffect(() => {
+    const handleUserUpdate = (e) => {
+      setUser(e.detail);
+    };
+    
+    window.addEventListener("userUpdated", handleUserUpdate);
+    return () => window.removeEventListener("userUpdated", handleUserUpdate);
+  }, []);
 
   const menus = {
     employee: [
@@ -27,20 +50,18 @@ export default function Sidebar({ role, onLogout }) {
       { label: "Saved Progress", icon: Save, path: "/saved-progress" },
       { label: "Submit for Approval", icon: Clock, path: "/submit-for-approval" },
       { label: "My Submissions", icon: FileText, path: "/submissions" },
-      { label: "My Profile", icon: User, path: "/profile" },
     ],
     reviewer: [
       { label: "Dashboard", icon: Home, path: "/" },
+      { label: "Upload Attendance", icon: Upload, path: "/upload-reviewer" },
       { label: "Pending Reviews", icon: Clock, path: "/pending-reviews" },
       { label: "Archive", icon: Archive, path: "/archive" },
-      { label: "My Profile", icon: User, path: "/profile" },
     ],
     admin: [
       { label: "Dashboard", icon: Home, path: "/" },
       { label: "User Management", icon: Users, path: "/users" },
       { label: "Templates", icon: Layers, path: "/templates" },
       { label: "System Logs", icon: Activity, path: "/logs" },
-      { label: "My Profile", icon: User, path: "/profile" },
     ],
   };
 
@@ -53,11 +74,40 @@ export default function Sidebar({ role, onLogout }) {
   };
   const handleCancelLogout = () => setShowLogoutConfirm(false);
 
+  // Get initials for avatar
+  const initials = user.first_name && user.last_name 
+    ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase() 
+    : "U";
+
   return (
     <>
       <aside className="w-64 hidden md:flex flex-col bg-[rgb(28,26,136)] text-white h-screen sticky top-0">
         <div className="h-20 flex items-center px-6 border-b border-white/10">
           <img src="/images/dict-logo.png" alt="DICT Logo" className="h-10 w-auto" />
+        </div>
+
+        {/* User Profile Section */}
+        <div className="px-4 py-4 border-b border-white/10 bg-white/5">
+          <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            {user.profile_picture ? (
+              <img 
+                src={`http://127.0.0.1:5000/api/profile/${user.public_id}/picture?t=${new Date(user.profile_picture_updated || user.updated_at).getTime()}`}
+                alt="Profile"
+                className="w-12 h-12 rounded-full object-cover border-2 border-yellow-400 shadow-lg"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center font-bold text-sm border-2 border-yellow-400 shadow-lg">
+                {initials}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{user.full_name || "User"}</p>
+              <p className="text-xs text-white/70 truncate">{user.role?.toUpperCase()}</p>
+            </div>
+          </Link>
         </div>
 
         <nav className="flex-1 py-6 space-y-1 overflow-y-auto">

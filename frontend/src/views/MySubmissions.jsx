@@ -1,5 +1,51 @@
 import React, { useState, useEffect } from "react";
 
+const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <h3 className="font-semibold text-slate-800 truncate pr-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            {title || 'Document Viewer'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 bg-slate-100 relative">
+          {documentId ? (
+            <iframe
+              src={`http://127.0.0.1:5000/api/document/view/${documentId}`}
+              className="w-full h-full border-0"
+              title="PDF Viewer"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 mb-4">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <p className="mt-2 text-sm">No document selected</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -63,7 +109,7 @@ const TrashIcon = ({ className }) => (
 
 const EyeIcon = ({ className }) => (
   <Icon className={className}>
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <circle cx="12" cy="12" r="3" />
   </Icon>
 );
@@ -80,6 +126,7 @@ const StatusBadge = ({ status }) => {
   const styles = {
     draft: "bg-slate-100 text-slate-700 border-slate-200",
     submitted: "bg-blue-100 text-blue-700 border-blue-200",
+    pending: "bg-amber-100 text-amber-700 border-amber-200",
     approved: "bg-green-100 text-green-700 border-green-200",
     declined: "bg-red-100 text-red-700 border-red-200",
   };
@@ -87,6 +134,7 @@ const StatusBadge = ({ status }) => {
   const icons = {
     draft: <ClockIcon className="w-3 h-3" />,
     submitted: <AlertCircleIcon className="w-3 h-3" />,
+    pending: <ClockIcon className="w-3 h-3" />,
     approved: <CheckCircleIcon className="w-3 h-3" />,
     declined: <XCircleIcon className="w-3 h-3" />,
   };
@@ -104,6 +152,7 @@ export default function MySubmissions({ user, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -145,13 +194,15 @@ export default function MySubmissions({ user, onNavigate }) {
   };
 
   const filteredSubmissions = submissions.filter(doc => {
+    if (doc.is_draft === true) return false;
+    
     const matchesFilter = filter === 'all' || doc.status === filter;
     const matchesSearch = getFilename(doc).toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
   const handleDelete = async (docId) => {
-    if (!confirm('Are you sure you want to delete this document?')) return;
+    if (!window.confirm('Are you sure you want to delete this document?')) return;
     
     try {
       const response = await fetch(`http://127.0.0.1:5000/api/document/${docId}?user_id=${user.user_id}`, {
@@ -173,14 +224,23 @@ export default function MySubmissions({ user, onNavigate }) {
     window.history.pushState({}, '', `?doc_id=${doc.id}`);
   };
 
+  const handleViewPdf = (doc) => {
+    const filename = getFilename(doc);
+    setViewPdfModal({
+      isOpen: true,
+      docId: doc.id,
+      title: filename.replace('.json', '')
+    });
+  };
+
   const handleDownloadSigned = (doc) => {
     window.open(`http://127.0.0.1:5000/api/document/download/${doc.id}`, '_blank');
   };
 
   const filterOptions = [
     { value: 'all', label: 'All' },
-    { value: 'draft', label: 'Drafts' },
     { value: 'submitted', label: 'Submitted' },
+    { value: 'pending', label: 'Pending' },
     { value: 'approved', label: 'Approved' },
     { value: 'declined', label: 'Declined' },
   ];
@@ -293,6 +353,12 @@ export default function MySubmissions({ user, onNavigate }) {
                   </td>
                   <td className="px-6 py-4">
                     <StatusBadge status={doc.status} />
+                    {doc.status === 'declined' && doc.reviewer_note && (
+                      <div className="mt-2 p-2 bg-red-50 rounded-lg">
+                        <p className="text-xs text-red-600 font-medium">Rejection Reason:</p>
+                        <p className="text-xs text-red-500 italic">"{doc.reviewer_note}"</p>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     {doc.review_file_path ? (
@@ -318,6 +384,13 @@ export default function MySubmissions({ user, onNavigate }) {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleViewPdf(doc)}
+                        className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="View Document"
+                      >
+                        <EyeIcon className="w-4 h-4" />
+                      </button>
                       {doc.review_file_path && (
                         <button
                           onClick={() => handleDownloadSigned(doc)}
@@ -328,21 +401,12 @@ export default function MySubmissions({ user, onNavigate }) {
                         </button>
                       )}
                       <button
-                        onClick={() => handleView(doc)}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="View/Edit"
+                        onClick={() => handleDelete(doc.id)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete"
                       >
-                        <EyeIcon className="w-4 h-4" />
+                        <TrashIcon className="w-4 h-4" />
                       </button>
-                      {doc.status === 'draft' && (
-                        <button
-                          onClick={() => handleDelete(doc.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      )}
                     </div>
                   </td>
                 </tr>
@@ -351,6 +415,13 @@ export default function MySubmissions({ user, onNavigate }) {
           </table>
         </div>
       )}
+      
+      <PDFViewerModal
+        isOpen={viewPdfModal.isOpen}
+        onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
+        documentId={viewPdfModal.docId}
+        title={viewPdfModal.title}
+      />
     </div>
   );
 }

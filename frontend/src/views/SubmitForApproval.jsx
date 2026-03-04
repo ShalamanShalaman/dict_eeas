@@ -61,6 +61,8 @@ export default function SubmitForApproval({ user, onNavigate }) {
   const [convertedDocumentId, setConvertedDocumentId] = useState(null);
   const [convertedFilePath, setConvertedFilePath] = useState(null);
   const [convertedFileName, setConvertedFileName] = useState(null);
+  const [customFileName, setCustomFileName] = useState('');
+  const [renaming, setRenaming] = useState(false);
   
   const fileInputRef = useRef(null);
 
@@ -162,12 +164,17 @@ export default function SubmitForApproval({ user, onNavigate }) {
         return;
       }
 
+      // Create default filename based on user: LastName, FirstName
+      const defaultFileName = `${user.last_name}, ${user.first_name}.pdf`;
+      const fileName = defaultFileName;
+      
       const createDocFormData = new FormData();
       createDocFormData.append('user_id', user.user_id);
+      // Send custom filename to backend
+      createDocFormData.append('filename', fileName);
       
       const fileResponse = await fetch(`/static/${uploadResult.file_path}`);
       const fileBlob = await fileResponse.blob();
-      const fileName = uploadResult.file_path.split('/').pop();
       const convertedFile = new File([fileBlob], fileName, { type: 'application/pdf' });
       createDocFormData.append('file', convertedFile);
 
@@ -258,9 +265,47 @@ export default function SubmitForApproval({ user, onNavigate }) {
     setConvertedDocumentId(null);
     setConvertedFilePath(null);
     setConvertedFileName(null);
+    setCustomFileName('');
     setSelectedReviewerId(reviewers.length === 1 ? reviewers[0].id.toString() : '');
     setError(null);
     setSuccessMessage(null);
+  };
+
+  const handleRenameFile = async () => {
+    if (!customFileName.trim()) {
+      setError("Please enter a filename");
+      return;
+    }
+
+    setRenaming(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/document/rename/${convertedDocumentId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filename: customFileName.trim() })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        const newFilename = result.document.file_path.split(/[/\\]/).pop();
+        const newFilePath = result.file_path;
+        setConvertedFileName(newFilename);
+        setConvertedFilePath(newFilePath);
+        setSuccessMessage("File renamed successfully!");
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(result.error || 'Failed to rename file');
+      }
+    } catch (err) {
+      setError('Failed to rename file. Please try again.');
+    } finally {
+      setRenaming(false);
+    }
   };
 
   const handleBackToStep1 = () => {
@@ -270,7 +315,9 @@ export default function SubmitForApproval({ user, onNavigate }) {
 
   const handleViewPDF = () => {
     if (convertedFilePath) {
-      window.open(`/static/${convertedFilePath}`, '_blank');
+      const url = `/static/${convertedFilePath}`;
+      console.log('Opening PDF URL:', url);
+      window.open(url, '_blank');
     }
   };
 
@@ -517,6 +564,35 @@ export default function SubmitForApproval({ user, onNavigate }) {
                     View PDF
                   </button>
                 </div>
+              </div>
+
+              {/* Rename File Section */}
+              <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                <p className="text-sm font-medium text-indigo-700 mb-2">Rename PDF File (Optional)</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter new filename..."
+                    value={customFileName}
+                    onChange={(e) => setCustomFileName(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
+                  />
+                  <button 
+                    onClick={handleRenameFile}
+                    disabled={!customFileName.trim() || renaming}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+                  >
+                    {renaming ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Renaming...
+                      </>
+                    ) : (
+                      'Rename'
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-indigo-500 mt-2">The .pdf extension will be added automatically</p>
               </div>
 
               <button

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { createBrowserRouter, RouterProvider, createRoutesFromElements, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -7,6 +8,7 @@ import EmployeeDashboard from "./views/EmployeeDashboard";
 import ReviewerDashboard from "./views/ReviewerDashboard";
 import AdminDashboard from "./views/AdminDashboard";
 import MyProfile from "./views/MyProfile";
+import UploadAttendance from "./views/UploadAttendance";
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -53,7 +55,8 @@ export default function App() {
         <Route path="/submit-for-approval" element={<Protected><EmployeeDashboard selectedMenu="Submit for Approval" user={user} setActivePage={() => {}} /></Protected>} />
         <Route path="/submissions" element={<Protected><EmployeeDashboard selectedMenu="My Submissions" user={user} setActivePage={() => {}} /></Protected>} />
         <Route path="/pending-reviews" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
-        <Route path="/archive" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
+        <Route path="/upload-reviewer" element={<Protected><UploadAttendance user={user} /></Protected>} />
+        <Route path="/archive" element={<Protected><ReviewerDashboard user={user} isArchiveView={true} /></Protected>} />
         <Route path="/signature" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
         <Route path="/users" element={<Protected>{viewRole === "admin" ? <UserManagement /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/templates" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="Templates" /> : <Navigate to="/" replace />}</Protected>} />

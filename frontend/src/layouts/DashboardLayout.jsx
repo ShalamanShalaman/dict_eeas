@@ -21,7 +21,7 @@ export default function DashboardLayout({
 
       <div className="flex-1 flex flex-col">
         {/* Pass user to Header for permission checks */}
-        <Header role={role} setRole={setRole} user={user} />
+        <Header role={role} setRole={setRole} user={user} onLogout={onLogout} />
         <main className="flex-1 overflow-auto p-2">{children}</main>
       </div>
     </div>

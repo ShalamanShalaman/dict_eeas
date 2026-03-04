@@ -39,10 +39,12 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = os.path.join(BASE_DIR, "uploads")
     app.config["GENERATED_FOLDER"] = os.path.join(BASE_DIR, "generated_files")
     app.config["TEMPLATE_FILES_DIR"] = os.path.join(BASE_DIR, "template_files")
+    app.config["PROFILE_PICTURES_FOLDER"] = os.path.join(BASE_DIR, "static", "profile_pictures")
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(app.config["GENERATED_FOLDER"], exist_ok=True)
     os.makedirs(app.config["TEMPLATE_FILES_DIR"], exist_ok=True)
+    os.makedirs(app.config["PROFILE_PICTURES_FOLDER"], exist_ok=True)
 
     app.config["DTR_TEMPLATE"] = os.path.join(
         app.config["TEMPLATE_FILES_DIR"],
