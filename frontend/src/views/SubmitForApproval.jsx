@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import SuccessModal from "../components/SuccessModal";
 
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
@@ -110,6 +111,8 @@ export default function SubmitForApproval({ user, onNavigate }) {
   const [convertedFileName, setConvertedFileName] = useState(null);
   const [customFileName, setCustomFileName] = useState('');
   const [renaming, setRenaming] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successReviewerName, setSuccessReviewerName] = useState('');
   
   const fileInputRef = useRef(null);
 
@@ -287,7 +290,8 @@ export default function SubmitForApproval({ user, onNavigate }) {
         const selectedReviewer = reviewers.find(r => r.id.toString() === selectedReviewerId);
         const reviewerName = selectedReviewer ? selectedReviewer.full_name : 'selected reviewer';
         
-        alert(`Successfully submitted to ${reviewerName}!`);
+        setSuccessReviewerName(reviewerName);
+        setShowSuccessModal(true);
         resetForm();
       } else {
         setError(submitResult.error || 'Failed to submit document to reviewer');
@@ -727,6 +731,15 @@ export default function SubmitForApproval({ user, onNavigate }) {
         onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
         documentId={viewPdfModal.docId}
         title={viewPdfModal.title}
+      />
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        message="Successfully submitted to the designated reviewer"
+        subMessage={successReviewerName ? `Submitted to: ${successReviewerName}` : undefined}
+        onClose={() => setShowSuccessModal(false)}
+        autoClose={true}
+        autoCloseDelay={4000}
       />
     </div>
   );

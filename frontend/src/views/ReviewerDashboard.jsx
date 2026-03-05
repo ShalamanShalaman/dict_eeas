@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const CheckIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
@@ -340,7 +341,9 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [processing, setProcessing] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(null);
-  const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
+const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [docToDelete, setDocToDelete] = useState(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -607,19 +610,6 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
               </button>
             </>
           )}
-          {isArchive && (
-            <button 
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this document?')) {
-                  handleDelete(doc.id);
-                }
-              }}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Delete Document"
-            >
-              <TrashIcon />
-            </button>
-          )}
         </div>
       </td>
     </tr>
@@ -628,11 +618,30 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
   if (isArchiveView) {
     return (
       <div>
-        <PDFViewerModal
+<PDFViewerModal
           isOpen={viewPdfModal.isOpen}
           onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
           documentId={viewPdfModal.docId}
           title={viewPdfModal.title}
+        />
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false);
+            setDocToDelete(null);
+          }}
+          onConfirm={() => {
+            if (docToDelete) {
+              handleDelete(docToDelete.id);
+            }
+            setShowDeleteConfirm(false);
+            setDocToDelete(null);
+          }}
+          title="Delete Document"
+          message="Are you sure you want to delete this document?"
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmVariant="danger"
         />
         
         <div className="mb-8">
@@ -730,12 +739,31 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
         isOpen={showDeclineSuccessModal}
         onClose={() => setShowDeclineSuccessModal(false)}
       />
-      <UploadModal 
+<UploadModal 
         isOpen={showUploadModal}
         doc={selectedDoc}
         onClose={closeUploadModal}
         onUpload={handleUploadSigned}
         uploading={uploadingFile}
+      />
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setDocToDelete(null);
+        }}
+        onConfirm={() => {
+          if (docToDelete) {
+            handleDelete(docToDelete.id);
+          }
+          setShowDeleteConfirm(false);
+          setDocToDelete(null);
+        }}
+        title="Delete Document"
+        message="Are you sure you want to delete this document?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
       />
       
       <div className="mb-8">
