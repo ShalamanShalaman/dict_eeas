@@ -87,6 +87,7 @@ class User(db.Model):
     last_name = db.Column(db.String(50), nullable=False)
     contact_no = db.Column(db.String(20), nullable=True)
     profile_picture = db.Column(db.String(255), nullable=True)
+    profile_picture_updated = db.Column(db.DateTime, nullable=True)
 
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     force_change_password = db.Column(db.Boolean, default=True, nullable=False)
@@ -164,6 +165,7 @@ class User(db.Model):
             "last_name": self.last_name,
             "contact_no": self.contact_no,
             "profile_picture": self.profile_picture,
+            "profile_picture_updated": self.profile_picture_updated.isoformat() if self.profile_picture_updated else None,
             "is_active": self.is_active,
             "office_location_id": self.office_location_id,
             "position_id": pos_name,

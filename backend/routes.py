@@ -8,6 +8,7 @@ import random
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from PIL import Image
 
 account_bp = Blueprint('account', __name__)
 document_bp = Blueprint('document', __name__)
@@ -305,9 +306,41 @@ def upload_profile_picture(public_id):
     filename = f"{public_id}.{file_extension}"
     filepath = os.path.join(current_app.config['PROFILE_PICTURES_FOLDER'], filename)
     
-    file.save(filepath)
+    # Compress and save the image
+    try:
+        # Open the image
+        image = Image.open(file)
+        
+        # Convert to RGB if necessary (for JPEG compatibility)
+        if image.mode in ("RGBA", "P"):
+            image = image.convert("RGB")
+        
+        # Resize if too large (max 800x800 pixels)
+        max_size = (800, 800)
+        if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
+        # Save with compression
+        if file_extension.lower() in ['jpg', 'jpeg']:
+            # For JPEG, use quality setting
+            image.save(filepath, 'JPEG', quality=85, optimize=True)
+        elif file_extension.lower() == 'png':
+            # For PNG, use compression
+            image.save(filepath, 'PNG', optimize=True, compress_level=6)
+        elif file_extension.lower() == 'webp':
+            # For WebP, use quality setting
+            image.save(filepath, 'WebP', quality=85)
+        else:
+            # For other formats, save as is
+            image.save(filepath)
+            
+    except Exception as e:
+        # If compression fails, save original file
+        file.seek(0)
+        file.save(filepath)
     
     user.profile_picture = filename
+    user.profile_picture_updated = datetime.utcnow()
     db.session.commit()
     
     return jsonify({
@@ -341,6 +374,7 @@ def delete_profile_picture(public_id):
             os.remove(filepath)
         
         user.profile_picture = None
+        user.profile_picture_updated = None
         db.session.commit()
         
         return jsonify({

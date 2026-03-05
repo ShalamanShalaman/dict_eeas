@@ -74,6 +74,13 @@ def migrate():
         else:
             print("\n✓ profile_picture column already exists")
         
+        # Check if profile_picture_updated column exists
+        if not column_exists(connection, 'users', 'profile_picture_updated'):
+            migrations_needed.append('profile_picture_updated')
+            print("→ profile_picture_updated column missing - will be added")
+        else:
+            print("✓ profile_picture_updated column already exists")
+        
         # Check if updated_at column exists
         if not column_exists(connection, 'users', 'updated_at'):
             migrations_needed.append('updated_at')
@@ -94,6 +101,14 @@ def migrate():
                     ADD COLUMN profile_picture VARCHAR(255) NULL
                 """)
                 print("✓ Successfully added profile_picture column")
+            
+            if 'profile_picture_updated' in migrations_needed:
+                print("→ Adding profile_picture_updated column to users table...")
+                cursor.execute("""
+                    ALTER TABLE users 
+                    ADD COLUMN profile_picture_updated DATETIME NULL
+                """)
+                print("✓ Successfully added profile_picture_updated column")
             
             if 'updated_at' in migrations_needed:
                 print("→ Adding updated_at column to users table...")

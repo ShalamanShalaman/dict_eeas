@@ -28,6 +28,15 @@ export default function App() {
     }
   }, [user]);
 
+  useEffect(() => {
+    const handleUserUpdate = (e) => {
+      setUser(e.detail);
+    };
+    
+    window.addEventListener("userUpdated", handleUserUpdate);
+    return () => window.removeEventListener("userUpdated", handleUserUpdate);
+  }, []);
+
   const handleLogout = () => {
     setUser(null);
     setViewRole("");

@@ -384,7 +384,18 @@ function DashboardHome({ user, onNavigate }) {
           
           <div className="space-y-5">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white shadow-md">
+              {user?.profile_picture ? (
+                <img 
+                  src={`http://127.0.0.1:5000/api/profile/${user.public_id}/picture?t=${new Date(user.profile_picture_updated || user.updated_at).getTime()}`}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-full object-cover border-2 border-yellow-400 shadow-md"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div className={`w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white shadow-md ${user?.profile_picture ? 'hidden' : ''}`}>
                 <span className="text-2xl font-bold">
                   {user?.first_name?.charAt(0) || 'U'}{user?.last_name?.charAt(0) || ''}
                 </span>
