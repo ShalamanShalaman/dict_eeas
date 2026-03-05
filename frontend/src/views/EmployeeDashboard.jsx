@@ -121,7 +121,7 @@ const TrashIcon = ({ className }) => (
 
 const EyeIcon = ({ className }) => (
   <Icon className={className}>
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <circle cx="12" cy="12" r="3" />
   </Icon>
 );
@@ -151,40 +151,44 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.draft}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.draft}`}>
       {icons[status] || icons.draft}
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
 };
 
-// Stats Card Component
-function StatsCard({ title, value, icon: IconComponent, color, trend }) {
-  const colorClasses = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600", 
-    yellow: "bg-yellow-50 text-yellow-600",
-    red: "bg-red-50 text-red-600",
-    purple: "bg-purple-50 text-purple-600",
-    indigo: "bg-indigo-50 text-indigo-600",
+// Stats Card Component matching ReviewerDashboard aesthetic
+function StatsCard({ title, value, icon: IconComponent, variant }) {
+  if (variant === 'white') {
+    return (
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+          <h3 className="text-3xl font-bold text-slate-800">{value}</h3>
+        </div>
+        <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
+          <IconComponent className="w-5 h-5" />
+        </div>
+      </div>
+    );
+  }
+
+  const gradientClasses = {
+    amber: "bg-gradient-to-br from-amber-500 to-orange-500 shadow-orange-200",
+    blue: "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200",
+    green: "bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-200",
+    red: "bg-gradient-to-br from-red-500 to-rose-600 shadow-red-200",
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow group">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-          <p className="text-3xl font-bold text-slate-800">{value}</p>
-          {trend && (
-            <p className={`text-xs mt-2 flex items-center gap-1 ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-              <TrendingUpIcon className={`w-3 h-3 ${trend < 0 ? 'rotate-180' : ''}`} />
-              {trend > 0 ? '+' : ''}{trend}% from last month
-            </p>
-          )}
-        </div>
-        <div className={`p-3 rounded-xl ${colorClasses[color] || colorClasses.blue} group-hover:scale-110 transition-transform`}>
-          <IconComponent className="w-6 h-6" />
-        </div>
+    <div className={`${gradientClasses[variant]} text-white p-6 rounded-xl shadow-lg flex items-start justify-between`}>
+      <div>
+        <p className="text-sm font-medium opacity-90 mb-1">{title}</p>
+        <h3 className="text-3xl font-bold">{value}</h3>
+      </div>
+      <div className="p-3 bg-white/20 rounded-lg">
+        <IconComponent className="w-5 h-5" />
       </div>
     </div>
   );
@@ -236,8 +240,8 @@ function ActivityItem({ activity }) {
   };
 
   return (
-    <div className="flex items-start gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors">
-      <div className="p-2 bg-slate-100 rounded-lg shrink-0">
+    <div className="flex items-start gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-100 last:border-0">
+      <div className="p-2 bg-slate-100 rounded-lg shrink-0 mt-0.5">
         {getIcon()}
       </div>
       <div className="flex-1 min-w-0">
@@ -252,7 +256,9 @@ function ActivityItem({ activity }) {
           })}
         </p>
       </div>
-      <StatusBadge status={activity.status} />
+      <div className="shrink-0 mt-1">
+        <StatusBadge status={activity.status} />
+      </div>
     </div>
   );
 }
@@ -298,36 +304,37 @@ function DashboardHome({ user, onNavigate }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+        <p>Loading dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Welcome back, {user?.first_name || 'Employee'}! 👋</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Welcome back, {user?.first_name || 'Employee'}! 👋</h2>
           <p className="text-slate-500 mt-1">Here's what's happening with your submissions today.</p>
         </div>
         <button
           onClick={() => onNavigate("Upload Attendance")}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm hover:shadow-md"
+          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm hover:shadow-md"
         >
           <UploadIcon className="w-4 h-4" />
           New Submission
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total Submissions" value={stats.total} icon={FileTextIcon} color="indigo" />
-        <StatsCard title="Drafts (Pending)" value={stats.draft} icon={ClockIcon} color="yellow" />
-        <StatsCard title="Submitted" value={stats.submitted} icon={AlertCircleIcon} color="blue" />
-        <StatsCard title="Approved" value={stats.approved} icon={CheckCircleIcon} color="green" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard title="Total Submissions" value={stats.total} icon={FileTextIcon} variant="white" />
+        <StatsCard title="Drafts (Pending)" value={stats.draft} icon={ClockIcon} variant="amber" />
+        <StatsCard title="Submitted" value={stats.submitted} icon={AlertCircleIcon} variant="blue" />
+        <StatsCard title="Approved" value={stats.approved} icon={CheckCircleIcon} variant="green" />
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
           <ActivityIcon className="w-5 h-5 text-indigo-600" />
           Quick Actions
@@ -341,8 +348,8 @@ function DashboardHome({ user, onNavigate }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <TrendingUpIcon className="w-5 h-5 text-indigo-600" />
               Recent Activity
@@ -352,69 +359,71 @@ function DashboardHome({ user, onNavigate }) {
             </button>
           </div>
           
-          {recentActivity.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <ClockIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p>No recent activity yet</p>
-              <p className="text-sm">Start by creating your first submission</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recentActivity.map(activity => (
-                <ActivityItem key={activity.id} activity={activity} />
-              ))}
-            </div>
-          )}
+          <div className="p-4">
+            {recentActivity.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                <ClockIcon className="w-10 h-10 mb-3 opacity-50" />
+                <p className="font-medium text-slate-600">No recent activity yet</p>
+                <p className="text-sm">Start by creating your first submission</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {recentActivity.map(activity => (
+                  <ActivityItem key={activity.id} activity={activity} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
             <UserIcon className="w-5 h-5 text-indigo-600" />
             Your Profile
           </h3>
           
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl font-bold text-indigo-600">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white shadow-md">
+                <span className="text-2xl font-bold">
                   {user?.first_name?.charAt(0) || 'U'}{user?.last_name?.charAt(0) || ''}
                 </span>
               </div>
               <div>
-                <p className="font-semibold text-slate-800">{user?.full_name || 'Employee'}</p>
+                <p className="font-bold text-slate-900 text-lg">{user?.full_name || 'Employee'}</p>
                 <p className="text-sm text-slate-500">{user?.email}</p>
               </div>
             </div>
 
             <hr className="border-slate-100" />
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-sm">
-                <BriefcaseIcon className="w-4 h-4 text-slate-400" />
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 text-sm">
+                <BriefcaseIcon className="w-4 h-4 text-slate-400 mt-0.5" />
                 <div>
-                  <p className="text-slate-500">Position</p>
-                  <p className="font-medium text-slate-800">{user?.position_name || 'Not assigned'}</p>
+                  <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-0.5">Position</p>
+                  <p className="font-semibold text-slate-800">{user?.position_name || 'Not assigned'}</p>
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 text-sm">
-                <MapPinIcon className="w-4 h-4 text-slate-400" />
+              <div className="flex items-start gap-3 text-sm">
+                <MapPinIcon className="w-4 h-4 text-slate-400 mt-0.5" />
                 <div>
-                  <p className="text-slate-500">Office</p>
-                  <p className="font-medium text-slate-800">{user?.office_name || 'Not assigned'}</p>
+                  <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-0.5">Office</p>
+                  <p className="font-semibold text-slate-800">{user?.office_name || 'Not assigned'}</p>
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 text-sm">
-                <UserIcon className="w-4 h-4 text-slate-400" />
+              <div className="flex items-start gap-3 text-sm">
+                <UserIcon className="w-4 h-4 text-slate-400 mt-0.5" />
                 <div>
-                  <p className="text-slate-500">Provincial Officer</p>
-                  <p className="font-medium text-slate-800">{user?.provincial_officer || 'Not assigned'}</p>
+                  <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-0.5">Provincial Officer</p>
+                  <p className="font-semibold text-slate-800">{user?.provincial_officer || 'Not assigned'}</p>
                 </div>
               </div>
             </div>
 
-            <button onClick={() => window.location.href = '/profile'} className="w-full mt-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium transition-colors text-sm">
+            <button onClick={() => window.location.href = '/profile'} className="w-full mt-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2.5 rounded-lg font-medium transition-colors text-sm">
               Edit Profile
             </button>
           </div>
@@ -453,7 +462,7 @@ export default function EmployeeDashboard({ selectedMenu, setActivePage, user })
   switch (selectedMenu) {
     case "Dashboard":
       return (
-        <div className="p-6">
+        <div className="p-6 bg-slate-50 min-h-screen">
           <DashboardHome user={user} onNavigate={handleNavigate} />
         </div>
       );
@@ -468,21 +477,21 @@ export default function EmployeeDashboard({ selectedMenu, setActivePage, user })
 
     case "Submit for Approval":
       return (
-        <div className="p-6">
+        <div className="p-6 bg-slate-50 min-h-screen">
           <SubmitForApproval user={user} onNavigate={handleNavigate} />
         </div>
       );
 
     case "My Submissions":
       return (
-        <div className="p-6">
+        <div className="p-6 bg-slate-50 min-h-screen">
           <MySubmissions user={user} onNavigate={handleNavigate} />
         </div>
       );
 
     default:
       return (
-        <div className="p-6">
+        <div className="p-6 bg-slate-50 min-h-screen">
           <DashboardHome user={user} onNavigate={handleNavigate} />
         </div>
       );

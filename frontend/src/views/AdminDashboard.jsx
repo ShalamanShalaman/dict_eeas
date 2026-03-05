@@ -1,12 +1,81 @@
-import React, { useState } from 'react'
+import React, { useState } from 'react';
+
+const PlusIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+const ServerIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+    <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+    <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+    <line x1="6" y1="6" x2="6.01" y2="6" />
+    <line x1="6" y1="18" x2="6.01" y2="18" />
+  </svg>
+);
+
+const DatabaseIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+    <ellipse cx="12" cy="5" rx="9" ry="3" />
+    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+  </svg>
+);
+
+const ActivityIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+
+const SearchIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
+
+const XIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
+const UserPlusIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.5" cy="7" r="4" />
+    <line x1="20" y1="8" x2="20" y2="14" />
+    <line x1="23" y1="11" x2="17" y2="11" />
+  </svg>
+);
+
+const CheckCircleIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
 
 const AdminDashboard = () => {
-  const [totalUsers, setTotalUsers] = useState(150)
-  const [activeSessions] = useState(23)
-  const [storage] = useState(45)
-  const [search, setSearch] = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [toast, setToast] = useState('')
+  const [totalUsers, setTotalUsers] = useState(150);
+  const [activeSessions] = useState(23);
+  const [storage] = useState(45);
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [toast, setToast] = useState('');
 
   const [logs, setLogs] = useState([
     { time: '10:05 AM', user: 'Admin_01', action: 'Update', type: 'update', details: 'Modified permissions' },
@@ -14,21 +83,21 @@ const AdminDashboard = () => {
     { time: '09:30 AM', user: 'Admin_01', action: 'Delete', type: 'delete', details: 'Removed inactive user' },
     { time: '09:15 AM', user: 'John_D', action: 'Login', type: 'login', details: 'Successful login' },
     { time: '08:50 AM', user: 'Admin_01', action: 'Export', type: 'export', details: 'Downloaded report' },
-  ])
+  ]);
 
   const styles = {
-    update: 'text-blue-600 bg-blue-50 border-blue-100',
-    create: 'text-green-600 bg-green-50 border-green-100',
-    delete: 'text-red-600 bg-red-50 border-red-100',
-    login: 'text-violet-600 bg-violet-50 border-violet-100',
-    export: 'text-amber-600 bg-amber-50 border-amber-100',
-  }
+    update: 'bg-blue-100 text-blue-800',
+    create: 'bg-green-100 text-green-800',
+    delete: 'bg-red-100 text-red-800',
+    login: 'bg-violet-100 text-violet-800',
+    export: 'bg-amber-100 text-amber-800',
+  };
 
   function addUser(name, role) {
     const time = new Date().toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
-    })
+    });
 
     setLogs(prev => [
       {
@@ -39,12 +108,12 @@ const AdminDashboard = () => {
         details: `Added ${role}: ${name}`,
       },
       ...prev,
-    ])
+    ]);
 
-    setTotalUsers(u => u + 1)
-    setToast(`User "${name}" added`)
-    setTimeout(() => setToast(''), 3000)
-    setShowModal(false)
+    setTotalUsers(u => u + 1);
+    setToast(`User "${name}" added successfully`);
+    setTimeout(() => setToast(''), 3000);
+    setShowModal(false);
   }
 
   const filteredLogs = logs.filter(
@@ -52,186 +121,228 @@ const AdminDashboard = () => {
       log.user.toLowerCase().includes(search.toLowerCase()) ||
       log.action.toLowerCase().includes(search.toLowerCase()) ||
       log.details.toLowerCase().includes(search.toLowerCase())
-  )
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mb-8 flex flex-col sm:flex-row justify-between gap-4">
+      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">System Administration</h2>
           <p className="text-slate-500">Overview of system health and usage</p>
         </div>
-
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium"
-        >
-          <i className="fa-solid fa-plus mr-2"></i>
-          Add User
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        <Stat title="Total Users" value={totalUsers}>
-          <p className="text-xs text-slate-400 mt-2">
-            10 Reviewers · {totalUsers - 10} Employees
-          </p>
-        </Stat>
-
-        <Stat title="System Status">
-          <div className="flex items-center gap-2 mt-1">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-            </span>
-            <span className="font-semibold text-slate-800">Online</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white p-6 rounded-xl shadow-lg shadow-blue-200 flex items-start justify-between">
+          <div>
+            <p className="text-sm font-medium opacity-90 mb-1">Total Users</p>
+            <h3 className="text-3xl font-bold">{totalUsers}</h3>
+            <p className="text-xs mt-2 opacity-80">
+              10 Reviewers · {totalUsers - 10} Employees
+            </p>
           </div>
-        </Stat>
-
-        <Stat title="Storage Usage" value={`${storage}%`}>
-          <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-            <div
-              className="bg-blue-600 h-1.5 rounded-full"
-              style={{ width: `${storage}%` }}
-            />
+          <div className="p-3 bg-white/20 rounded-lg">
+            <UsersIcon />
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            {storage} GB of 100 GB
-          </p>
-        </Stat>
-
-        <Stat title="Active Sessions" value={activeSessions}>
-          <p className="text-xs text-green-600 mt-2">▲ 12% last hour</p>
-        </Stat>
-      </div>
-
-      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b flex flex-col sm:flex-row justify-between gap-3">
-          <h3 className="font-semibold">Audit Logs</h3>
-
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search logs..."
-            className="border rounded-lg px-3 py-1.5 text-sm"
-          />
         </div>
 
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-6 py-3 text-left">Time</th>
-              <th className="px-6 py-3 text-left">User</th>
-              <th className="px-6 py-3 text-left">Action</th>
-              <th className="px-6 py-3 text-left">Details</th>
-            </tr>
-          </thead>
+        <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-6 rounded-xl shadow-lg shadow-green-200 flex items-start justify-between">
+          <div>
+            <p className="text-sm font-medium opacity-90 mb-1">System Status</p>
+            <div className="flex items-center gap-2 mt-1 mb-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-200 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+              </span>
+              <h3 className="text-2xl font-bold">Online</h3>
+            </div>
+            <p className="text-xs opacity-80">All services operational</p>
+          </div>
+          <div className="p-3 bg-white/20 rounded-lg">
+            <ServerIcon />
+          </div>
+        </div>
 
-          <tbody className="divide-y">
-            {filteredLogs.length === 0 && (
-              <tr>
-                <td colSpan="4" className="px-6 py-8 text-center text-slate-400">
-                  No logs found
-                </td>
-              </tr>
-            )}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+          <div className="w-full">
+            <p className="text-sm font-medium text-slate-500 mb-1">Storage Usage</p>
+            <h3 className="text-3xl font-bold text-slate-800 mb-2">{storage}%</h3>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1">
+              <div
+                className="bg-indigo-600 h-1.5 rounded-full"
+                style={{ width: `${storage}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-400">
+              {storage} GB of 100 GB used
+            </p>
+          </div>
+          <div className="p-3 bg-slate-50 text-slate-600 rounded-lg ml-4">
+            <DatabaseIcon />
+          </div>
+        </div>
 
-            {filteredLogs.map((log, i) => (
-              <tr key={i} className="hover:bg-slate-50">
-                <td className="px-6 py-3 text-xs text-slate-400 font-mono">
-                  {log.time}
-                </td>
-                <td className="px-6 py-3 font-medium">
-                  {log.user}
-                </td>
-                <td className="px-6 py-3">
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs border font-medium ${styles[log.type]}`}
-                  >
-                    {log.action}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-xs text-slate-500">
-                  {log.details}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-500 mb-1">Active Sessions</p>
+            <h3 className="text-3xl font-bold text-slate-800">{activeSessions}</h3>
+            <p className="text-xs text-green-600 mt-2 font-medium">▲ 12% last hour</p>
+          </div>
+          <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
+            <ActivityIcon />
+          </div>
+        </div>
       </div>
 
-      {showModal && (
-        <AddUserModal
-          onClose={() => setShowModal(false)}
-          onAdd={addUser}
-        />
-      )}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
+          <h3 className="text-lg font-bold text-slate-800">Audit Logs</h3>
+          <div className="relative w-full sm:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <SearchIcon />
+            </div>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search logs..."
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
+              <tr>
+                <th className="px-6 py-3">Time</th>
+                <th className="px-6 py-3">User</th>
+                <th className="px-6 py-3">Action</th>
+                <th className="px-6 py-3">Details</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center">
+                      <SearchIcon className="w-8 h-8 mb-2 opacity-50" />
+                      <p>No logs found matching your search</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredLogs.map((log, i) => (
+                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 text-xs text-slate-500 font-mono whitespace-nowrap">
+                      {log.time}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-slate-800">
+                      {log.user}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${styles[log.type]}`}>
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500">
+                      {log.details}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <AddUserModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onAdd={addUser}
+      />
 
       {toast && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-5 py-3 rounded-lg shadow-lg">
-          {toast}
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-slate-800 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
+            <div className="text-green-400">
+              <CheckCircleIcon />
+            </div>
+            <p className="text-sm font-medium">{toast}</p>
+          </div>
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-const Stat = ({ title, value, children }) => (
-  <div className="bg-white p-6 rounded-xl border shadow-sm hover:-translate-y-0.5 transition">
-    <p className="text-sm text-slate-500 mb-1">{title}</p>
-    {value && <h3 className="text-3xl font-bold text-slate-800">{value}</h3>}
-    {children}
-  </div>
-)
+const AddUserModal = ({ isOpen, onClose, onAdd }) => {
+  if (!isOpen) return null;
 
-const AddUserModal = ({ onClose, onAdd }) => {
   const submit = e => {
-    e.preventDefault()
-    onAdd(e.target.name.value, e.target.role.value)
-  }
+    e.preventDefault();
+    onAdd(e.target.name.value, e.target.role.value);
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between">
-          <h3 className="font-semibold">Add New User</h3>
-          <button onClick={onClose}>✕</button>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-indigo-100 text-indigo-600 rounded-full">
+            <UserPlusIcon />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">Add New User</h3>
+            <p className="text-sm text-slate-500">Create a new account in the system</p>
+          </div>
         </div>
 
-        <form onSubmit={submit} className="p-6 space-y-4">
-          <input
-            name="name"
-            placeholder="Full Name"
-            required
-            className="w-full border rounded-lg px-4 py-2.5"
-          />
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Full Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              name="name"
+              placeholder="e.g. Jane Doe"
+              required
+              autoFocus
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+            />
+          </div>
 
-          <select
-            name="role"
-            className="w-full border rounded-lg px-4 py-2.5"
-          >
-            <option>Employee</option>
-            <option>Reviewer</option>
-            <option>Admin</option>
-          </select>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Role <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="role"
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+            >
+              <option>Employee</option>
+              <option>Reviewer</option>
+              <option>Admin</option>
+            </select>
+          </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 justify-end pt-4 mt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border rounded-lg py-2.5"
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium"
             >
               Cancel
             </button>
-
-            <button className="flex-1 bg-slate-800 text-white rounded-lg py-2.5">
-              Add User
+            <button 
+              type="submit"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              Create User
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default AdminDashboard
+export default AdminDashboard;
