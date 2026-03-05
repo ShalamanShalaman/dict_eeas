@@ -35,28 +35,19 @@ export default function LoginForm({ onLogin }) {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden flex items-center justify-center font-sans">
+    <div className="relative w-screen h-screen overflow-hidden flex items-center justify-start font-sans">
       <div className="absolute inset-0">
-        <img src="/images/dict_banner.png" alt="Background Blur" className="w-full h-full object-cover filter blur-sm opacity-40" />
-      </div>
-
-      <div className="absolute inset-0 flex overflow-hidden">
-        <div className="flex-shrink-0 w-full h-full animate-marquee relative">
-          <img src="/images/dict_banner.png" alt="Moving Banner" className="w-full h-full object-contain mask-fade" />
-        </div>
-        <div className="flex-shrink-0 w-full h-full animate-marquee relative">
-          <img src="/images/dict_banner.png" alt="Moving Banner" className="w-full h-full object-contain mask-fade" />
-        </div>
+        <img src="/images/Login Page.png" alt="Background" className="w-full h-full object-cover" />
       </div>
 
       <div className="absolute inset-0 bg-black/30 z-0"></div>
 
-      <div className="relative z-10 w-full max-w-sm mx-4 bg-black/40 border border-white/20 shadow-2xl rounded-2xl p-8 flex flex-col items-center justify-center">
+      <div className="relative z-10 w-full max-w-md ml-32 mr-4 min-h-[32rem] bg-black/40 border border-white/20 shadow-2xl rounded-2xl p-12 flex flex-col items-center justify-center">
         <div className="mb-6 flex items-center gap-3 p-4 rounded-xl w-full justify-center">
-          <img src="/images/logo.gif" alt="Logo" className="w-14 h-14 object-contain" />
+          <img src="/images/logo.gif" alt="Logo" className="w-20 h-20 object-contain" />
           <div>
-            <h2 className="text-xl font-bold text-white leading-tight text-center">DICT-EAAS</h2>
-            <p className="text-xs text-white font-bold text-center">Employee Attendance and Accomplishment System</p>
+            <h2 className="text-3xl font-bold text-white leading-tight text-center">DICT-EAAS</h2>
+            <p className="text-sm text-white font-bold text-center">Employee Attendance and Accomplishment System</p>
           </div>
         </div>
 
@@ -132,19 +123,6 @@ export default function LoginForm({ onLogin }) {
       </div>
 
       <style jsx>{`
-        @keyframes marquee {
-          0% { transform: translateX(0%); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-          display: inline-block;
-          white-space: nowrap;
-          animation: marquee 500s linear infinite;
-        }
-        .mask-fade {
-          -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%);
-          mask-image: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0) 100%);
-        }
         html, body, #__next {
           width: 100%;
           height: 100%;
