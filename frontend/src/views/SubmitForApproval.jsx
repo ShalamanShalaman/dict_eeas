@@ -46,6 +46,52 @@ const UserIcon = ({ className }) => (
   </Icon>
 );
 
+const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <h3 className="font-semibold text-slate-800 truncate pr-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            {title || 'Document Viewer'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 bg-slate-100 relative">
+          {documentId ? (
+            <iframe
+              src={`http://127.0.0.1:5000/api/document/view/${documentId}`}
+              className="w-full h-full border-0"
+              title="PDF Viewer"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 mb-4">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <p className="mt-2 text-sm">No document selected</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function SubmitForApproval({ user, onNavigate }) {
   const [files, setFiles] = useState([]);
   const [converting, setConverting] = useState(false);
@@ -56,6 +102,7 @@ export default function SubmitForApproval({ user, onNavigate }) {
   const [selectedReviewerId, setSelectedReviewerId] = useState('');
   const [loadingReviewers, setLoadingReviewers] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
   
   const [currentStep, setCurrentStep] = useState(1);
   const [convertedDocumentId, setConvertedDocumentId] = useState(null);
@@ -286,7 +333,10 @@ export default function SubmitForApproval({ user, onNavigate }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ filename: customFileName.trim() })
+        body: JSON.stringify({ 
+          filename: customFileName.trim(),
+          user_id: user.user_id
+        })
       });
 
       const result = await response.json();
@@ -314,10 +364,12 @@ export default function SubmitForApproval({ user, onNavigate }) {
   };
 
   const handleViewPDF = () => {
-    if (convertedFilePath) {
-      const url = `/static/${convertedFilePath}`;
-      console.log('Opening PDF URL:', url);
-      window.open(url, '_blank');
+    if (convertedDocumentId) {
+      setViewPdfModal({
+        isOpen: true,
+        docId: convertedDocumentId,
+        title: convertedFileName ? convertedFileName.replace('.json', '') : 'Document Viewer'
+      });
     }
   };
 
@@ -669,6 +721,13 @@ export default function SubmitForApproval({ user, onNavigate }) {
           ? "Step 1 of 2: Convert your files to PDF first" 
           : "Step 2 of 2: Review the PDF and submit to your reviewer"}
       </p>
+      
+      <PDFViewerModal
+        isOpen={viewPdfModal.isOpen}
+        onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
+        documentId={viewPdfModal.docId}
+        title={viewPdfModal.title}
+      />
     </div>
   );
 }

@@ -86,30 +86,6 @@ export default function Sidebar({ role, onLogout }) {
           <img src="/images/dict-logo.png" alt="DICT Logo" className="h-10 w-auto" />
         </div>
 
-        {/* User Profile Section */}
-        <div className="px-4 py-4 border-b border-white/10 bg-white/5">
-          <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            {user.profile_picture ? (
-              <img 
-                src={`http://127.0.0.1:5000/api/profile/${user.public_id}/picture?t=${new Date(user.profile_picture_updated || user.updated_at).getTime()}`}
-                alt="Profile"
-                className="w-12 h-12 rounded-full object-cover border-2 border-yellow-400 shadow-lg"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center font-bold text-sm border-2 border-yellow-400 shadow-lg">
-                {initials}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{user.full_name || "User"}</p>
-              <p className="text-xs text-white/70 truncate">{user.role?.toUpperCase()}</p>
-            </div>
-          </Link>
-        </div>
-
         <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
           {currentMenu.map(({ label, icon: Icon, path }) => {
             const isActive = location.pathname === path;

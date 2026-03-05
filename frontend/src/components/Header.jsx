@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User, Settings, Key, Bell, HelpCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "./NotificationDropdown";
@@ -8,10 +8,36 @@ export default function Header({ role, setRole, user, onLogout }) {
   
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const navigate = useNavigate();
 
   const userName = user?.full_name || user?.name || user?.username || "User";
   const userRole = user?.role || "employee";
+
+  // Fetch unread notification count on mount
+  useEffect(() => {
+    if (user?.user_id) {
+      fetchUnreadCount();
+    }
+  }, [user?.user_id]);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/api/document/notifications/${user.user_id}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadNotificationCount(data.unread_count || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch unread notification count:", err);
+    }
+  };
+
+  const handleUnreadCountChange = (count) => {
+    setUnreadNotificationCount(count);
+  };
 
   const handleNavigate = (tab) => {
     setShowDropdown(false);
@@ -59,10 +85,17 @@ export default function Header({ role, setRole, user, onLogout }) {
             >
               <Bell size={20} />
             </button>
+            {/* Unread count badge outside the bell */}
+            {unreadNotificationCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+              </span>
+            )}
             <NotificationDropdown 
               user={user}
               isOpen={showNotifications}
               onClose={() => setShowNotifications(false)}
+              onUnreadCountChange={handleUnreadCountChange}
             />
           </div>
         )}
@@ -72,7 +105,18 @@ export default function Header({ role, setRole, user, onLogout }) {
             onClick={() => setShowDropdown(!showDropdown)}
             className="flex items-center gap-2 px-2 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-400 flex items-center justify-center text-purple-900 font-bold text-sm shadow-md">
+            {user?.profile_picture ? (
+              <img 
+                src={`http://127.0.0.1:5000/api/profile/${user.public_id}/picture?t=${new Date(user.profile_picture_updated || user.updated_at).getTime()}`}
+                alt="Profile"
+                className="w-8 h-8 rounded-full object-cover border-2 border-yellow-400 shadow-md"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-400 flex items-center justify-center text-purple-900 font-bold text-sm shadow-md ${user?.profile_picture ? 'hidden' : ''}`}>
               {userName.charAt(0).toUpperCase()}
             </div>
             <div className="hidden md:flex flex-col items-start">
@@ -90,7 +134,7 @@ export default function Header({ role, setRole, user, onLogout }) {
           </button>
 
           {showDropdown && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
+            <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-[100]">
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                 <p className="text-sm font-semibold text-gray-900">{userName}</p>
                 <p className="text-xs text-gray-500 capitalize">{userRole}</p>

@@ -1,6 +1,52 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <h3 className="font-semibold text-slate-800 truncate pr-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            {title || 'Document Viewer'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 bg-slate-100 relative">
+          {documentId ? (
+            <iframe
+              src={`http://127.0.0.1:5000/api/document/view/${documentId}`}
+              className="w-full h-full border-0"
+              title="PDF Viewer"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 mb-4">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <p className="mt-2 text-sm">No document selected</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -42,32 +88,42 @@ const RefreshIcon = ({ className }) => (
   </Icon>
 );
 
-const SendIcon = ({ className }) => (
+const EyeIcon = ({ className }) => (
   <Icon className={className}>
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
   </Icon>
 );
 
-const AlertCircleIcon = ({ className }) => (
+const PinIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+  </svg>
+);
+
+const XIcon = ({ className }) => (
   <Icon className={className}>
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="12" />
-    <line x1="12" y1="16" x2="12.01" y2="16" />
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </Icon>
 );
 
-const UserIcon = ({ className }) => (
+const CheckSquareIcon = ({ className }) => (
   <Icon className={className}>
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
+    <polyline points="9 11 12 14 22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
   </Icon>
 );
 
-const CheckCircleIcon = ({ className }) => (
+const ChevronLeftIcon = ({ className }) => (
   <Icon className={className}>
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
+    <polyline points="15 18 9 12 15 6" />
+  </Icon>
+);
+
+const ChevronRightIcon = ({ className }) => (
+  <Icon className={className}>
+    <polyline points="9 18 15 12 9 6" />
   </Icon>
 );
 
@@ -81,15 +137,11 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
   const [markedIds, setMarkedIds] = useState([]);
   const [markMode, setMarkMode] = useState(false);
   const [pinnedIds, setPinnedIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const navigate = useNavigate();
 
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [reviewers, setReviewers] = useState([]);
-  const [loadingReviewers, setLoadingReviewers] = useState(false);
-  const [selectedReviewerId, setSelectedReviewerId] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
 
   useEffect(() => {
     if (propUser) {
@@ -102,37 +154,12 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
     }
   }, [propUser]);
 
-  useEffect(() => {
-    const fetchReviewers = async () => {
-      try {
-        setLoadingReviewers(true);
-        const response = await fetch('http://127.0.0.1:5000/api/document/reviewers');
-        if (response.ok) {
-          const data = await response.json();
-          setReviewers(data);
-          if (data.length === 1) {
-            setSelectedReviewerId(data[0].id.toString());
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch reviewers:", err);
-      } finally {
-        setLoadingReviewers(false);
-      }
-    };
-
-    if (showSubmitModal) {
-      fetchReviewers();
-    }
-  }, [showSubmitModal]);
-
   const fetchDocs = async () => {
     if (!currentUser) return;
     
     const userId = currentUser.user_id || currentUser.id;
 
     if (!userId) {
-        console.error("User object found, but no ID present:", currentUser);
         return;
     }
 
@@ -155,8 +182,8 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       });
       
       setSavedDocs(sorted);
+      setCurrentPage(1);
     } catch (err) {
-      console.error("Failed to fetch documents:", err);
     } finally {
       setLoading(false);
     }
@@ -167,6 +194,10 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
         fetchDocs();
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   const handleDeleteClick = (id) => {
     setDeleteTargetIds([id]);
@@ -200,7 +231,15 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
     setMarkMode(false);
   };
 
-  const markAll = () => setMarkedIds(savedDocs.map(d => d.id));
+  const markAll = () => {
+    const pageIds = currentDocs.map(d => d.id);
+    setMarkedIds(prev => {
+      const newSet = new Set(prev);
+      pageIds.forEach(id => newSet.add(id));
+      return Array.from(newSet);
+    });
+  };
+
   const unmarkAll = () => setMarkedIds([]);
 
   const confirmDelete = async () => {
@@ -228,163 +267,14 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
     }
   };
 
-  const handleOpenSubmitModal = () => {
-    if (markedIds.length === 0) {
-      alert("Please select at least one draft to submit.");
-      return;
-    }
-    setShowSubmitModal(true);
-    setSubmitError(null);
-    setSubmitSuccess(false);
-  };
-
-  const handleSubmitForApproval = async () => {
-    if (!selectedReviewerId) {
-      setSubmitError("Please select a reviewer");
-      return;
-    }
-
-    if (markedIds.length === 0) {
-      setSubmitError("Please select at least one draft");
-      return;
-    }
-
-    setSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      let submittedCount = 0;
-      let failedCount = 0;
-
-      for (const docId of markedIds) {
-        const contentResponse = await fetch(`http://127.0.0.1:5000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
-        
-        if (!contentResponse.ok) {
-          console.error(`Failed to get content for doc ${docId}`);
-          failedCount++;
-          continue;
-        }
-
-        const stateData = await contentResponse.json();
-        
-        const employeeName = stateData.arMeta?.name || currentUser.full_name || "Employee";
-        const selectedMonth = stateData.selectedMonth || "";
-        
-        const finalName = employeeName;
-        const finalPeriod = selectedMonth;
-        const filteredData = stateData.employees?.[Object.keys(stateData.employees)[0]]?.[selectedMonth] || {};
-
-        const dtrResponse = await fetch("http://127.0.0.1:5000/api/download-dtr", {
-          method: "POST",
-          mode: 'cors',
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            employee_name: finalName,
-            employee_data: filteredData,
-            approver: stateData.arMeta?.approver || "",
-            period_text: finalPeriod,
-            period_format: stateData.arMeta?.periodFormat || "full"
-          }),
-        });
-
-        if (!dtrResponse.ok) {
-          console.error(`Failed to generate DTR for doc ${docId}`);
-          failedCount++;
-          continue;
-        }
-
-        const dtrBlob = await dtrResponse.blob();
-        const dtrFile = new File([dtrBlob], `${finalName.replace(/\s+/g, '_')}_DTR.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-
-        const formData = new FormData();
-        formData.append('user_id', currentUser.user_id);
-        formData.append('files', dtrFile);
-
-        const uploadResponse = await fetch('/api/document/upload-attachments', {
-          method: 'POST',
-          body: formData
-        });
-
-        let uploadResult;
-        const contentType = uploadResponse.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          uploadResult = await uploadResponse.json();
-        } else {
-          const text = await uploadResponse.text();
-          console.error('Non-JSON response:', text);
-          failedCount++;
-          continue;
-        }
-
-        if (!uploadResponse.ok) {
-          console.error(`Failed to convert DTR to PDF for doc ${docId}`, uploadResult.error);
-          failedCount++;
-          continue;
-        }
-
-        const defaultFileName = `${currentUser.last_name}, ${currentUser.first_name}.pdf`;
-        
-        const createDocFormData = new FormData();
-        createDocFormData.append('user_id', currentUser.user_id);
-        createDocFormData.append('filename', defaultFileName);
-        
-        const fileResponse = await fetch(`/static/${uploadResult.file_path}`);
-        const fileBlob = await fileResponse.blob();
-        const convertedFile = new File([fileBlob], defaultFileName, { type: 'application/pdf' });
-        createDocFormData.append('file', convertedFile);
-
-        const createDocResponse = await fetch('/api/document/upload', {
-          method: 'POST',
-          body: createDocFormData
-        });
-
-        if (!createDocResponse.ok) {
-          console.error(`Failed to create document for doc ${docId}`);
-          failedCount++;
-          continue;
-        }
-
-        const createDocResult = await createDocResponse.json();
-        const newDocId = createDocResult.document.id;
-
-        const submitFormData = new FormData();
-        submitFormData.append('user_id', currentUser.user_id);
-        submitFormData.append('reviewer_id', selectedReviewerId);
-
-        const submitResponse = await fetch(`/api/document/submit/${newDocId}`, {
-          method: 'POST',
-          body: submitFormData
-        });
-
-        if (submitResponse.ok) {
-          submittedCount++;
-          setSavedDocs(prev => prev.filter(doc => String(doc.id) !== String(docId)));
-        } else {
-          failedCount++;
-        }
-      }
-
-      if (submittedCount > 0) {
-        setSubmitSuccess(true);
-        setMarkedIds([]);
-        setMarkMode(false);
-        
-        setTimeout(() => {
-          setShowSubmitModal(false);
-          setSubmitSuccess(false);
-        }, 2000);
-      }
-
-      if (failedCount > 0) {
-        setSubmitError(`${failedCount} submission(s) failed. Please try again.`);
-      }
-
-    } catch (err) {
-      console.error("Submit error:", err);
-      setSubmitError("Failed to submit: " + err.message);
-    } finally {
-      setSubmitting(false);
-    }
+  const handleViewPdf = (e, doc) => {
+    e.stopPropagation();
+    const filename = getDisplayFilename(doc);
+    setViewPdfModal({
+      isOpen: true,
+      docId: doc.id,
+      title: filename.replace('.json', '')
+    });
   };
 
   const getDisplayFilename = (doc) => {
@@ -397,7 +287,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
   const filteredDocs = savedDocs.filter(doc => {
     const filename = getDisplayFilename(doc).toLowerCase();
-    return filename.endsWith('.json') && filename.toLowerCase().includes(search.toLowerCase());
+    return filename.toLowerCase().includes(search.toLowerCase());
   });
 
   const displayedDocs = [...filteredDocs].sort((a, b) => {
@@ -406,9 +296,16 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
     return bPinned - aPinned;
   });
 
+  const totalPages = Math.ceil(displayedDocs.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDocs = displayedDocs.slice(indexOfFirstItem, indexOfLastItem);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <FolderIcon className="w-7 h-7 text-indigo-600" />
@@ -417,101 +314,94 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
           <p className="text-slate-500 text-sm">Manage and resume your previous attendance drafts.</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/upload')}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-          >
-            <Icon className="w-4 h-4"><path d="M12 5v14M5 12h14" /></Icon>
-            New Draft
-          </button>
-
-          <button
-            onClick={fetchDocs}
-            disabled={loading}
-            className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Refresh List"
-          >
-            <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-
-          <div className="flex items-center gap-3">
-            <div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => { if (markMode) setMarkedIds([]); setMarkMode(prev => !prev); }}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${markMode ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-                title="Select drafts"
+                onClick={() => navigate('/upload')}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 h-[42px] rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
               >
-                Select
+                <Icon className="w-4 h-4"><path d="M12 5v14M5 12h14" /></Icon>
+                New Draft
+              </button>
+
+              <button
+                onClick={fetchDocs}
+                disabled={loading}
+                className="flex items-center justify-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 w-[42px] h-[42px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh List"
+              >
+                <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+
+              <div className="h-8 w-px bg-slate-200 mx-1"></div>
+
+              <button
+                onClick={() => {
+                  if (markMode) setMarkedIds([]);
+                  setMarkMode(prev => !prev);
+                }}
+                className={`flex items-center justify-center w-[42px] h-[42px] rounded-lg transition-colors ${
+                  markMode 
+                    ? 'bg-slate-700 hover:bg-slate-800 text-white' 
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                }`}
+                title={markMode ? "Cancel selection" : "Select drafts"}
+              >
+                {markMode ? <XIcon className="w-5 h-5" /> : <CheckSquareIcon className="w-5 h-5" />}
               </button>
             </div>
 
-            {markMode && (
-              <>
-                <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-                  <button
-                    onClick={markAll}
-                    className="text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 transition-colors font-medium"
-                    title="Mark all visible drafts"
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={unmarkAll}
-                    className="text-xs px-2.5 py-1.5 bg-slate-100 text-slate-600 border border-slate-200 rounded hover:bg-slate-200 transition-colors font-medium"
-                    title="Clear all marks"
-                  >
-                    None
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 ml-3">
-                  <button
-                    onClick={() => pinMarked()}
-                    disabled={markedIds.length === 0}
-                    title="Pin selected drafts"
-                    className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                    </svg>
-                    <span className="sr-only">Pin</span>
-                  </button>
-                  <button
-                    onClick={handleOpenSubmitModal}
-                    disabled={markedIds.length === 0}
-                    title="Submit selected drafts for approval"
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <SendIcon className="w-4 h-4" />
-                    Submit
-                  </button>
-                  <button
-                    onClick={() => { if (markedIds.length) { setDeleteTargetIds(markedIds); setShowDeleteConfirm(true); } }}
-                    disabled={markedIds.length === 0}
-                    title="Delete selected drafts"
-                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                    <span className="sr-only">Delete</span>
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="relative w-full md:w-72 shrink-0">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search files..."
+                className="pl-10 pr-4 w-full h-[42px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search files..."
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-64 text-sm transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          {markMode && (
+            <div className="flex items-center gap-2 pt-3 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
+              <span className="text-sm font-medium text-slate-500 mr-2">
+                {markedIds.length} selected
+              </span>
+              <button
+                onClick={markAll}
+                className="text-xs px-3 h-[42px] bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg transition-colors font-medium whitespace-nowrap"
+                title="Select All"
+              >
+                Select All
+              </button>
+              <button
+                onClick={unmarkAll}
+                className="text-xs px-3 h-[42px] bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg transition-colors font-medium whitespace-nowrap"
+                title="Clear Selection"
+              >
+                Clear
+              </button>
+              <div className="h-8 w-px bg-slate-200 mx-1"></div>
+              <button
+                onClick={() => pinMarked()}
+                disabled={markedIds.length === 0}
+                className="flex items-center justify-center w-[42px] h-[42px] bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Pin Selected"
+              >
+                <PinIcon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => { if (markedIds.length) { setDeleteTargetIds(markedIds); setShowDeleteConfirm(true); } }}
+                disabled={markedIds.length === 0}
+                className="flex items-center justify-center w-[42px] h-[42px] bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Delete Selected"
+              >
+                <Trash2Icon className="w-5 h-5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -536,99 +426,160 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayedDocs.map((doc) => {
-            const isMarked = markedIds.find(x => String(x) === String(doc.id)) ? true : false;
-            const isPinned = pinnedIds.find(x => String(x) === String(doc.id)) ? true : false;
-            return (
-            <div 
-              key={doc.id} 
-              className={`bg-white rounded-xl p-5 hover:shadow-lg transition-all group relative cursor-pointer ${
-                markMode && isMarked 
-                  ? 'border-2 border-blue-500 shadow-md' 
-                  : 'border border-slate-200 hover:border-indigo-200'
-              }`}
-              onClick={() => markMode && toggleMark(doc.id)}
-            >
-              {markMode && isMarked && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-blue-500/5 pointer-events-none">
-                  <div className="w-12 h-12 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-blue-500">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                      <polyline points="22 4 12 14.01 9 11.01" />
-                    </svg>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {currentDocs.map((doc) => {
+              const isMarked = markedIds.find(x => String(x) === String(doc.id)) ? true : false;
+              const isPinned = pinnedIds.find(x => String(x) === String(doc.id)) ? true : false;
+              const isJson = getDisplayFilename(doc).toLowerCase().endsWith('.json');
+
+              return (
+              <div 
+                key={doc.id} 
+                className={`bg-white rounded-xl p-5 hover:shadow-lg transition-all group relative cursor-pointer ${
+                  markMode && isMarked 
+                    ? 'border-2 border-blue-500 shadow-md' 
+                    : 'border border-slate-200 hover:border-indigo-200'
+                }`}
+                onClick={() => markMode && toggleMark(doc.id)}
+              >
+                {markMode && isMarked && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-blue-500/5 pointer-events-none">
+                    <div className="w-12 h-12 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-blue-500">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 flex items-center gap-2">
+                     <Icon className="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></Icon>
+                     {!markMode && isPinned && (
+                       <PinIcon className="w-4 h-4 text-yellow-500 fill-current" />
+                     )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
+                          doc.status === 'approved' ? 'bg-green-100 text-green-700' :
+                          doc.status === 'declined' ? 'bg-red-100 text-red-700' :
+                          doc.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
+                          'bg-slate-100 text-slate-600'
+                      }`}>
+                          {doc.status}
+                      </span>
+                      {!markMode && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); togglePin(doc.id); }}
+                        className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
+                        title={isPinned ? 'Unpin' : 'Pin'}
+                      >
+                        {isPinned ? (
+                          <PinIcon className="w-4 h-4 text-yellow-500 fill-current" />
+                        ) : (
+                          <PinIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                      )}
+                      {!markMode && !isJson && (
+                      <button 
+                        onClick={(e) => handleViewPdf(e, doc)}
+                        className="text-slate-400 hover:text-indigo-600 p-1.5 hover:bg-indigo-50 rounded-md transition-colors"
+                        title="View PDF"
+                      >
+                        <EyeIcon className="w-4 h-4" />
+                      </button>
+                      )}
+                      {!markMode && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(doc.id); }}
+                        className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
+                        title="Delete Draft"
+                      >
+                        <Trash2Icon className="w-4 h-4" />
+                      </button>
+                      )}
                   </div>
                 </div>
-              )}
-              
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 flex items-center gap-2">
-                   <Icon className="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></Icon>
-                   {!markMode && isPinned && (
-                     <svg className="w-4 h-4 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                       <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                     </svg>
-                   )}
-                </div>
-                <div className="flex items-center gap-1">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
-                        doc.status === 'approved' ? 'bg-green-100 text-green-700' :
-                        doc.status === 'declined' ? 'bg-red-100 text-red-700' :
-                        doc.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
-                        'bg-slate-100 text-slate-600'
-                    }`}>
-                        {doc.status}
-                    </span>
-                    {!markMode && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); togglePin(doc.id); }}
-                      className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
-                      title={isPinned ? 'Unpin' : 'Pin'}
-                    >
-                      {isPinned ? (
-                        <svg className="w-4 h-4 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                        </svg>
-                      )}
-                    </button>
-                    )}
-                    {!markMode && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(doc.id); }}
-                      className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-md transition-colors"
-                      title="Delete Draft"
-                    >
-                      <Trash2Icon className="w-4 h-4" />
-                    </button>
-                    )}
-                </div>
-              </div>
 
-              <h4 className="font-semibold text-slate-800 truncate mb-1" title={getDisplayFilename(doc)}>
-                {getDisplayFilename(doc).replace(".json", "")}
-              </h4>
-              
-              <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
-                <span>{new Date(doc.updated_at || doc.created_at).toLocaleDateString()}</span>
-                <span>•</span>
-                <span>{new Date(doc.updated_at || doc.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-              </div>
+                <h4 className="font-semibold text-slate-800 truncate mb-1" title={getDisplayFilename(doc)}>
+                  {getDisplayFilename(doc).replace(".json", "")}
+                </h4>
+                
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
+                  <span>{new Date(doc.updated_at || doc.created_at).toLocaleDateString()}</span>
+                  <span>•</span>
+                  <span>{new Date(doc.updated_at || doc.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
 
-              <button 
-                onClick={(e) => { e.stopPropagation(); navigate(`/upload?doc_id=${doc.id}`); }}
-                className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
-              >
-                <ExternalLinkIcon className="w-4 h-4" />
-                Resume Work
-              </button>
+                {isJson && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); navigate(`/upload?doc_id=${doc.id}`); }}
+                    className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
+                  >
+                    <ExternalLinkIcon className="w-4 h-4" />
+                    Resume Work
+                  </button>
+                )}
+              </div>
+              );
+            })}
+          </div>
+          
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-8">
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+                <button
+                  onClick={() => paginate(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+                >
+                  <ChevronLeftIcon className="w-5 h-5" />
+                </button>
+                
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => {
+                    if (
+                      number === 1 || 
+                      number === totalPages || 
+                      (number >= currentPage - 1 && number <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={number}
+                          onClick={() => paginate(number)}
+                          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                            currentPage === number
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {number}
+                        </button>
+                      );
+                    } else if (
+                      number === currentPage - 2 || 
+                      number === currentPage + 2
+                    ) {
+                      return <span key={number} className="w-8 h-8 flex items-center justify-center text-slate-400">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => paginate(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+                >
+                  <ChevronRightIcon className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            );
-          })}
-        </div>
+          )}
+        </>
       )}
 
       {showDeleteConfirm && (
@@ -667,106 +618,13 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
           </div>
         </div>
       )}
-
-      {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !submitting && setShowSubmitModal(false)} />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
-            
-            {submitSuccess ? (
-              <div className="text-center py-6">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircleIcon className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">
-                  Submitted Successfully!
-                </h3>
-                <p className="text-gray-600">
-                  Your documents have been submitted for approval.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <SendIcon className="w-8 h-8 text-green-600" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Submit for Approval
-                  </h3>
-                  <p className="text-gray-600 text-sm mt-1">
-                    {markedIds.length} draft(s) selected
-                  </p>
-                </div>
-
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <UserIcon className="w-4 h-4 text-indigo-500" />
-                    Select Reviewer <span className="text-red-500">*</span>
-                  </label>
-                  {loadingReviewers ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                      Loading reviewers...
-                    </div>
-                  ) : reviewers.length === 0 ? (
-                    <p className="text-sm text-red-500">No reviewers available. Please contact your administrator.</p>
-                  ) : (
-                    <select
-                      value={selectedReviewerId}
-                      onChange={(e) => setSelectedReviewerId(e.target.value)}
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm shadow-sm"
-                    >
-                      <option value="">-- Select a Reviewer --</option>
-                      {reviewers.map(reviewer => (
-                        <option key={reviewer.id} value={reviewer.id}>
-                          {reviewer.full_name} {reviewer.office_location ? `(${reviewer.office_location})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                {submitError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600 flex items-center gap-2">
-                      <AlertCircleIcon className="w-4 h-4" />
-                      {submitError}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowSubmitModal(false)}
-                    disabled={submitting}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSubmitForApproval}
-                    disabled={submitting || !selectedReviewerId}
-                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <SendIcon className="w-4 h-4" />
-                        Submit
-                      </>
-                    )}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      
+      <PDFViewerModal
+        isOpen={viewPdfModal.isOpen}
+        onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
+        documentId={viewPdfModal.docId}
+        title={viewPdfModal.title}
+      />
     </div>
   );
 }
