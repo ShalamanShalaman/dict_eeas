@@ -173,7 +173,11 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
       const result = await response.json();
       
-      const drafts = (result || []).filter(doc => doc.is_draft || doc.status === 'draft');
+      const drafts = (result || []).filter(doc => 
+        (doc.is_draft || doc.status === 'draft') && 
+        doc.file_path && 
+        doc.file_path.toLowerCase().endsWith('.json')
+      );
       
       const sorted = drafts.sort((a, b) => {
           const dateA = new Date(b.updated_at || b.created_at);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
@@ -93,6 +94,8 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
 };
 
 export default function SubmitForApproval({ user, onNavigate }) {
+  const navigate = useNavigate();
+  
   const [files, setFiles] = useState([]);
   const [converting, setConverting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +106,7 @@ export default function SubmitForApproval({ user, onNavigate }) {
   const [loadingReviewers, setLoadingReviewers] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   
   const [currentStep, setCurrentStep] = useState(1);
   const [convertedDocumentId, setConvertedDocumentId] = useState(null);
@@ -112,6 +116,41 @@ export default function SubmitForApproval({ user, onNavigate }) {
   const [renaming, setRenaming] = useState(false);
   
   const fileInputRef = useRef(null);
+
+  // Check if there's unsaved work (converted PDF that hasn't been submitted)
+  const hasUnsavedWork = currentStep === 2 && convertedDocumentId !== null;
+
+  // Handle browser back button and beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedWork) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedWork]);
+
+  const handleConfirmExit = () => {
+    setShowExitConfirm(false);
+    // Reset form and navigate away
+    resetForm();
+    if (onNavigate) {
+      onNavigate("Dashboard");
+    } else {
+      navigate('/');
+    }
+  };
+
+  const handleCancelExit = () => {
+    setShowExitConfirm(false);
+  };
 
   useEffect(() => {
     const fetchReviewers = async () => {
@@ -728,6 +767,45 @@ export default function SubmitForApproval({ user, onNavigate }) {
         documentId={viewPdfModal.docId}
         title={viewPdfModal.title}
       />
+
+      {/* Exit Confirmation Dialog */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleCancelExit} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircleIcon className="w-8 h-8 text-amber-600" />
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Unsaved Work
+              </h3>
+              <p className="text-gray-600 mb-2">
+                You have a converted PDF that hasn't been submitted yet.
+              </p>
+              <p className="text-gray-500 text-sm mb-6">
+                What would you like to do?
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelExit}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Continue Working
+                </button>
+                <button
+                  onClick={handleConfirmExit}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Exit Anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
