@@ -9,6 +9,7 @@ import ReviewerDashboard from "./views/ReviewerDashboard";
 import AdminDashboard from "./views/AdminDashboard";
 import MyProfile from "./views/MyProfile";
 import UploadAttendance from "./views/UploadAttendance";
+import EmployeeRecords from "./views/EmployeeRecords";
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/archive" element={<Protected><ReviewerDashboard user={user} isArchiveView={true} /></Protected>} />
         <Route path="/signature" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
         <Route path="/users" element={<Protected>{viewRole === "admin" ? <UserManagement /> : <Navigate to="/" replace />}</Protected>} />
+        <Route path="/employee-records" element={<Protected>{viewRole === "admin" ? <EmployeeRecords /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/templates" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="Templates" /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/logs" element={<Protected>{viewRole === "admin" ? <AdminDashboard selectedMenu="System Logs" /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/profile" element={<Protected><MyProfile /></Protected>} />

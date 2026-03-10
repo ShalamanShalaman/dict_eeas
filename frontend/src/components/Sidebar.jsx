@@ -60,7 +60,7 @@ export default function Sidebar({ role, onLogout }) {
     admin: [
       { label: "Dashboard", icon: Home, path: "/" },
       { label: "User Management", icon: Users, path: "/users" },
-      { label: "Templates", icon: Layers, path: "/templates" },
+      { label: "Employee Records", icon: Layers, path: "/employee-records" },
       { label: "System Logs", icon: Activity, path: "/logs" },
     ],
   };

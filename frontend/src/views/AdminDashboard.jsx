@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const PlusIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
@@ -69,21 +69,108 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
+const RefreshIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+    <polyline points="23 4 23 10 17 10" />
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+  </svg>
+);
+
+const API_URL = "http://127.0.0.1:5000/api";
+
 const AdminDashboard = () => {
-  const [totalUsers, setTotalUsers] = useState(150);
-  const [activeSessions] = useState(23);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeSessions] = useState(0);
   const [storage] = useState(45);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
+  const [loadingLogs, setLoadingLogs] = useState(true);
 
-  const [logs, setLogs] = useState([
-    { time: '10:05 AM', user: 'Admin_01', action: 'Update', type: 'update', details: 'Modified permissions' },
-    { time: '09:45 AM', user: 'Sarah_M', action: 'Create', type: 'create', details: 'Added employee' },
-    { time: '09:30 AM', user: 'Admin_01', action: 'Delete', type: 'delete', details: 'Removed inactive user' },
-    { time: '09:15 AM', user: 'John_D', action: 'Login', type: 'login', details: 'Successful login' },
-    { time: '08:50 AM', user: 'Admin_01', action: 'Export', type: 'export', details: 'Downloaded report' },
-  ]);
+  const [logs, setLogs] = useState([]);
+  const [availableActions, setAvailableActions] = useState([]);
+  const [filterAction, setFilterAction] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+
+  useEffect(() => {
+    fetchLogs();
+    fetchUserCount();
+    fetchActions();
+  }, []);
+
+  const fetchUserCount = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/users`);
+      const data = await res.json();
+      setTotalUsers(data.length || 0);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      setTotalUsers(0);
+    }
+  };
+
+  const fetchActions = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/logs/actions`);
+      const data = await res.json();
+      setAvailableActions(data);
+    } catch (error) {
+      console.error("Error fetching actions:", error);
+    }
+  };
+
+  const fetchLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      let url = `${API_URL}/admin/logs?limit=100`;
+      if (filterAction) {
+        url += `&action=${encodeURIComponent(filterAction)}`;
+      }
+      if (filterRole) {
+        url += `&role=${encodeURIComponent(filterRole)}`;
+      }
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.logs) {
+        setLogs(data.logs);
+      }
+    } catch (error) {
+      console.error("Error fetching logs:", error);
+      setLogs([]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  // Transform API logs to frontend format
+  const transformLog = (log) => {
+    const actionTypes = {
+      'LOGIN': { action: 'Login', type: 'login' },
+      'CREATE_USER': { action: 'Create', type: 'create' },
+      'UPDATE_USER': { action: 'Update', type: 'update' },
+      'DELETE_USER': { action: 'Delete', type: 'delete' },
+      'UPLOAD_DOCUMENT': { action: 'Upload', type: 'create' },
+      'SUBMIT_DOCUMENT': { action: 'Submit', type: 'update' },
+      'APPROVE_DOCUMENT': { action: 'Approve', type: 'update' },
+      'DECLINE_DOCUMENT': { action: 'Decline', type: 'delete' },
+      'UPLOAD_ATTACHMENTS': { action: 'Upload', type: 'create' },
+      'UPDATE_PROFILE': { action: 'Update', type: 'update' },
+    };
+
+    const transformed = actionTypes[log.action] || { action: log.action, type: 'update' };
+    
+    return {
+      time: new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date(log.created_at).toLocaleDateString(),
+      user: log.user_name,
+      role: log.user_role,
+      action: transformed.action,
+      type: transformed.type,
+      details: log.details || log.action
+    };
+  };
 
   const styles = {
     update: 'bg-blue-100 text-blue-800',
@@ -102,7 +189,9 @@ const AdminDashboard = () => {
     setLogs(prev => [
       {
         time,
+        date: new Date().toLocaleDateString(),
         user: 'Admin_01',
+        role: 'admin',
         action: 'Create',
         type: 'create',
         details: `Added ${role}: ${name}`,
@@ -116,11 +205,19 @@ const AdminDashboard = () => {
     setShowModal(false);
   }
 
+  const handleFilterChange = () => {
+    fetchLogs();
+  };
+
   const filteredLogs = logs.filter(
-    log =>
-      log.user.toLowerCase().includes(search.toLowerCase()) ||
-      log.action.toLowerCase().includes(search.toLowerCase()) ||
-      log.details.toLowerCase().includes(search.toLowerCase())
+    log => {
+      const transformed = transformLog(log);
+      return (
+        transformed.user.toLowerCase().includes(search.toLowerCase()) ||
+        transformed.action.toLowerCase().includes(search.toLowerCase()) ||
+        transformed.details.toLowerCase().includes(search.toLowerCase())
+      );
+    }
   );
 
   return (
@@ -130,6 +227,14 @@ const AdminDashboard = () => {
           <h2 className="text-2xl font-bold text-slate-900">System Administration</h2>
           <p className="text-slate-500">Overview of system health and usage</p>
         </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={fetchLogs}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <RefreshIcon /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -138,7 +243,7 @@ const AdminDashboard = () => {
             <p className="text-sm font-medium opacity-90 mb-1">Total Users</p>
             <h3 className="text-3xl font-bold">{totalUsers}</h3>
             <p className="text-xs mt-2 opacity-80">
-              10 Reviewers · {totalUsers - 10} Employees
+              System Users
             </p>
           </div>
           <div className="p-3 bg-white/20 rounded-lg">
@@ -186,7 +291,7 @@ const AdminDashboard = () => {
           <div>
             <p className="text-sm font-medium text-slate-500 mb-1">Active Sessions</p>
             <h3 className="text-3xl font-bold text-slate-800">{activeSessions}</h3>
-            <p className="text-xs text-green-600 mt-2 font-medium">▲ 12% last hour</p>
+            <p className="text-xs text-green-600 mt-2 font-medium">Currently logged in</p>
           </div>
           <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
             <ActivityIcon />
@@ -197,16 +302,40 @@ const AdminDashboard = () => {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
           <h3 className="text-lg font-bold text-slate-800">Audit Logs</h3>
-          <div className="relative w-full sm:w-64">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-              <SearchIcon />
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <select
+              value={filterAction}
+              onChange={(e) => { setFilterAction(e.target.value); }}
+              onBlur={handleFilterChange}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+            >
+              <option value="">All Actions</option>
+              {availableActions.map(action => (
+                <option key={action} value={action}>{action}</option>
+              ))}
+            </select>
+            <select
+              value={filterRole}
+              onChange={(e) => { setFilterRole(e.target.value); }}
+              onBlur={handleFilterChange}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+            >
+              <option value="">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="employee">Employee</option>
+            </select>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <SearchIcon />
+              </div>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search logs..."
+                className="w-full sm:w-64 pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+              />
             </div>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search logs..."
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
-            />
           </div>
         </div>
 
@@ -216,14 +345,21 @@ const AdminDashboard = () => {
               <tr>
                 <th className="px-6 py-3">Time</th>
                 <th className="px-6 py-3">User</th>
+                <th className="px-6 py-3">Role</th>
                 <th className="px-6 py-3">Action</th>
                 <th className="px-6 py-3">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredLogs.length === 0 ? (
+              {loadingLogs ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                    Loading logs...
+                  </td>
+                </tr>
+              ) : filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center">
                       <SearchIcon className="w-8 h-8 mb-2 opacity-50" />
                       <p>No logs found matching your search</p>
@@ -231,24 +367,35 @@ const AdminDashboard = () => {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-xs text-slate-500 font-mono whitespace-nowrap">
-                      {log.time}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-slate-800">
-                      {log.user}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${styles[log.type]}`}>
-                        {log.action}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {log.details}
-                    </td>
-                  </tr>
-                ))
+                filteredLogs.map((log, i) => {
+                  const transformed = transformLog(log);
+                  return (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 text-xs text-slate-500 font-mono whitespace-nowrap">
+                        {transformed.date} {transformed.time}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-slate-800">
+                        {transformed.user}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize
+                          ${transformed.role === 'admin' ? 'bg-purple-100 text-purple-800' : 
+                            transformed.role === 'reviewer' ? 'bg-orange-100 text-orange-800' : 
+                            'bg-green-100 text-green-800'}`}>
+                          {transformed.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${styles[transformed.type] || styles.update}`}>
+                          {transformed.action}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500">
+                        {transformed.details}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -346,3 +493,4 @@ const AddUserModal = ({ isOpen, onClose, onAdd }) => {
 };
 
 export default AdminDashboard;
+

@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app, send_file
-from models import db, User, Position, OfficeLocation, Document
+from models import db, User, Position, OfficeLocation, Document, SystemLog
+from system_logger import log_action
 import os
 import secrets
 import string
@@ -239,6 +240,10 @@ def login():
     user = User.query.filter_by(user_id=user_id).first()
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid credentials'}), 401
+    
+    # Log successful login
+    log_action(user, 'LOGIN', f'User logged in successfully')
+    
     return jsonify({'message': 'Login successful', 'user': user.to_dict()}), 200
 
 @account_bp.route('/api/profile/send-otp', methods=['POST'])
@@ -733,6 +738,9 @@ def upload_attachments():
             
             relative_path = os.path.join('documents', output_filename)
             
+            # Log the attachment upload
+            log_action(user, 'UPLOAD_ATTACHMENTS', f'Uploaded {len(files)} file(s) as attachments')
+            
             return jsonify({
                 'message': 'Files converted to PDF successfully',
                 'file_path': relative_path,
@@ -748,3 +756,73 @@ def upload_attachments():
     except Exception as e:
         print(f"Unexpected error in upload_attachments: {str(e)}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+# ==================== SYSTEM LOGS ENDPOINTS ====================
+
+@account_bp.route('/api/admin/logs', methods=['GET'])
+def get_system_logs():
+    """Get system logs with optional filtering"""
+    # Get query parameters for filtering
+    user_id = request.args.get('user_id')
+    action = request.args.get('action')
+    role = request.args.get('role')
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    
+    # Build query
+    query = SystemLog.query
+    
+    if user_id:
+        query = query.filter(SystemLog.user_id == int(user_id))
+    if action:
+        query = query.filter(SystemLog.action == action)
+    if role:
+        query = query.filter(SystemLog.user_role == role)
+    
+    # Get total count before pagination
+    total_count = query.count()
+    
+    # Order by most recent first and apply pagination
+    logs = query.order_by(SystemLog.created_at.desc()).offset(offset).limit(limit).all()
+    
+    return jsonify({
+        'logs': [log.to_dict() for log in logs],
+        'total': total_count,
+        'limit': limit,
+        'offset': offset
+    })
+
+@account_bp.route('/api/admin/logs/actions', methods=['GET'])
+def get_log_actions():
+    """Get list of unique action types for filtering"""
+    actions = db.session.query(SystemLog.action).distinct().all()
+    return jsonify([action[0] for action in actions])
+
+# ==================== ADMIN ALL DOCUMENTS ENDPOINT ====================
+
+@account_bp.route('/api/admin/all-documents', methods=['GET'])
+def get_all_documents_admin():
+    """Get all documents across all employees for admin view"""
+    status = request.args.get('status')
+    employee_id = request.args.get('employee_id')
+    
+    query = Document.query
+    
+    if status:
+        query = query.filter(Document.status == status)
+    if employee_id:
+        query = query.filter(Document.employee_id == int(employee_id))
+    
+    docs = query.order_by(Document.updated_at.desc()).all()
+    
+    result = []
+    for doc in docs:
+        doc_dict = doc.to_dict()
+        # Add employee info
+        if doc.employee:
+            doc_dict['employee_name'] = doc.employee.full_name
+            doc_dict['employee_user_id'] = doc.employee.user_id
+            doc_dict['office_name'] = doc.employee.office_location.location if doc.employee.office_location else None
+        result.append(doc_dict)
+    
+    return jsonify(result)
