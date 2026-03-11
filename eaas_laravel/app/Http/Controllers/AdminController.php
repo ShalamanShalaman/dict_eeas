@@ -193,6 +193,7 @@ class AdminController extends Controller
             return response()->json(['error' => 'Email already exists'], 409);
         }
 
+        // Generate a random password for new users
         $tempPassword = Str::random(12);
 
         $pos_id = null;
@@ -241,7 +242,23 @@ class AdminController extends Controller
 
         LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'CREATE', 'User', "Created user: {$user->user_id} ({$user->role})", $user->id);
 
-        return response()->json(['message' => 'User created', 'user' => $user->toArray()], 201);
+        // =========================================================================
+        // Print the generated credentials to the artisan serve terminal
+        // =========================================================================
+        error_log("\n=======================================================");
+        error_log(" 🚀 NEW USER ACCOUNT CREATED! ");
+        error_log("=======================================================");
+        error_log(" Name     : " . $user->full_name);
+        error_log(" Role     : " . ucfirst($user->role));
+        error_log(" User ID  : " . $user->user_id);
+        error_log(" Password : " . $tempPassword);
+        error_log("=======================================================\n");
+
+        return response()->json([
+            'message' => 'User created', 
+            'user' => $user->toArray(),
+            'generated_password' => $tempPassword // Included in response just in case you need it on the frontend later
+        ], 201);
     }
 
     public function editUser(Request $request, $public_id)
@@ -284,6 +301,18 @@ class AdminController extends Controller
             } else {
                 $updateData['position_id'] = null;
             }
+        }
+
+        // Allow Admin to reset the password during edit if they provide one
+        if ($request->filled('password')) {
+            $newPassword = $request->input('password');
+            $updateData['password'] = Hash::make($newPassword);
+            
+            error_log("\n=======================================================");
+            error_log(" 🔑 ADMIN UPDATED USER PASSWORD ");
+            error_log(" User ID  : " . $updateData['user_id']);
+            error_log(" New Pass : " . $newPassword);
+            error_log("=======================================================\n");
         }
 
         $user->update($updateData);
