@@ -55,6 +55,8 @@ Route::prefix('document')->group(function () {
     Route::get('/notifications/{user_id}', [DocumentController::class, 'getNotifications']);
     Route::post('/notifications/mark-read/{user_id}', [DocumentController::class, 'markNotificationsRead']);
     Route::delete('/notifications/{user_id}/clear', [DocumentController::class, 'clearNotifications']);
+    Route::put('/notification/{notification_id}/read', [DocumentController::class, 'markNotificationRead']);
+    Route::delete('/notification/{notification_id}', [DocumentController::class, 'deleteNotification']);
     Route::post('/upload-attachments', [DocumentController::class, 'uploadAttachments']);
     Route::post('/rename/{doc_id}', [DocumentController::class, 'renameDocument']);
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Bell, X, AlertCircle, Clock, CheckCheck, Send, CheckCircle, Trash2 } from "lucide-react";
+import { Bell, X, AlertCircle, Clock, CheckCheck, Send, CheckCircle, Trash2, User, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
@@ -110,8 +110,13 @@ const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) =>
     
     onClose();
     
-    if (notification.document_id) {
-        navigate(`/submissions`);
+    // Navigate based on notification type and user role
+    if (notification.notification_type === 'submitted' && user?.role === 'reviewer') {
+      // Reviewer clicked on new submission notification -> go to pending reviews
+      navigate(`/pending-reviews`);
+    } else if (notification.document_id) {
+      // Employee clicked on approved/declined notification -> go to submissions
+      navigate(`/submissions`);
     }
   };
 
@@ -169,6 +174,44 @@ const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) =>
           bgColor: 'bg-red-100',
           iconColor: 'text-red-600',
           badgeColor: 'bg-red-500'
+        };
+      case 'document_autosaved':
+        return {
+          icon: <Clock size={16} />,
+          bgColor: 'bg-yellow-100',
+          iconColor: 'text-yellow-600',
+          badgeColor: 'bg-yellow-500'
+        };
+      case 'profile_updated':
+        return {
+          icon: <User size={16} />,
+          bgColor: 'bg-purple-100',
+          iconColor: 'text-purple-600',
+          badgeColor: 'bg-purple-500'
+        };
+      case 'password_changed':
+        return {
+          icon: <Key size={16} />,
+          bgColor: 'bg-orange-100',
+          iconColor: 'text-orange-600',
+          badgeColor: 'bg-orange-500'
+        };
+      case 'user_registered':
+      case 'user_role_changed':
+      case 'user_updated':
+      case 'user_deleted':
+      case 'position_created':
+      case 'position_deleted':
+      case 'office_location_created':
+      case 'office_location_deleted':
+      case 'document_submitted':
+      case 'document_approved':
+      case 'document_declined':
+        return {
+          icon: <Bell size={16} />,
+          bgColor: 'bg-indigo-100',
+          iconColor: 'text-indigo-600',
+          badgeColor: 'bg-indigo-500'
         };
       default:
         return {
@@ -320,11 +363,11 @@ const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) =>
             <button 
               onClick={() => {
                 onClose();
-                navigate('/submissions');
+                navigate(user?.role === 'reviewer' ? '/pending-reviews' : '/submissions');
               }}
               className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
             >
-              View all submissions
+              {user?.role === 'reviewer' ? 'View all pending reviews' : 'View all submissions'}
             </button>
           </div>
         )}
