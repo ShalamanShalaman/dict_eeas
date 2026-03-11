@@ -1,9 +1,13 @@
-# Python virtual environment
-backend/venv/
-backend/.venv/
-__pycache__/
-*.pyc
+# Laravel
+eaas_laravel/vendor/
+eaas_laravel/.env
 
-# Node
-node_modules/
-dist/
+# Python
+eaas_python/venv/
+eaas_python/__pycache__/
+eaas_python/*.pyc
+eaas_python/.env
+
+# Frontend
+eaas_frontend/node_modules/
+eaas_frontend/.env
