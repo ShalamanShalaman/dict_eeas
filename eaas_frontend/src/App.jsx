@@ -28,6 +28,16 @@ export default function App() {
     }
   }, [user]);
 
+  // Listen for user updates (e.g., profile picture changes)
+  useEffect(() => {
+    const handleUserUpdate = (e) => {
+      setUser(e.detail);
+    };
+
+    window.addEventListener("userUpdated", handleUserUpdate);
+    return () => window.removeEventListener("userUpdated", handleUserUpdate);
+  }, []);
+
   const handleLogout = () => {
     setUser(null);
     setViewRole("");
