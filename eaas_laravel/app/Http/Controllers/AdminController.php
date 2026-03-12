@@ -7,6 +7,7 @@ use App\Models\Position;
 use App\Models\OfficeLocation;
 use App\Models\User;
 use App\Models\Document;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
@@ -15,6 +16,26 @@ use App\Helpers\LogHelper;
 
 class AdminController extends Controller
 {
+    /**
+     * Create a notification for admin users
+     */
+    private function createAdminNotification($type, $title, $message, $data = null)
+    {
+        // Get all admin users
+        $admins = User::where('role', 'admin')->where('is_active', true)->get();
+        
+        foreach ($admins as $admin) {
+            Notification::create([
+                'user_id' => $admin->id,
+                'type' => $type,
+                'title' => $title,
+                'message' => $message,
+                'data' => $data,
+                'is_read' => false,
+            ]);
+        }
+    }
+
     public function getActivityLogs()
     {
         $logs = ActivityLog::orderBy('created_at', 'desc')->get();
@@ -42,6 +63,14 @@ class AdminController extends Controller
             'description' => $request->input('description')
         ]);
 
+        // Notify admins about new position
+        $this->createAdminNotification(
+            'position_created',
+            'New Position Created',
+            "A new position has been created: {$name}",
+            ['position_id' => $pos->id, 'position_name' => $name]
+        );
+
         LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'CREATE', 'Position', "Created position: {$name}", $pos->id);
 
         return response()->json(['message' => 'Position created', 'position' => $pos->toArray()], 201);
@@ -66,6 +95,14 @@ class AdminController extends Controller
         $pos_name = $pos->name;
         $pos->delete();
 
+        // Notify admins about position deletion
+        $this->createAdminNotification(
+            'position_deleted',
+            'Position Deleted',
+            "Position '{$pos_name}' has been deleted from the system",
+            ['deleted_position_name' => $pos_name]
+        );
+
         LogHelper::log($request->query('action_by'), 'DELETE', 'Position', "Deleted position: {$pos_name}", $pos_id);
 
         return response()->json(['message' => 'Position deleted']);
@@ -88,6 +125,14 @@ class AdminController extends Controller
             'location' => $location,
             'reviewer_id' => $request->input('reviewer_id')
         ]);
+
+        // Notify admins about new office location
+        $this->createAdminNotification(
+            'office_location_created',
+            'New Office Location Created',
+            "A new office location has been created: {$location}",
+            ['location_id' => $loc->id, 'location_name' => $location]
+        );
 
         LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'CREATE', 'OfficeLocation', "Created office location: {$location}", $loc->id);
 
@@ -112,6 +157,14 @@ class AdminController extends Controller
         $loc = OfficeLocation::findOrFail($loc_id);
         $loc_name = $loc->location;
         $loc->delete();
+
+        // Notify admins about office location deletion
+        $this->createAdminNotification(
+            'office_location_deleted',
+            'Office Location Deleted',
+            "Office location '{$loc_name}' has been deleted from the system",
+            ['deleted_location_name' => $loc_name]
+        );
 
         LogHelper::log($request->query('action_by'), 'DELETE', 'OfficeLocation', "Deleted office location: {$loc_name}", $loc_id);
 
@@ -140,6 +193,7 @@ class AdminController extends Controller
             return response()->json(['error' => 'Email already exists'], 409);
         }
 
+        // Generate a random password for new users
         $tempPassword = Str::random(12);
 
         $pos_id = null;
@@ -178,9 +232,33 @@ class AdminController extends Controller
             'force_change_password' => true
         ]);
 
+        // Notify admins about new user registration
+        $this->createAdminNotification(
+            'user_registered',
+            'New User Registered',
+            "A new {$request->input('role')} has been registered: {$user->full_name} ({$user->user_id})",
+            ['user_id' => $user->id, 'user_name' => $user->full_name, 'role' => $user->role]
+        );
+
         LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'CREATE', 'User', "Created user: {$user->user_id} ({$user->role})", $user->id);
 
-        return response()->json(['message' => 'User created', 'user' => $user->toArray()], 201);
+        // =========================================================================
+        // Print the generated credentials to the artisan serve terminal
+        // =========================================================================
+        error_log("\n=======================================================");
+        error_log(" 🚀 NEW USER ACCOUNT CREATED! ");
+        error_log("=======================================================");
+        error_log(" Name     : " . $user->full_name);
+        error_log(" Role     : " . ucfirst($user->role));
+        error_log(" User ID  : " . $user->user_id);
+        error_log(" Password : " . $tempPassword);
+        error_log("=======================================================\n");
+
+        return response()->json([
+            'message' => 'User created', 
+            'user' => $user->toArray(),
+            'generated_password' => $tempPassword // Included in response just in case you need it on the frontend later
+        ], 201);
     }
 
     public function editUser(Request $request, $public_id)
@@ -225,7 +303,37 @@ class AdminController extends Controller
             }
         }
 
+        // Allow Admin to reset the password during edit if they provide one
+        if ($request->filled('password')) {
+            $newPassword = $request->input('password');
+            $updateData['password'] = Hash::make($newPassword);
+            
+            error_log("\n=======================================================");
+            error_log(" 🔑 ADMIN UPDATED USER PASSWORD ");
+            error_log(" User ID  : " . $updateData['user_id']);
+            error_log(" New Pass : " . $newPassword);
+            error_log("=======================================================\n");
+        }
+
         $user->update($updateData);
+
+        // Notify admins about user role change
+        if ($request->has('role') && $request->input('role') !== $user->role) {
+            $this->createAdminNotification(
+                'user_role_changed',
+                'User Role Changed',
+                "User {$user->full_name} ({$user->user_id}) role changed from {$user->role} to {$request->input('role')}",
+                ['user_id' => $user->id, 'user_name' => $user->full_name, 'old_role' => $user->role, 'new_role' => $request->input('role')]
+            );
+        }
+
+        // Notify admins about user profile update
+        $this->createAdminNotification(
+            'user_updated',
+            'User Updated',
+            "User {$user->full_name} ({$user->user_id}) has been updated by an administrator.",
+            ['user_id' => $user->id, 'user_name' => $user->full_name]
+        );
 
         LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'UPDATE', 'User', "Updated user profile: {$user->user_id}", $user->id);
 
@@ -252,6 +360,14 @@ class AdminController extends Controller
         }
 
         $user->delete();
+
+        // Notify admins about user deletion
+        $this->createAdminNotification(
+            'user_deleted',
+            'User Deleted',
+            "User {$user_id_str} has been deleted from the system",
+            ['deleted_user_id' => $user_id_int, 'user_id' => $user_id_str]
+        );
 
         LogHelper::log($request->query('action_by'), 'DELETE', 'User', "Deleted user: {$user_id_str}", $user_id_int);
 

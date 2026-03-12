@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Document;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\LogHelper;
@@ -11,6 +12,41 @@ use Symfony\Component\Process\Process;
 
 class DocumentController extends Controller
 {
+    /**
+     * Create a notification for a user
+     */
+    private function createNotification($userId, $type, $title, $message, $documentId = null, $data = null)
+    {
+        return Notification::create([
+            'user_id' => $userId,
+            'type' => $type,
+            'title' => $title,
+            'message' => $message,
+            'document_id' => $documentId,
+            'data' => $data,
+            'is_read' => false,
+        ]);
+    }
+
+    /**
+     * Create notifications for admin users
+     */
+    private function createAdminNotifications($type, $title, $message, $data = null)
+    {
+        $admins = \App\Models\User::where('role', 'admin')->where('is_active', true)->get();
+        
+        foreach ($admins as $admin) {
+            Notification::create([
+                'user_id' => $admin->id,
+                'type' => $type,
+                'title' => $title,
+                'message' => $message,
+                'data' => $data,
+                'is_read' => false,
+            ]);
+        }
+    }
+
     private function runPythonScript($action, $data)
     {
         $pythonDirName = 'eaas_python';
@@ -132,6 +168,16 @@ class DocumentController extends Controller
         $doc->is_draft = true;
         $doc->save();
 
+        // Create notification for auto-save
+        $this->createNotification(
+            $user->id,
+            'document_autosaved',
+            'Document Auto-saved',
+            "Your document has been auto-saved as draft.",
+            $doc->id,
+            ['document_name' => basename($doc->file_path)]
+        );
+
         LogHelper::log($user->id, 'UPDATE', 'Document', "User autosaved draft #{$doc->id}", $doc->id);
         return response()->json(['message' => 'Draft autosaved', 'document' => $doc->toArray()]);
     }
@@ -160,6 +206,24 @@ class DocumentController extends Controller
         $doc->submitted_at = now();
         $doc->save();
 
+        // Create notification for the reviewer
+        $this->createNotification(
+            $reviewer->id,
+            'submitted',
+            'New Document Submitted',
+            "{$user->full_name} submitted a document for your review.",
+            $doc->id,
+            ['employee_name' => $user->full_name, 'document_name' => basename($doc->file_path)]
+        );
+
+        // Notify admins about new document submission
+        $this->createAdminNotifications(
+            'document_submitted',
+            'New Document Submitted',
+            "{$user->full_name} submitted a document for review.",
+            ['employee_name' => $user->full_name, 'document_id' => $doc->id, 'document_name' => basename($doc->file_path)]
+        );
+
         LogHelper::log($user->id, 'SUBMIT', 'Document', "User submitted document #{$doc->id}", $doc->id);
         return response()->json(['message' => 'Document submitted', 'document' => $doc->toArray()]);
     }
@@ -177,6 +241,26 @@ class DocumentController extends Controller
             $doc->status = 'approved';
             $doc->reviewed_at = now();
             $doc->save();
+
+            // Create notification for the employee (document approved)
+            $this->createNotification(
+                $doc->employee_id,
+                'approved',
+                'Document Approved',
+                "Your document has been approved by {$reviewer->full_name}.",
+                $doc->id,
+                ['reviewer_name' => $reviewer->full_name, 'document_name' => basename($doc->file_path)]
+            );
+
+            // Notify admins about document approval
+            $this->createAdminNotifications(
+                'document_approved',
+                'Document Approved',
+                "{$reviewer->full_name} approved a document from {$doc->employee->full_name}.",
+                ['reviewer_name' => $reviewer->full_name, 'employee_name' => $doc->employee->full_name, 'document_id' => $doc->id]
+            );
+
+            LogHelper::log($reviewer->id, 'APPROVE', 'Document', "Reviewer approved document #{$doc->id}", $doc->id);
             return response()->json(['message' => 'Document approved', 'document' => $doc->toArray()]);
         } elseif (in_array($action, ['decline', 'declined'])) {
             $reason = $request->input('reason') ?? $request->input('note', '');
@@ -184,6 +268,26 @@ class DocumentController extends Controller
             $doc->reviewer_note = $reason;
             $doc->reviewed_at = now();
             $doc->save();
+
+            // Create notification for the employee (document declined)
+            $this->createNotification(
+                $doc->employee_id,
+                'declined',
+                'Document Declined',
+                "Your document has been declined by {$reviewer->full_name}. Reason: {$reason}",
+                $doc->id,
+                ['reviewer_name' => $reviewer->full_name, 'document_name' => basename($doc->file_path), 'reason' => $reason]
+            );
+
+            // Notify admins about document decline
+            $this->createAdminNotifications(
+                'document_declined',
+                'Document Declined',
+                "{$reviewer->full_name} declined a document from {$doc->employee->full_name}. Reason: {$reason}",
+                ['reviewer_name' => $reviewer->full_name, 'employee_name' => $doc->employee->full_name, 'document_id' => $doc->id, 'reason' => $reason]
+            );
+
+            LogHelper::log($reviewer->id, 'DECLINE', 'Document', "Reviewer declined document #{$doc->id}", $doc->id);
             return response()->json(['message' => 'Document declined', 'document' => $doc->toArray()]);
         }
         return response()->json(['error' => 'Invalid action'], 400);
@@ -206,7 +310,7 @@ class DocumentController extends Controller
         $doc = Document::findOrFail($doc_id);
         $path = $doc->review_file_path ?: $doc->file_path;
         if (!Storage::disk('public')->exists($path)) return response()->json(['error' => 'File not found'], 404);
-        return Storage::disk('public')->download($path);
+        return response()->download(Storage::disk('public')->path($path));
     }
 
     public function viewDocument($doc_id)
@@ -270,44 +374,94 @@ class DocumentController extends Controller
         $doc->status = 'approved';
         $doc->reviewed_at = now();
         $doc->save();
+
+        // Create notification for the employee (document approved with reviewed file)
+        $this->createNotification(
+            $doc->employee_id,
+            'approved',
+            'Document Approved',
+            "Your document has been reviewed and approved by {$reviewer->full_name}.",
+            $doc->id,
+            ['reviewer_name' => $reviewer->full_name, 'document_name' => basename($doc->file_path)]
+        );
+
+        LogHelper::log($reviewer->id, 'UPLOAD_REVIEW', 'Document', "Reviewer uploaded reviewed document #{$doc->id}", $doc->id);
         return response()->json(['message' => 'Uploaded', 'document' => $doc->toArray()], 200);
     }
 
     public function getNotifications($user_id)
     {
         $user = User::where('user_id', $user_id)->firstOrFail();
-        $declinedDocs = Document::where('employee_id', $user->id)
-            ->where('status', 'declined')
-            ->whereNotNull('reviewer_note')
-            ->where('reviewer_note', '!=', '')
-            ->orderBy('reviewed_at', 'desc')
-            ->get();
+        
+        // Fetch notifications from the new notifications table
+        $notifications = Notification::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get()
+            ->map(function ($notif) {
+                return [
+                    'id' => $notif->id,
+                    'document_id' => $notif->document_id,
+                    'document_name' => $notif->data['document_name'] ?? null,
+                    'title' => $notif->title,
+                    'message' => $notif->message,
+                    'reviewer_note' => $notif->data['reason'] ?? null,
+                    'notification_type' => $notif->type,
+                    'is_read' => $notif->is_read,
+                    'created_at' => $notif->created_at ? $notif->created_at->toISOString() : null,
+                ];
+            });
 
-        $notifications = [];
-        foreach ($declinedDocs as $doc) {
-            $notifications[] = [
-                'id' => $doc->id,
-                'document_id' => $doc->id,
-                'document_name' => basename($doc->file_path),
-                'title' => 'Document Declined',
-                'message' => 'Your document was declined',
-                'reviewer_note' => $doc->reviewer_note,
-                'notification_type' => 'declined',
-                'is_read' => false,
-                'created_at' => $doc->reviewed_at ? $doc->reviewed_at->toISOString() : null,
-            ];
-        }
-        return response()->json(['notifications' => $notifications, 'unread_count' => count($notifications)], 200);
+        $unreadCount = Notification::where('user_id', $user->id)->where('is_read', false)->count();
+
+        return response()->json([
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount
+        ], 200);
     }
 
     public function markNotificationsRead(Request $request, $user_id)
     {
-        return response()->json(['message' => 'Read']);
+        $user = User::where('user_id', $user_id)->firstOrFail();
+        
+        // Mark all notifications as read for this user
+        Notification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->update(['is_read' => true, 'read_at' => now()]);
+
+        return response()->json(['message' => 'All notifications marked as read']);
     }
 
     public function clearNotifications(Request $request, $user_id)
     {
-        return response()->json(['message' => 'Cleared']);
+        $user = User::where('user_id', $user_id)->firstOrFail();
+        
+        // Delete all notifications for this user
+        Notification::where('user_id', $user->id)->delete();
+
+        return response()->json(['message' => 'All notifications cleared']);
+    }
+
+    /**
+     * Mark a single notification as read
+     */
+    public function markNotificationRead(Request $request, $notification_id)
+    {
+        $notification = Notification::findOrFail($notification_id);
+        $notification->markAsRead();
+        
+        return response()->json(['message' => 'Notification marked as read']);
+    }
+
+    /**
+     * Delete a single notification
+     */
+    public function deleteNotification(Request $request, $notification_id)
+    {
+        $notification = Notification::findOrFail($notification_id);
+        $notification->delete();
+        
+        return response()->json(['message' => 'Notification deleted']);
     }
 
     public function renameDocument(Request $request, $doc_id)
