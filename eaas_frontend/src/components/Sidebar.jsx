@@ -26,6 +26,7 @@ export default function Sidebar({ role, onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinDirection, setSpinDirection] = useState('');
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   const location = useLocation();
   
   // restore collapse state from localStorage so we remember if sidebar was hidden
@@ -104,7 +105,12 @@ export default function Sidebar({ role, onLogout }) {
 
   return (
     <>
-      <aside className={`${collapsed ? 'w-20' : 'w-64'} hidden md:flex flex-col bg-[#09095C] text-white h-screen sticky top-0 transition-all duration-200 relative`}>        
+      <aside 
+        className={`${collapsed ? 'w-20' : 'w-64'} hidden md:flex flex-col bg-[#09095C] text-white h-screen sticky top-0 transition-all duration-200 relative group`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+      >        
+
         <div className="h-20 flex items-center px-6">
           <div className="flex items-center flex-shrink-0">
             <img
@@ -121,17 +127,15 @@ export default function Sidebar({ role, onLogout }) {
             )}
           </div>
         </div>
-
-        {/* Floating Toggle Button */}
         <button
           onClick={handleToggle}
-          className="absolute -right-6 top-1/2 transform -translate-y-1/2 w-12 h-12 rounded-full bg-[#FDC700] hover:bg-[#FDB700] flex items-center justify-center shadow-lg transition-all duration-200 z-50"
+          className={`absolute right-1 top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-all duration-200 ${sidebarHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} group-hover:opacity-100 group-hover:scale-100`}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? (
-            <ChevronRight size={24} className="text-white" />
+            <ChevronRight size={20} className="text-white" />
           ) : (
-            <ChevronLeft size={24} className="text-white" />
+            <ChevronLeft size={20} className="text-white" />
           )}
         </button>
 
