@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +12,40 @@ use App\Helpers\LogHelper;
 
 class ProfileController extends Controller
 {
+    /**
+     * Create a notification for a user
+     */
+    private function createNotification($userId, $type, $title, $message, $data = null)
+    {
+        return Notification::create([
+            'user_id' => $userId,
+            'type' => $type,
+            'title' => $title,
+            'message' => $message,
+            'data' => $data,
+            'is_read' => false,
+        ]);
+    }
+
+    /**
+     * Create notifications for admin users
+     */
+    private function createAdminNotifications($type, $title, $message, $data = null)
+    {
+        $admins = User::where('role', 'admin')->where('is_active', true)->get();
+        
+        foreach ($admins as $admin) {
+            Notification::create([
+                'user_id' => $admin->id,
+                'type' => $type,
+                'title' => $title,
+                'message' => $message,
+                'data' => $data,
+                'is_read' => false,
+            ]);
+        }
+    }
+
     public function sendOtp(Request $request)
     {
         $userId = $request->input('user_id');
@@ -72,6 +107,7 @@ class ProfileController extends Controller
         }
 
         $newPassword = $request->input('password');
+        $passwordChanged = false;
         if ($newPassword) {
             $oldPassword = $request->input('old_password');
             $otp = $request->input('otp');
@@ -83,6 +119,7 @@ class ProfileController extends Controller
                 }
                 $user->password = Hash::make($newPassword);
                 $user->force_change_password = false;
+                $passwordChanged = true;
                 Cache::forget("otp_{$user->user_id}");
             } elseif ($oldPassword) {
                 if (!Hash::check($oldPassword, $user->password)) {
@@ -90,12 +127,41 @@ class ProfileController extends Controller
                 }
                 $user->password = Hash::make($newPassword);
                 $user->force_change_password = false;
+                $passwordChanged = true;
             } else {
                 return response()->json(['error' => 'Old password or OTP verification is required to set a new password'], 400);
             }
         }
 
         $user->save();
+
+        // Notify employee of profile update
+        $this->createNotification(
+            $user->id,
+            'profile_updated',
+            'Profile Updated',
+            'Your profile information has been updated successfully.',
+            ['updated_fields' => array_keys($request->only(['first_name', 'middle_name', 'last_name', 'contact_no', 'email']))]
+        );
+
+        // Notify employee if password was changed
+        if ($passwordChanged) {
+            $this->createNotification(
+                $user->id,
+                'password_changed',
+                'Password Changed',
+                'Your password has been changed successfully. If you did not make this change, please contact support immediately.',
+                ['changed_at' => now()->toISOString()]
+            );
+        }
+
+        // Notify admins about profile update
+        $this->createAdminNotifications(
+            'user_profile_updated',
+            'User Profile Updated',
+            "User {$user->full_name} ({$user->user_id}) updated their profile.",
+            ['user_id' => $user->id, 'user_name' => $user->full_name]
+        );
 
         LogHelper::log($user->id, 'UPDATE', 'User', "User {$user->user_id} updated their own profile", $user->id);
 
