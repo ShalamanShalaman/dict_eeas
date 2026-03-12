@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useBlocker, useNavigate } from "react-router-dom";
 
+// --- MODALS & ICONS ---
+
 const SuccessModal = ({ isOpen, message, subMessage, onClose, autoCloseDelay }) => {
   useEffect(() => {
     if (isOpen && autoCloseDelay) {
@@ -44,169 +46,44 @@ const AlertModal = ({ isOpen, message, onClose }) => {
 };
 
 const Icon = ({ children, className }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     {children}
   </svg>
 );
 
-const UploadIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
-  </Icon>
+const UploadIcon = ({ className }) => (<Icon className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></Icon>);
+const FileTextIcon = ({ className }) => (<Icon className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></Icon>);
+const DownloadIcon = ({ className }) => (<Icon className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></Icon>);
+const Trash2Icon = ({ className }) => (<Icon className={className}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></Icon>);
+const Edit3Icon = ({ className }) => (<Icon className={className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></Icon>);
+const UserIcon = ({ className }) => (<Icon className={className}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Icon>);
+const BriefcaseIcon = ({ className }) => (<Icon className={className}><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></Icon>);
+const MapPinIcon = ({ className }) => (<Icon className={className}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></Icon>);
+const LayersIcon = ({ className }) => (<Icon className={className}><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></Icon>);
+const BadgeCheckIcon = ({ className }) => (<Icon className={className}><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.78 4.78 4 4 0 0 1-6.74 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" /><path d="m9 12 2 2 4-4" /></Icon>);
+const CalendarIcon = ({ className }) => (<Icon className={className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></Icon>);
+const ListIcon = ({ className }) => (<Icon className={className}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></Icon>);
+const CheckIcon = ({ className }) => (<Icon className={className}><polyline points="20 6 9 17 4 12" /></Icon>);
+const SaveIcon = ({ className }) => (<Icon className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></Icon>);
+const FileSignatureIcon = ({ className }) => (<Icon className={className}><path d="M20 19v2a2 2 0 0 1-2-2V6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8" /><path d="M18 13.5L21.5 10l-4.5-4.5L13.5 9" /><path d="M13.5 9L10 12.5V16h3.5L17 12.5" /></Icon>);
+const FileWarningIcon = ({ className }) => (<Icon className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M12 9v4" /><path d="M12 17h.01" /></Icon>);
+const AlertCircleIcon = ({ className }) => (<Icon className={className}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></Icon>);
+const PlusIcon = ({ className }) => (<Icon className={className}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></Icon>);
+const XIcon = ({ className }) => (<Icon className={className}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon>);
+
+const GripIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <circle cx="9" cy="5" r="1.5" />
+    <circle cx="9" cy="12" r="1.5" />
+    <circle cx="9" cy="19" r="1.5" />
+    <circle cx="15" cy="5" r="1.5" />
+    <circle cx="15" cy="12" r="1.5" />
+    <circle cx="15" cy="19" r="1.5" />
+  </svg>
 );
 
-const FileTextIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
-  </Icon>
-);
 
-const DownloadIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
-  </Icon>
-);
-
-const Trash2Icon = ({ className }) => (
-  <Icon className={className}>
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    <line x1="10" y1="11" x2="10" y2="17" />
-    <line x1="14" y1="11" x2="14" y2="17" />
-  </Icon>
-);
-
-const Edit3Icon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-  </Icon>
-);
-
-const UserIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </Icon>
-);
-
-const BriefcaseIcon = ({ className }) => (
-  <Icon className={className}>
-    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-  </Icon>
-);
-
-const MapPinIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <circle cx="12" cy="10" r="3" />
-  </Icon>
-);
-
-const LayersIcon = ({ className }) => (
-  <Icon className={className}>
-    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-    <polyline points="2 17 12 22 22 17" />
-    <polyline points="2 12 12 17 22 12" />
-  </Icon>
-);
-
-const BadgeCheckIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.78 4.78 4 4 0 0 1-6.74 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
-    <path d="m9 12 2 2 4-4" />
-  </Icon>
-);
-
-const CalendarIcon = ({ className }) => (
-  <Icon className={className}>
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </Icon>
-);
-
-const ListIcon = ({ className }) => (
-    <Icon className={className}>
-        <line x1="8" y1="6" x2="21" y2="6" />
-        <line x1="8" y1="12" x2="21" y2="12" />
-        <line x1="8" y1="18" x2="21" y2="18" />
-        <line x1="3" y1="6" x2="3.01" y2="6" />
-        <line x1="3" y1="12" x2="3.01" y2="12" />
-        <line x1="3" y1="18" x2="3.01" y2="18" />
-    </Icon>
-);
-
-const CheckIcon = ({ className }) => (
-    <Icon className={className}>
-        <polyline points="20 6 9 17 4 12" />
-    </Icon>
-);
-
-const SaveIcon = ({ className }) => (
-    <Icon className={className}>
-        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-        <polyline points="17 21 17 13 7 13 7 21" />
-        <polyline points="7 3 7 8 15 8" />
-    </Icon>
-);
-
-const FileSignatureIcon = ({ className }) => (
-    <Icon className={className}>
-        <path d="M20 19v2a2 2 0 0 1-2-2V6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8" />
-        <path d="M18 13.5L21.5 10l-4.5-4.5L13.5 9" />
-        <path d="M13.5 9L10 12.5V16h3.5L17 12.5" />
-    </Icon>
-);
-
-const FileWarningIcon = ({ className }) => (
-    <Icon className={className}>
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <path d="M12 9v4" />
-        <path d="M12 17h.01" />
-    </Icon>
-);
-
-const AlertCircleIcon = ({ className }) => (
-  <Icon className={className}>
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="12" />
-    <line x1="12" y1="16" x2="12.01" y2="16" />
-  </Icon>
-);
-
-const PlusIcon = ({ className }) => (
-  <Icon className={className}>
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
-  </Icon>
-);
-
-const XIcon = ({ className }) => (
-  <Icon className={className}>
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </Icon>
-);
+// --- MAIN UPLOAD ATTENDANCE COMPONENT ---
 
 export default function UploadAttendance({ onNavigate }) {
   const [file, setFile] = useState(null);
@@ -232,29 +109,18 @@ export default function UploadAttendance({ onNavigate }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
-  );
+  let blocker = { state: 'unblocked' };
+  try {
+    blocker = useBlocker(
+        ({ currentLocation, nextLocation }) =>
+        hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+    );
+  } catch (e) {
+    // Fallback if useBlocker is not available in the current router setup
+  }
 
   const [arMeta, setArMeta] = useState({
-    name: "",
-    adjustmentName: "",
-    position: "",
-    office: "",
-    project: "",
-    approver: "",
-    approverTitle: "PROVINCIAL OFFICER, ISABELA - CAUAYAN II",
-    periodFormat: "full",
-    tasks: {}, 
-    manualHighlights: {},
-    employeeNo: "",
-    controlNo: "",
-    filingDate: "",
-    adjustmentReason: "",
-    adjustmentDetails: "",
-    obWith: "",
-    obAt: "",
+    name: "", adjustmentName: "", position: "", office: "", project: "", approver: "", approverTitle: "PROVINCIAL OFFICER, ISABELA - CAUAYAN II", periodFormat: "full", tasks: {},  manualHighlights: {}, employeeNo: "", controlNo: "", filingDate: "", adjustmentReason: "", adjustmentDetails: "", obWith: "", obAt: "",
     adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" })
   });
 
@@ -382,7 +248,7 @@ export default function UploadAttendance({ onNavigate }) {
   }, [hasUnsavedChanges]);
 
   useEffect(() => {
-    if (blocker.state === "blocked") {
+    if (blocker && blocker.state === "blocked") {
       setPendingAction('navigate');
       setShowConfirmDialog(true);
     }
@@ -545,7 +411,7 @@ export default function UploadAttendance({ onNavigate }) {
         setShowNameModal(false);
         setShowSuccessModal(true);
 
-        if (pendingAction === 'navigate' && blocker.state === "blocked") {
+        if (pendingAction === 'navigate' && blocker?.state === "blocked") {
              blocker.proceed();
         } else {
              setSavedDocId(result.document.id); 
@@ -651,7 +517,7 @@ export default function UploadAttendance({ onNavigate }) {
     
     if (pendingAction === 'clear') {
       handleClearAll();
-    } else if (pendingAction === 'navigate' && blocker.state === "blocked") {
+    } else if (pendingAction === 'navigate' && blocker?.state === "blocked") {
       blocker.proceed();
     } else {
       setHasUnsavedChanges(false);
@@ -661,7 +527,7 @@ export default function UploadAttendance({ onNavigate }) {
 
   const handleCancelConfirm = () => {
     setShowConfirmDialog(false);
-    if (pendingAction === 'navigate' && blocker.state === "blocked") {
+    if (pendingAction === 'navigate' && blocker?.state === "blocked") {
       blocker.reset();
     }
     setPendingAction(null);
@@ -1362,6 +1228,8 @@ export default function UploadAttendance({ onNavigate }) {
   );
 }
 
+// --- SUBCOMPONENTS (DTR Adjustment, Tables, Tools) ---
+
 function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUser }) {
   const handleFieldChange = (field, value) => {
     setArMeta(prev => ({ ...prev, [field]: value }));
@@ -1612,59 +1480,127 @@ const InputCell = ({ day, field, value, onUpdate }) => (
     />
 );
 
-const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReason, setBatchReason, customReason, setCustomReason, isWeekendValid, applyBatch, clearBatchRemarks, className, style }, ref) => (
-  <div ref={ref} className={className} style={style}>
-    <div className="flex items-center justify-between">
-      <div className="text-sm bg-blue-100 text-blue-800 font-bold px-3 py-1.5 rounded-lg whitespace-nowrap">
-        {selectedDays.size} days selected
+const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReason, setBatchReason, customReason, setCustomReason, isWeekendValid, applyBatch, clearBatchRemarks }, ref) => {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const startPos = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = (e) => {
+    // Only drag from the handle to keep forms usable
+    setIsDragging(true);
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    startPos.current = { x: clientX - position.x, y: clientY - position.y };
+  };
+
+  useEffect(() => {
+    const handlePointerMove = (e) => {
+      if (!isDragging) return;
+      if (e.type === 'touchmove') e.preventDefault(); // Prevent scrolling while dragging on touch screens
+      
+      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+      
+      setPosition({
+        x: clientX - startPos.current.x,
+        y: clientY - startPos.current.y
+      });
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handlePointerMove);
+      window.addEventListener('mouseup', handlePointerUp);
+      window.addEventListener('touchmove', handlePointerMove, { passive: false });
+      window.addEventListener('touchend', handlePointerUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+    };
+  }, [isDragging]);
+
+  return (
+    <div 
+        ref={ref} 
+        className={`fixed bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-blue-200 p-4 rounded-xl flex flex-col gap-4 w-[18rem] z-[999999] transition-shadow ${isDragging ? 'shadow-blue-500/30' : ''}`}
+        style={{
+            top: '32px', // Default anchor at top left, it moves from here.
+            left: '32px', 
+            transform: `translate(${position.x}px, ${position.y}px)`,
+            touchAction: 'none' // Ensures touch drag works correctly
+        }}
+    >
+      {/* DRAG HANDLE */}
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3 -mx-2 px-2 -mt-2">
+         <div 
+            className="flex items-center gap-2 text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing w-full py-1"
+            onMouseDown={handlePointerDown}
+            onTouchStart={handlePointerDown}
+            title="Drag to move"
+         >
+            <GripIcon className="w-4 h-4" />
+            <span className="text-[10px] font-bold uppercase tracking-wider select-none">Drag to move</span>
+         </div>
+         <button onClick={() => setSelectedDays(new Set())} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors shrink-0" title="Close">
+             <XIcon className="w-4 h-4" />
+         </button>
       </div>
-      <button onClick={() => setSelectedDays(new Set())} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-md transition-colors" title="Clear selection">
-          <XIcon className="w-4 h-4" />
-      </button>
-    </div>
-    <div className="flex flex-col gap-3">
-        <label className="text-xs text-slate-500 font-semibold uppercase">Merge/Set Reason:</label>
-        <select 
-            value={batchReason}
-            onChange={(e) => setBatchReason(e.target.value)}
-            className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white w-full"
-        >
-            <option value="Saturday">Saturday</option>
-            <option value="Sunday">Sunday</option>
-            <option value="Weekend" disabled={!isWeekendValid}>Weekend (Requires 2 consecutive days)</option>
-            <option value="Work Suspension">Work Suspension</option>
-            <option value="Holiday">Holiday</option>
-            <option value="Sick Leave">Sick Leave</option>
-            <option value="Vacation Leave">Vacation Leave</option>
-            <option value="Others">Others</option>
-        </select>
-        
-        {batchReason === "Others" && (
-            <input 
-                placeholder="Type reason..."
-                value={customReason}
-                onChange={(e) => setCustomReason(e.target.value)}
-                className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-full"
-            />
-        )}
 
-        <button 
-            onClick={applyBatch}
-            className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 shadow-sm transition-colors w-full"
-        >
-            Apply to Selected
-        </button>
+      <div className="text-sm bg-blue-50 text-blue-800 font-bold px-3 py-2 rounded-lg text-center border border-blue-100">
+        {selectedDays.size} {selectedDays.size === 1 ? 'day' : 'days'} selected
+      </div>
 
-        <button 
-            onClick={clearBatchRemarks}
-            className="bg-white border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 shadow-sm transition-colors w-full"
-            title="Remove remarks and restore time columns"
-        >
-            Clear Remarks
-        </button>
+      <div className="flex flex-col gap-3">
+          <label className="text-xs text-slate-500 font-semibold uppercase">Merge/Set Reason:</label>
+          <select 
+              value={batchReason}
+              onChange={(e) => setBatchReason(e.target.value)}
+              className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white w-full"
+          >
+              <option value="Saturday">Saturday</option>
+              <option value="Sunday">Sunday</option>
+              <option value="Weekend" disabled={!isWeekendValid}>Weekend (Requires 2 consecutive days)</option>
+              <option value="Work Suspension">Work Suspension</option>
+              <option value="Holiday">Holiday</option>
+              <option value="Sick Leave">Sick Leave</option>
+              <option value="Vacation Leave">Vacation Leave</option>
+              <option value="Others">Others</option>
+          </select>
+          
+          {batchReason === "Others" && (
+              <input 
+                  placeholder="Type reason..."
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-full"
+              />
+          )}
+
+          <button 
+              onClick={applyBatch}
+              className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 shadow-sm transition-colors w-full"
+          >
+              Apply to Selected
+          </button>
+
+          <button 
+              onClick={clearBatchRemarks}
+              className="bg-white border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 shadow-sm transition-colors w-full"
+              title="Remove remarks and restore time columns"
+          >
+              Clear Remarks
+          </button>
+      </div>
     </div>
-  </div>
-));
+  );
+});
 
 ToolContent.displayName = "ToolContent";
 
@@ -1679,8 +1615,6 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
   const [batchReason, setBatchReason] = useState("Work Suspension");
   const [customReason, setCustomReason] = useState("");
   const tableRef = useRef(null);
-  const toolRef = useRef(null);
-  const [toolStyle, setToolStyle] = useState({ top: -9999, left: 16, opacity: 0, pointerEvents: 'none' });
 
   const toggleDay = (day) => {
     const newSelected = new Set(selectedDays);
@@ -1731,101 +1665,15 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
       setSelectedDays(new Set());
   };
 
-  useEffect(() => {
-    if (selectedDays.size === 0) return;
-
-    const updatePos = () => {
-        if (!tableRef.current) return;
-        const rect = tableRef.current.getBoundingClientRect();
-        const toolHeight = toolRef.current ? toolRef.current.getBoundingClientRect().height : 320; 
-        const stickyOffset = 100;
-        
-        let calculatedTop = Math.max(rect.top, stickyOffset);
-        
-        if (calculatedTop + toolHeight > rect.bottom) {
-            calculatedTop = rect.bottom - toolHeight;
-        }
-        
-        let isVisible = true;
-        if (rect.bottom < stickyOffset || rect.top > window.innerHeight) {
-            isVisible = false;
-        }
-
-        // Adjust positioning logic here to ensure it doesn't overlay the table
-        let calculatedLeft = rect.left - 270;
-        
-        // If there isn't enough space on the left (e.g. less than 16px), 
-        // we force it to hide the floating desktop tool so the mobile/bottom drawer takes over,
-        // OR we can push it to the right side if there's room. 
-        // For simplicity, if space is too tight, we hide the desktop view entirely.
-        if (calculatedLeft < 16) {
-           isVisible = false; 
-        }
-
-        setToolStyle({
-            top: calculatedTop,
-            left: calculatedLeft,
-            opacity: isVisible ? 1 : 0,
-            pointerEvents: isVisible ? 'auto' : 'none'
-        });
-    };
-
-    const mainEl = tableRef.current.closest('main') || document.querySelector('main');
-    if (mainEl) {
-        mainEl.addEventListener('scroll', updatePos, { passive: true });
-    }
-    window.addEventListener('scroll', updatePos, { passive: true });
-    window.addEventListener('resize', updatePos);
-    
-    const timeoutId = setTimeout(updatePos, 0);
-
-    return () => {
-        clearTimeout(timeoutId);
-        if (mainEl) mainEl.removeEventListener('scroll', updatePos);
-        window.removeEventListener('scroll', updatePos);
-        window.removeEventListener('resize', updatePos);
-    };
-  }, [selectedDays.size]);
-
   return (
     <div className="relative w-full" ref={tableRef}>
         {selectedDays.size > 0 && typeof document !== 'undefined' && createPortal(
-            <>
-                <ToolContent 
-                    className="xl:hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex flex-col gap-4 w-[90vw] max-w-md animate-in slide-in-from-bottom-4"
-                    style={{ zIndex: 999999 }}
-                    selectedDays={selectedDays} 
-                    setSelectedDays={setSelectedDays}
-                    batchReason={batchReason} 
-                    setBatchReason={setBatchReason}
-                    customReason={customReason} 
-                    setCustomReason={setCustomReason}
-                    isWeekendValid={isWeekendValid}
-                    applyBatch={applyBatch}
-                    clearBatchRemarks={clearBatchRemarks}
-                />
-
-                <ToolContent 
-                    ref={toolRef}
-                    className="hidden xl:flex fixed bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex-col gap-4 w-[16rem] transition-opacity duration-75"
-                    style={{ 
-                        zIndex: 999999, 
-                        top: `${toolStyle.top}px`, 
-                        left: `${toolStyle.left}px`, 
-                        opacity: toolStyle.opacity, 
-                        pointerEvents: toolStyle.pointerEvents 
-                    }}
-                    selectedDays={selectedDays} 
-                    setSelectedDays={setSelectedDays}
-                    batchReason={batchReason} 
-                    setBatchReason={setBatchReason}
-                    customReason={customReason} 
-                    setCustomReason={setCustomReason}
-                    isWeekendValid={isWeekendValid}
-                    applyBatch={applyBatch}
-                    clearBatchRemarks={clearBatchRemarks}
-                />
-            </>,
+            <ToolContent 
+                selectedDays={selectedDays} setSelectedDays={setSelectedDays}
+                batchReason={batchReason} setBatchReason={setBatchReason}
+                customReason={customReason} setCustomReason={setCustomReason}
+                isWeekendValid={isWeekendValid} applyBatch={applyBatch} clearBatchRemarks={clearBatchRemarks}
+            />,
             document.body
         )}
 
@@ -1952,8 +1800,6 @@ function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMet
 
   const handleChange = (e, day) => {
       let value = e.target.value;
-      
-      const cursorPosition = e.target.selectionStart;
       
       const lines = value.split('\n');
       let modified = false;

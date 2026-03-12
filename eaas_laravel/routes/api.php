@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\MessageController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -68,3 +69,12 @@ Route::post('/generate-dtr-adjustment', [AttendanceController::class, 'generateD
 Route::post('/download-dtr-pdf', [AttendanceController::class, 'downloadDtrPdf']);
 Route::post('/generate-ar-pdf', [AttendanceController::class, 'generateArPdf']);
 Route::post('/generate-pdf', [AttendanceController::class, 'generatePdf']);
+
+Route::post('/messages/send', [MessageController::class, 'sendMessage']);
+Route::get('/messages/{user_id}', [MessageController::class, 'getMessages']);
+Route::get('/messages/sent/{user_id}', [MessageController::class, 'getSentMessages']);
+Route::put('/messages/{message_id}/read', [MessageController::class, 'markAsRead']);
+Route::post('/messages/mark-read/{user_id}', [MessageController::class, 'markAllAsRead']);
+Route::delete('/messages/{message_id}', [MessageController::class, 'deleteMessage']);
+Route::get('/messages/unread/{user_id}', [MessageController::class, 'getUnreadCount']);
+Route::get('/messages/users/{user_id}', [MessageController::class, 'getUsers']);

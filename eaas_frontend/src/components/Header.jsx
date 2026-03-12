@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { User, Settings, Key, Bell, HelpCircle } from "lucide-react";
+import { User, Settings, Key, Bell, HelpCircle, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "./NotificationDropdown";
+import MessageDropdown from "./MessageDropdown";
 
 export default function Header({ role, setRole, user, onLogout }) {
   const canToggleRoles = user && (user.role === 'admin' || user.role === 'hr');
   
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const navigate = useNavigate();
 
   const userName = user?.full_name || user?.name || user?.username || "User";
@@ -22,10 +25,11 @@ export default function Header({ role, setRole, user, onLogout }) {
     setImageHash(Date.now());
   }, [user]);
 
-  // Fetch unread notification count on mount
+  // Fetch unread notification and message count on mount
   useEffect(() => {
     if (user?.user_id) {
       fetchUnreadCount();
+      fetchUnreadMessageCount();
     }
   }, [user?.user_id]);
 
@@ -43,8 +47,26 @@ export default function Header({ role, setRole, user, onLogout }) {
     }
   };
 
+  const fetchUnreadMessageCount = async () => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/messages/unread/${user.user_id}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadMessageCount(data.unread_count || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch unread message count:", err);
+    }
+  };
+
   const handleUnreadCountChange = (count) => {
     setUnreadNotificationCount(count);
+  };
+
+  const handleMessageUnreadCountChange = (count) => {
+    setUnreadMessageCount(count);
   };
 
   const handleNavigate = (tab) => {
@@ -54,7 +76,14 @@ export default function Header({ role, setRole, user, onLogout }) {
 
   const handleNotificationClick = () => {
     setShowDropdown(false);
-    setShowNotifications(true);
+    setShowMessages(false); // Close messages if open
+    setShowNotifications(!showNotifications);
+  };
+
+  const handleMessagesClick = () => {
+    setShowDropdown(false);
+    setShowNotifications(false); // Close notifications if open
+    setShowMessages(!showMessages);
   };
 
   return (
@@ -87,7 +116,7 @@ export default function Header({ role, setRole, user, onLogout }) {
         {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
           <div className="relative">
             <button
-              onClick={() => setShowNotifications(!showNotifications)}
+              onClick={handleNotificationClick}
               className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200"
               title="Notifications"
             >
@@ -110,9 +139,40 @@ export default function Header({ role, setRole, user, onLogout }) {
           </div>
         )}
 
+        {/* Message Icon - Show for employees, reviewers, and admins */}
+        {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
+          <div className="relative">
+            <button
+              onClick={handleMessagesClick}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200"
+              title="Messages"
+            >
+              <MessageSquare size={20} />
+            </button>
+            {/* Unread message count badge */}
+            {unreadMessageCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+              </span>
+            )}
+            
+            <MessageDropdown 
+              user={user}
+              isOpen={showMessages}
+              onClose={() => setShowMessages(false)}
+              onUnreadCountChange={handleMessageUnreadCountChange}
+            />
+          </div>
+        )}
+
+        {/* Profile Dropdown */}
         <div className="relative">
           <button
-            onClick={() => setShowDropdown(!showDropdown)}
+            onClick={() => {
+              setShowNotifications(false);
+              setShowMessages(false);
+              setShowDropdown(!showDropdown);
+            }}
             className="flex items-center gap-2 px-2 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
           >
             {user?.profile_picture ? (

@@ -8,7 +8,6 @@ import {
   Clock,
   Archive,
   Users,
-  Layers,
   Shield,
   LogOut,
   Save,
@@ -138,6 +137,7 @@ export default function Sidebar({ role, onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinDirection, setSpinDirection] = useState('');
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({
     general: true,
     myDocuments: true,
@@ -237,7 +237,6 @@ export default function Sidebar({ role, onLogout }) {
         items: [
           { label: "User Management", icon: Users, path: "/users" },
           { label: "System Audits", icon: Shield, path: "/audits" },
-          { label: "Templates", icon: Layers, path: "/templates" },
         ]
       });
     }
@@ -256,7 +255,11 @@ export default function Sidebar({ role, onLogout }) {
 
   return (
     <>
-      <aside className={`${collapsed ? 'w-20' : 'w-64'} hidden md:flex flex-col bg-[#09095C] text-white h-screen sticky top-0 transition-all duration-200 relative z-50`}>
+      <aside 
+        className={`${collapsed ? 'w-20' : 'w-64'} hidden md:flex flex-col bg-[#09095C] text-white h-screen sticky top-0 transition-all duration-200 relative group z-50`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+      >
         <div className="h-20 flex items-center px-6 shrink-0 border-b border-white/10">
           <div className="flex items-center flex-shrink-0">
             <img
@@ -274,16 +277,16 @@ export default function Sidebar({ role, onLogout }) {
           </div>
         </div>
 
-        {/* Floating Toggle Button */}
+        {/* Retractable UI Toggle Button */}
         <button
           onClick={handleToggle}
-          className="absolute -right-6 top-1/2 transform -translate-y-1/2 w-12 h-12 rounded-full bg-[#FDC700] hover:bg-[#FDB700] flex items-center justify-center shadow-lg transition-all duration-200 z-50"
+          className={`absolute ${collapsed ? '-right-3 border border-gray-400/50 bg-[#09095C]' : 'right-1'} top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-all duration-200 ${sidebarHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} group-hover:opacity-100 group-hover:scale-100 z-50`}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? (
-            <ChevronRight size={24} className="text-white" />
+            <ChevronRight size={20} className="text-white" />
           ) : (
-            <ChevronLeft size={24} className="text-white" />
+            <ChevronLeft size={20} className="text-white" />
           )}
         </button>
 
@@ -292,10 +295,10 @@ export default function Sidebar({ role, onLogout }) {
             <div key={category.id} className="mb-2">
               {!collapsed && (
                 <div 
-                  className="px-6 py-2 flex items-center justify-between cursor-pointer group"
+                  className="px-6 py-2 flex items-center justify-between cursor-pointer group/cat"
                   onClick={() => toggleCategory(category.id)}
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50 group-hover:text-white/70 transition-colors">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/50 group-hover/cat:text-white/70 transition-colors">
                     {category.title}
                   </span>
                   {expandedCategories[category.id] ? (
@@ -314,7 +317,7 @@ export default function Sidebar({ role, onLogout }) {
                       key={label}
                       to={path}
                       title={collapsed ? label : undefined}
-                      className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-6'} py-2.5 text-sm transition-all duration-200 relative group ${
+                      className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-6'} py-2.5 text-sm transition-all duration-200 relative group/item ${
                         isActive
                           ? "bg-white/10 text-white font-semibold"
                           : "text-white/70 hover:bg-white/5 hover:text-white"
