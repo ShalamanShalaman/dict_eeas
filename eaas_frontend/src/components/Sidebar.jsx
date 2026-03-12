@@ -129,7 +129,7 @@ export default function Sidebar({ role, onLogout }) {
         </div>
         <button
           onClick={handleToggle}
-          className={`absolute right-1 top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-all duration-200 ${sidebarHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} group-hover:opacity-100 group-hover:scale-100`}
+className={`absolute ${collapsed ? '-right-3 border border-gray-400/50' : 'right-1'} top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-all duration-200 ${sidebarHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} group-hover:opacity-100 group-hover:scale-100`}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? (
