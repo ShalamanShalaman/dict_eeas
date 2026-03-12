@@ -268,6 +268,12 @@ function DashboardHome({ user, onNavigate }) {
   const [stats, setStats] = useState({ total: 0, draft: 0, submitted: 0, approved: 0, declined: 0 });
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [imageHash, setImageHash] = useState(() => Date.now());
+
+  useEffect(() => {
+    // Update hash whenever the user object changes (like after a profile picture upload)
+    setImageHash(Date.now());
+  }, [user]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -384,9 +390,21 @@ function DashboardHome({ user, onNavigate }) {
           
           <div className="space-y-5">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white shadow-md">
+              {user?.profile_picture ? (
+                <img 
+                  key={imageHash}
+                  src={`http://127.0.0.1:8000/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-full object-cover border-2 border-indigo-600 shadow-md"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div className={`w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-400 flex items-center justify-center text-purple-900 font-bold text-2xl shadow-md ${user?.profile_picture ? 'hidden' : ''}`}>
                 <span className="text-2xl font-bold">
-                  {user?.first_name?.charAt(0) || 'U'}{user?.last_name?.charAt(0) || ''}
+                  {user?.first_name?.charAt(0).toUpperCase() || 'U'}
                 </span>
               </div>
               <div>
