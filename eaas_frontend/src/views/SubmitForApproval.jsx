@@ -154,12 +154,23 @@ export default function SubmitForApproval({ user, onNavigate }) {
   useEffect(() => {
     const fetchReviewers = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/document/reviewers');
-        if (response.ok) {
+        const response = await fetch('http://127.0.0.1:8000/api/document/reviewers', {
+          headers: { 'Accept': 'application/json' }
+        });
+        const contentType = response.headers.get('content-type');
+        if (response.ok && contentType && contentType.includes('application/json')) {
           const data = await response.json();
-          setReviewers(data);
-          if (data.length === 1 && !selectedReviewerId) {
-            setSelectedReviewerId(data[0].id.toString());
+          
+          const filteredData = data.filter(r => r.id !== user?.id && r.user_id !== user?.user_id);
+          setReviewers(filteredData);
+          
+          if (!selectedReviewerId) {
+            const defaultReviewer = filteredData.find(r => r.office_location === user?.office_name);
+            if (defaultReviewer) {
+              setSelectedReviewerId(defaultReviewer.id.toString());
+            } else if (filteredData.length === 1) {
+              setSelectedReviewerId(filteredData[0].id.toString());
+            }
           }
         }
       } catch (err) {
@@ -168,8 +179,10 @@ export default function SubmitForApproval({ user, onNavigate }) {
         setLoadingReviewers(false);
       }
     };
-    fetchReviewers();
-  }, [selectedReviewerId]);
+    if (user) {
+      fetchReviewers();
+    }
+  }, [user, selectedReviewerId]);
 
   const handleFileSelect = (e) => {
     const newFiles = Array.from(e.target.files);
@@ -210,6 +223,16 @@ export default function SubmitForApproval({ user, onNavigate }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const handleJsonResponse = async (response) => {
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Non-JSON response from server:', text);
+      throw new Error('Server returned an unexpected response format. Check the browser console.');
+    }
+    return await response.json();
+  };
+
   const handleConvertToPDF = async () => {
     if (files.length === 0) {
       setError("Please attach at least one file");
@@ -230,22 +253,16 @@ export default function SubmitForApproval({ user, onNavigate }) {
 
       const uploadResponse = await fetch('http://127.0.0.1:8000/api/document/upload-attachments', {
         method: 'POST',
+        headers: {
+          'Accept': 'application/json'
+        },
         body: formData
       });
 
-      let uploadResult;
-      const contentType = uploadResponse.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        uploadResult = await uploadResponse.json();
-      } else {
-        const text = await uploadResponse.text();
-        console.error('Non-JSON response:', text);
-        setError('Server error: The server returned an invalid response.');
-        return;
-      }
+      const uploadResult = await handleJsonResponse(uploadResponse);
 
       if (!uploadResponse.ok) {
-        setError(uploadResult.error || 'Failed to convert files to PDF');
+        setError(uploadResult.message || uploadResult.error || 'Failed to convert files to PDF');
         return;
       }
 
@@ -260,8 +277,6 @@ export default function SubmitForApproval({ user, onNavigate }) {
       let errorMessage = err.message;
       if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
         errorMessage = 'Failed to connect to the server. Please ensure the backend is running.';
-      } else if (err.message && err.message.includes('network')) {
-        errorMessage = 'Network error. Please check your internet connection and ensure the backend is running.';
       }
       setError('Error: ' + errorMessage);
     } finally {
@@ -290,10 +305,13 @@ export default function SubmitForApproval({ user, onNavigate }) {
 
       const submitResponse = await fetch(`http://127.0.0.1:8000/api/document/submit/${convertedDocumentId}`, {
         method: 'POST',
+        headers: {
+          'Accept': 'application/json'
+        },
         body: submitFormData
       });
 
-      const submitResult = await submitResponse.json();
+      const submitResult = await handleJsonResponse(submitResponse);
 
       if (submitResponse.ok) {
         const selectedReviewer = reviewers.find(r => r.id.toString() === selectedReviewerId);
@@ -303,15 +321,13 @@ export default function SubmitForApproval({ user, onNavigate }) {
         setShowSuccessModal(true);
         resetForm();
       } else {
-        setError(submitResult.error || 'Failed to submit document to reviewer');
+        setError(submitResult.message || submitResult.error || 'Failed to submit document to reviewer');
       }
     } catch (err) {
       console.error("Full error:", err);
       let errorMessage = err.message;
       if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
         errorMessage = 'Failed to connect to the server. Please ensure the backend is running.';
-      } else if (err.message && err.message.includes('network')) {
-        errorMessage = 'Network error. Please check your internet connection and ensure the backend is running.';
       }
       setError('Error: ' + errorMessage);
     } finally {
@@ -326,7 +342,13 @@ export default function SubmitForApproval({ user, onNavigate }) {
     setConvertedFilePath(null);
     setConvertedFileName(null);
     setCustomFileName('');
-    setSelectedReviewerId(reviewers.length === 1 ? reviewers[0].id.toString() : '');
+    setSelectedReviewerId('');
+    const defaultReviewer = reviewers.find(r => r.office_location === user?.office_name);
+    if (defaultReviewer) {
+      setSelectedReviewerId(defaultReviewer.id.toString());
+    } else if (reviewers.length === 1) {
+      setSelectedReviewerId(reviewers[0].id.toString());
+    }
     setError(null);
     setSuccessMessage(null);
     sessionStorage.removeItem(CACHE_KEY);
@@ -346,6 +368,7 @@ export default function SubmitForApproval({ user, onNavigate }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ 
           filename: customFileName.trim(),
@@ -353,7 +376,7 @@ export default function SubmitForApproval({ user, onNavigate }) {
         })
       });
 
-      const result = await response.json();
+      const result = await handleJsonResponse(response);
 
       if (response.ok) {
         const newFilename = result.document.file_path.split(/[/\\]/).pop();
@@ -363,10 +386,11 @@ export default function SubmitForApproval({ user, onNavigate }) {
         setSuccessMessage("File renamed successfully!");
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        setError(result.error || 'Failed to rename file');
+        setError(result.message || result.error || 'Failed to rename file');
       }
     } catch (err) {
-      setError('Failed to rename file. Please try again.');
+      console.error("Rename Error:", err);
+      setError('Failed to rename file. ' + err.message);
     } finally {
       setRenaming(false);
     }
@@ -637,6 +661,7 @@ export default function SubmitForApproval({ user, onNavigate }) {
                 </div>
               </div>
 
+              {/* Rename File Section */}
               <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                 <p className="text-sm font-medium text-indigo-700 mb-2">Rename PDF File (Optional)</p>
                 <div className="flex items-center gap-2">

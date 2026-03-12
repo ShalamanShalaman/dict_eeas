@@ -1,5 +1,51 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Activity, Search, Shield, Download, RefreshCw, Filter, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Activity, Search, Shield, Download, RefreshCw, Filter, ChevronLeft, ChevronRight, Calendar, Eye, FileText } from 'lucide-react';
+
+const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <h3 className="font-semibold text-slate-800 truncate pr-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            {title || 'Document Viewer'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 bg-slate-100 relative">
+          {documentId ? (
+            <iframe
+              src={`http://127.0.0.1:8000/api/document/view/${documentId}`}
+              className="w-full h-full border-0"
+              title="PDF Viewer"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 mb-4">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <p className="mt-2 text-sm">No document selected</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const SystemAudits = () => {
   const [logs, setLogs] = useState([]);
@@ -15,6 +61,8 @@ const SystemAudits = () => {
   const [newLogsCount, setNewLogsCount] = useState(0);
   const [referenceLength, setReferenceLength] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
 
   const fetchLogs = useCallback(async (isInitial = false) => {
     if (!isInitial) setIsRefreshing(true);
@@ -70,9 +118,10 @@ const SystemAudits = () => {
     const act = action?.toUpperCase() || '';
     if (['CREATE', 'APPROVE'].includes(act)) return 'bg-green-100 text-green-800 border-green-200';
     if (['DELETE', 'DECLINE'].includes(act)) return 'bg-red-100 text-red-800 border-red-200';
-    if (['UPDATE', 'SUBMIT', 'UPLOAD'].includes(act)) return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (['UPDATE', 'SUBMIT', 'UPLOAD', 'UPLOAD_REVIEW'].includes(act)) return 'bg-blue-100 text-blue-800 border-blue-200';
     if (['LOGIN', 'AUTH'].includes(act)) return 'bg-purple-100 text-purple-800 border-purple-200';
     if (['GENERATE', 'EXPORT'].includes(act)) return 'bg-amber-100 text-amber-800 border-amber-200';
+    if (['RENAME'].includes(act)) return 'bg-indigo-100 text-indigo-800 border-indigo-200';
     return 'bg-slate-100 text-slate-800 border-slate-200';
   };
 
@@ -143,6 +192,119 @@ const SystemAudits = () => {
 
   const uniqueActions = ['ALL', ...new Set(logs.map(log => log.action.toUpperCase()))];
   const uniqueRoles = ['ALL', 'Admin', 'Reviewer', 'Employee', 'System'];
+
+  const handleViewDocument = (docId) => {
+    setViewPdfModal({
+      isOpen: true,
+      docId: docId,
+      title: `Audit Reference - Document #${docId}`
+    });
+  };
+
+  // Function to highlight specific text patterns in the details
+  const HighlightedDetails = ({ text }) => {
+    if (!text) return null;
+
+    // Split the text by single quotes to find filenames
+    const parts = text.split(/('[^']+')/g);
+    
+    return (
+      <>
+        {parts.map((part, index) => {
+          // If it's a quoted string (like a filename)
+          if (part.startsWith("'") && part.endsWith("'")) {
+            return (
+              <span key={index} className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded font-mono text-xs text-indigo-700">
+                {part.slice(1, -1)}
+              </span>
+            );
+          }
+          
+          // Match patterns like "User ADMIN001", "Reviewer: John Doe", "submitted by Jane Doe"
+          let processedPart = part;
+          
+          // Match "User [ID or Name]"
+          const userRegex = /(User |User\s)([A-Z0-9-]+|\b[A-Z][a-z]+ [A-Z][a-z]+\b)/g;
+          // Match "Reviewer: [Name]"
+          const reviewerRegex = /(Reviewer:\s)(.+?)(?=[.,]|$)/g;
+          // Match "submitted by [Name]"
+          const submittedByRegex = /(submitted by\s)(.+?)(?=[.,]|$)/g;
+
+          const fragments = [];
+          let lastIndex = 0;
+
+          // Helper to process regex matches and push them into fragments array
+          const processMatch = (regex, type) => {
+            let match;
+            const tempRegex = new RegExp(regex); // Reset regex state
+            while ((match = tempRegex.exec(processedPart)) !== null) {
+              // Add text before the match
+              if (match.index > lastIndex) {
+                fragments.push(processedPart.substring(lastIndex, match.index));
+              }
+              // Add the matched prefix (e.g., "User ", "Reviewer: ")
+              fragments.push(match[1]);
+              // Add the highlighted name/ID
+              fragments.push(
+                <span key={`${type}-${index}-${match.index}`} className="font-semibold text-slate-800 bg-slate-100 px-1 py-0.5 rounded">
+                  {match[2]}
+                </span>
+              );
+              lastIndex = tempRegex.lastIndex;
+            }
+          };
+
+          // Prioritize matches. We'll do a simple sequential pass for now, assuming they don't heavily overlap
+          let finalElements = [];
+          
+          // A bit hacky, but simpler for React rendering without complex AST parsing:
+          // We'll replace the target strings with a unique token, then split by that token.
+          let tempString = part;
+          const replacements = [];
+
+          const storeReplacement = (prefix, name) => {
+            const token = `__HL_${replacements.length}__`;
+            replacements.push({
+              token,
+              prefix,
+              name,
+            });
+            return token;
+          };
+
+          tempString = tempString.replace(userRegex, (match, p1, p2) => storeReplacement(p1, p2));
+          tempString = tempString.replace(reviewerRegex, (match, p1, p2) => storeReplacement(p1, p2));
+          tempString = tempString.replace(submittedByRegex, (match, p1, p2) => storeReplacement(p1, p2));
+
+          if (replacements.length > 0) {
+             const splitRegex = new RegExp(`(${replacements.map(r => r.token).join('|')})`, 'g');
+             const splitParts = tempString.split(splitRegex);
+             
+             return (
+               <React.Fragment key={index}>
+                 {splitParts.map((sp, i) => {
+                   const replacement = replacements.find(r => r.token === sp);
+                   if (replacement) {
+                     return (
+                       <React.Fragment key={i}>
+                         {replacement.prefix}
+                         <span className="font-semibold text-slate-900 bg-slate-200/50 px-1 rounded-sm">
+                           {replacement.name}
+                         </span>
+                       </React.Fragment>
+                     );
+                   }
+                   return <span key={i}>{sp}</span>;
+                 })}
+               </React.Fragment>
+             );
+          }
+
+          return <span key={index}>{part}</span>;
+        })}
+      </>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 animate-in fade-in duration-300">
@@ -262,31 +424,48 @@ const SystemAudits = () => {
                   </td>
                 </tr>
               ) : (
-                paginatedLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-6 py-3.5 text-xs text-slate-500 font-mono whitespace-nowrap">
-                      {formatDate(log.created_at)}
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <div className="font-medium text-slate-800">{log.user_name || 'System'}</div>
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
-                        {formatRole(log.user_role)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${getActionStyle(log.action)}`}>
-                        {log.action}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <span className="font-medium text-slate-700">{log.entity_type}</span>
-                      {log.entity_id && <span className="text-slate-400 text-xs ml-1 block mt-0.5">ID: #{log.entity_id}</span>}
-                    </td>
-                    <td className="px-6 py-3.5 text-slate-600 leading-relaxed">
-                      {log.details}
-                    </td>
-                  </tr>
-                ))
+                paginatedLogs.map((log) => {
+                  const isDocumentAction = log.entity_type === 'Document' && log.entity_id;
+                  const isDeleted = log.action === 'DELETE' || log.details.includes('deleted');
+
+                  return (
+                    <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-3.5 text-xs text-slate-500 font-mono whitespace-nowrap align-top">
+                        {formatDate(log.created_at)}
+                      </td>
+                      <td className="px-6 py-3.5 align-top">
+                        <div className="font-medium text-slate-800">{log.user_name || 'System'}</div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
+                          {formatRole(log.user_role)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3.5 align-top">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${getActionStyle(log.action)}`}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3.5 align-top">
+                        <span className="font-medium text-slate-700">{log.entity_type}</span>
+                        {log.entity_id && <span className="text-slate-400 text-xs ml-1 block mt-0.5 font-mono">ID: #{log.entity_id}</span>}
+                      </td>
+                      <td className="px-6 py-3.5 text-slate-600 leading-relaxed align-top">
+                        <div className="flex flex-col gap-2">
+                            <span><HighlightedDetails text={log.details} /></span>
+                            
+                            {isDocumentAction && !isDeleted && (
+                                <button 
+                                    onClick={() => handleViewDocument(log.entity_id)}
+                                    className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 hover:bg-indigo-100 self-start px-2.5 py-1.5 rounded-lg border border-indigo-100 mt-1"
+                                >
+                                    <FileText className="w-3.5 h-3.5" />
+                                    View Referenced Document
+                                </button>
+                            )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -318,6 +497,13 @@ const SystemAudits = () => {
           </div>
         </div>
       </div>
+
+      <PDFViewerModal
+        isOpen={viewPdfModal.isOpen}
+        onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
+        documentId={viewPdfModal.docId}
+        title={viewPdfModal.title}
+      />
     </div>
   );
 };

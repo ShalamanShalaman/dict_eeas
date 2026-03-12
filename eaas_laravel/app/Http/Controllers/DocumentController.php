@@ -28,25 +28,6 @@ class DocumentController extends Controller
         ]);
     }
 
-    /**
-     * Create notifications for admin users
-     */
-    private function createAdminNotifications($type, $title, $message, $data = null)
-    {
-        $admins = \App\Models\User::where('role', 'admin')->where('is_active', true)->get();
-        
-        foreach ($admins as $admin) {
-            Notification::create([
-                'user_id' => $admin->id,
-                'type' => $type,
-                'title' => $title,
-                'message' => $message,
-                'data' => $data,
-                'is_read' => false,
-            ]);
-        }
-    }
-
     private function runPythonScript($action, $data)
     {
         $pythonDirName = 'eaas_python';
@@ -142,7 +123,7 @@ class DocumentController extends Controller
             'is_draft' => true
         ]);
 
-        LogHelper::log($user->id, 'CREATE', 'Document', "User uploaded a draft document", $doc->id);
+        LogHelper::log($user->id, 'CREATE', 'Document', "User uploaded a new draft document: '{$filename}'", $doc->id);
         return response()->json(['message' => 'Document uploaded as draft', 'document' => $doc->toArray()], 201);
     }
 
@@ -178,7 +159,9 @@ class DocumentController extends Controller
             ['document_name' => basename($doc->file_path)]
         );
 
-        LogHelper::log($user->id, 'UPDATE', 'Document', "User autosaved draft #{$doc->id}", $doc->id);
+        $filename = basename($doc->file_path);
+        LogHelper::log($user->id, 'UPDATE', 'Document', "User autosaved draft document: '{$filename}'", $doc->id);
+        
         return response()->json(['message' => 'Draft autosaved', 'document' => $doc->toArray()]);
     }
 
@@ -216,15 +199,9 @@ class DocumentController extends Controller
             ['employee_name' => $user->full_name, 'document_name' => basename($doc->file_path)]
         );
 
-        // Notify admins about new document submission
-        $this->createAdminNotifications(
-            'document_submitted',
-            'New Document Submitted',
-            "{$user->full_name} submitted a document for review.",
-            ['employee_name' => $user->full_name, 'document_id' => $doc->id, 'document_name' => basename($doc->file_path)]
-        );
-
-        LogHelper::log($user->id, 'SUBMIT', 'Document', "User submitted document #{$doc->id}", $doc->id);
+        $filename = basename($doc->file_path);
+        LogHelper::log($user->id, 'SUBMIT', 'Document', "User submitted document '{$filename}' for approval to Reviewer: {$reviewer->full_name}", $doc->id);
+        
         return response()->json(['message' => 'Document submitted', 'document' => $doc->toArray()]);
     }
 
@@ -237,6 +214,9 @@ class DocumentController extends Controller
         if ($doc->reviewer_id !== $reviewer->id) return response()->json(['error' => 'Unauthorized'], 403);
 
         $action = $request->input('action') ?? $request->input('status');
+        $filename = basename($doc->file_path);
+        $employeeName = $doc->employee ? $doc->employee->full_name : 'Unknown Employee';
+
         if (in_array($action, ['approve', 'approved'])) {
             $doc->status = 'approved';
             $doc->reviewed_at = now();
@@ -249,19 +229,12 @@ class DocumentController extends Controller
                 'Document Approved',
                 "Your document has been approved by {$reviewer->full_name}.",
                 $doc->id,
-                ['reviewer_name' => $reviewer->full_name, 'document_name' => basename($doc->file_path)]
+                ['reviewer_name' => $reviewer->full_name, 'document_name' => $filename]
             );
 
-            // Notify admins about document approval
-            $this->createAdminNotifications(
-                'document_approved',
-                'Document Approved',
-                "{$reviewer->full_name} approved a document from {$doc->employee->full_name}.",
-                ['reviewer_name' => $reviewer->full_name, 'employee_name' => $doc->employee->full_name, 'document_id' => $doc->id]
-            );
-
-            LogHelper::log($reviewer->id, 'APPROVE', 'Document', "Reviewer approved document #{$doc->id}", $doc->id);
+            LogHelper::log($reviewer->id, 'APPROVE', 'Document', "Reviewer approved document '{$filename}' submitted by {$employeeName}.", $doc->id);
             return response()->json(['message' => 'Document approved', 'document' => $doc->toArray()]);
+            
         } elseif (in_array($action, ['decline', 'declined'])) {
             $reason = $request->input('reason') ?? $request->input('note', '');
             $doc->status = 'declined';
@@ -276,20 +249,13 @@ class DocumentController extends Controller
                 'Document Declined',
                 "Your document has been declined by {$reviewer->full_name}. Reason: {$reason}",
                 $doc->id,
-                ['reviewer_name' => $reviewer->full_name, 'document_name' => basename($doc->file_path), 'reason' => $reason]
+                ['reviewer_name' => $reviewer->full_name, 'document_name' => $filename, 'reason' => $reason]
             );
 
-            // Notify admins about document decline
-            $this->createAdminNotifications(
-                'document_declined',
-                'Document Declined',
-                "{$reviewer->full_name} declined a document from {$doc->employee->full_name}. Reason: {$reason}",
-                ['reviewer_name' => $reviewer->full_name, 'employee_name' => $doc->employee->full_name, 'document_id' => $doc->id, 'reason' => $reason]
-            );
-
-            LogHelper::log($reviewer->id, 'DECLINE', 'Document', "Reviewer declined document #{$doc->id}", $doc->id);
+            LogHelper::log($reviewer->id, 'DECLINE', 'Document', "Reviewer declined document '{$filename}' submitted by {$employeeName}. Reason: {$reason}", $doc->id);
             return response()->json(['message' => 'Document declined', 'document' => $doc->toArray()]);
         }
+        
         return response()->json(['error' => 'Invalid action'], 400);
     }
 
@@ -326,9 +292,16 @@ class DocumentController extends Controller
     public function deleteDocument(Request $request, $doc_id)
     {
         $doc = Document::findOrFail($doc_id);
+        $filename = basename($doc->file_path);
+        $userId = $request->input('user_id');
+
         if ($doc->file_path) Storage::disk('public')->delete($doc->file_path);
         if ($doc->review_file_path) Storage::disk('public')->delete($doc->review_file_path);
+        
         $doc->delete();
+
+        LogHelper::log($userId, 'DELETE', 'Document', "This file has been deleted: '{$filename}'", $doc_id);
+        
         return response()->json(['message' => 'Document deleted']);
     }
 
@@ -375,17 +348,21 @@ class DocumentController extends Controller
         $doc->reviewed_at = now();
         $doc->save();
 
+        $filename = basename($doc->file_path);
+        $employeeName = $doc->employee ? $doc->employee->full_name : 'Unknown Employee';
+
         // Create notification for the employee (document approved with reviewed file)
         $this->createNotification(
             $doc->employee_id,
             'approved',
-            'Document Approved',
+            'Document Approved & Signed',
             "Your document has been reviewed and approved by {$reviewer->full_name}.",
             $doc->id,
-            ['reviewer_name' => $reviewer->full_name, 'document_name' => basename($doc->file_path)]
+            ['reviewer_name' => $reviewer->full_name, 'document_name' => $filename]
         );
 
-        LogHelper::log($reviewer->id, 'UPLOAD_REVIEW', 'Document', "Reviewer uploaded reviewed document #{$doc->id}", $doc->id);
+        LogHelper::log($reviewer->id, 'UPLOAD_REVIEW', 'Document', "Reviewer uploaded a signed copy for document '{$filename}' submitted by {$employeeName}.", $doc->id);
+        
         return response()->json(['message' => 'Uploaded', 'document' => $doc->toArray()], 200);
     }
 
@@ -471,13 +448,20 @@ class DocumentController extends Controller
         if (!$newFilename) return response()->json(['error' => 'Required'], 400);
         if (!str_ends_with(strtolower($newFilename), '.pdf')) $newFilename .= '.pdf';
 
+        $oldFilename = basename($doc->file_path);
+
         if ($doc->file_path && Storage::disk('public')->exists($doc->file_path)) {
             $dir = dirname($doc->file_path);
             $newPath = $dir . '/' . uniqid() . '_' . $newFilename;
             Storage::disk('public')->move($doc->file_path, $newPath);
             $doc->file_path = $newPath;
             $doc->save();
+            
+            $userId = $request->input('user_id');
+            $newFilenameBase = basename($newPath);
+            LogHelper::log($userId, 'RENAME', 'Document', "Document renamed from '{$oldFilename}' to '{$newFilenameBase}'", $doc->id);
         }
+        
         return response()->json(['message' => 'Renamed', 'document' => $doc->toArray(), 'file_path' => ltrim($doc->file_path, '/')]);
     }
 
@@ -488,7 +472,7 @@ class DocumentController extends Controller
             $user = User::where('user_id', $userId)->firstOrFail();
             
             // Allow both 'files' and 'files[]' naming conventions
-            if (!$request->hasFile('files') && !$request->hasFile('files[]')) {
+            if (!$request->hasFile('files') && (!$request->hasFile('files[]'))) {
                 return response()->json(['error' => 'No files uploaded'], 400);
             }
 
@@ -536,7 +520,7 @@ class DocumentController extends Controller
                 'is_draft' => true
             ]);
 
-            LogHelper::log($user->id, 'CREATE', 'Document', "Merged attachments into document #{$doc->id}", $doc->id);
+            LogHelper::log($user->id, 'CREATE', 'Document', "Merged attachments into a new PDF document: '{$outputFilename}'", $doc->id);
 
             return response()->json([
                 'message' => 'Converted', 

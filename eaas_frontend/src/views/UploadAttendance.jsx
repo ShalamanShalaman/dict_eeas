@@ -11,8 +11,8 @@ const SuccessModal = ({ isOpen, message, subMessage, onClose, autoCloseDelay }) 
   }, [isOpen, autoCloseDelay, onClose]);
 
   if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50" onClick={onClose} style={{ zIndex: 999999 }}>
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ zIndex: 999999 }}>
       <div className="bg-white p-6 rounded-xl text-center shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
         <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
@@ -21,14 +21,15 @@ const SuccessModal = ({ isOpen, message, subMessage, onClose, autoCloseDelay }) 
         <p className="text-sm text-gray-500 mb-4">{subMessage}</p>
         <button onClick={onClose} className="w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors">Close</button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
 const AlertModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50" onClick={onClose} style={{ zIndex: 999999 }}>
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ zIndex: 999999 }}>
       <div className="bg-white p-6 rounded-xl text-center shadow-xl max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertCircleIcon className="w-6 h-6" />
@@ -37,7 +38,8 @@ const AlertModal = ({ isOpen, message, onClose }) => {
         <p className="text-sm text-gray-500 mb-6">{message}</p>
         <button onClick={onClose} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">Okay, got it</button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -971,7 +973,7 @@ export default function UploadAttendance({ onNavigate }) {
   };
 
   return (
-    <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen relative pb-32 z-[90]">
+    <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen pb-32">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
           <FileTextIcon className="w-6 h-6 text-blue-600" />
@@ -1263,9 +1265,9 @@ export default function UploadAttendance({ onNavigate }) {
         </div>
       )}
 
-      {showConfirmDialog && (
-        <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 999999 }}>
-          <div className="absolute inset-0 bg-black/50" onClick={handleCancelConfirm}></div>
+      {showConfirmDialog && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center z-[999999]">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleCancelConfirm}></div>
           
           <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="text-center">
@@ -1300,19 +1302,20 @@ export default function UploadAttendance({ onNavigate }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {showNameModal && (
-        <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 999999 }}>
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowNameModal(false)}></div>
+      {showNameModal && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center z-[999999]">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowNameModal(false)}></div>
           <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Save Draft</h3>
             <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Draft Name</label>
                 <input 
                   type="text" 
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-50 outline-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value)}
                   onKeyDown={(e) => { 
@@ -1339,7 +1342,8 @@ export default function UploadAttendance({ onNavigate }) {
                 </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <SuccessModal
@@ -1747,8 +1751,16 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
             isVisible = false;
         }
 
+        // Adjust positioning logic here to ensure it doesn't overlay the table
         let calculatedLeft = rect.left - 270;
-        if (calculatedLeft < 16) calculatedLeft = 16; 
+        
+        // If there isn't enough space on the left (e.g. less than 16px), 
+        // we force it to hide the floating desktop tool so the mobile/bottom drawer takes over,
+        // OR we can push it to the right side if there's room. 
+        // For simplicity, if space is too tight, we hide the desktop view entirely.
+        if (calculatedLeft < 16) {
+           isVisible = false; 
+        }
 
         setToolStyle({
             top: calculatedTop,
@@ -1780,7 +1792,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
         {selectedDays.size > 0 && typeof document !== 'undefined' && createPortal(
             <>
                 <ToolContent 
-                    className="md:hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex flex-col gap-4 w-[90vw] animate-in slide-in-from-bottom-4"
+                    className="xl:hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex flex-col gap-4 w-[90vw] max-w-md animate-in slide-in-from-bottom-4"
                     style={{ zIndex: 999999 }}
                     selectedDays={selectedDays} 
                     setSelectedDays={setSelectedDays}
@@ -1795,7 +1807,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
 
                 <ToolContent 
                     ref={toolRef}
-                    className="hidden md:flex fixed bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex-col gap-4 w-[16rem] transition-opacity duration-75"
+                    className="hidden xl:flex fixed bg-white shadow-2xl border border-blue-200 p-4 rounded-xl flex-col gap-4 w-[16rem] transition-opacity duration-75"
                     style={{ 
                         zIndex: 999999, 
                         top: `${toolStyle.top}px`, 

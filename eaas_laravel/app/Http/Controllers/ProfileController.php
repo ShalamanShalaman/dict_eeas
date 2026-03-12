@@ -27,25 +27,6 @@ class ProfileController extends Controller
         ]);
     }
 
-    /**
-     * Create notifications for admin users
-     */
-    private function createAdminNotifications($type, $title, $message, $data = null)
-    {
-        $admins = User::where('role', 'admin')->where('is_active', true)->get();
-        
-        foreach ($admins as $admin) {
-            Notification::create([
-                'user_id' => $admin->id,
-                'type' => $type,
-                'title' => $title,
-                'message' => $message,
-                'data' => $data,
-                'is_read' => false,
-            ]);
-        }
-    }
-
     public function sendOtp(Request $request)
     {
         $userId = $request->input('user_id');
@@ -154,14 +135,6 @@ class ProfileController extends Controller
                 ['changed_at' => now()->toISOString()]
             );
         }
-
-        // Notify admins about profile update
-        $this->createAdminNotifications(
-            'user_profile_updated',
-            'User Profile Updated',
-            "User {$user->full_name} ({$user->user_id}) updated their profile.",
-            ['user_id' => $user->id, 'user_name' => $user->full_name]
-        );
 
         LogHelper::log($user->id, 'UPDATE', 'User', "User {$user->user_id} updated their own profile", $user->id);
 

@@ -69,11 +69,17 @@ export default function AttachFiles({ user, onSubmit, onClose }) {
         const response = await fetch('http://127.0.0.1:8000/api/document/reviewers');
         if (response.ok) {
           const data = await response.json();
-          setReviewers(data);
           
-          // Auto-select the first reviewer if only one exists
-          if (data.length === 1) {
-            setSelectedReviewerId(data[0].id.toString());
+          const filteredData = data.filter(r => r.id !== user?.id && r.user_id !== user?.user_id);
+          setReviewers(filteredData);
+          
+          if (!selectedReviewerId) {
+            const defaultReviewer = filteredData.find(r => r.office_location === user?.office_name);
+            if (defaultReviewer) {
+              setSelectedReviewerId(defaultReviewer.id.toString());
+            } else if (filteredData.length === 1) {
+              setSelectedReviewerId(filteredData[0].id.toString());
+            }
           }
         }
       } catch (err) {
@@ -83,8 +89,10 @@ export default function AttachFiles({ user, onSubmit, onClose }) {
       }
     };
 
-    fetchReviewers();
-  }, []);
+    if (user) {
+      fetchReviewers();
+    }
+  }, [user, selectedReviewerId]);
 
   const handleFileSelect = (e) => {
     const newFiles = Array.from(e.target.files);
@@ -291,7 +299,7 @@ export default function AttachFiles({ user, onSubmit, onClose }) {
             <select
               value={selectedReviewerId}
               onChange={(e) => setSelectedReviewerId(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-50 outline-none text-sm"
             >
               <option value="">-- Select a Reviewer --</option>
               {reviewers.map(reviewer => (
