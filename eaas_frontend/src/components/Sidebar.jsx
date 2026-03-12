@@ -13,14 +13,32 @@ import {
   LogOut,
   User,
   Save,
-  Shield
+  Shield,
+  Menu,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
 
 export default function Sidebar({ role, onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
+  const [collapsed, setCollapsed] = useState(false);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [spinDirection, setSpinDirection] = useState('');
   const location = useLocation();
+  
+  // restore collapse state from localStorage so we remember if sidebar was hidden
+  useEffect(() => {
+    const stored = localStorage.getItem('sidebarCollapsed');
+    if (stored !== null) {
+      setCollapsed(stored === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', collapsed);
+  }, [collapsed]);
   
   useEffect(() => {
     const handleStorageChange = (e) => {
@@ -73,16 +91,49 @@ export default function Sidebar({ role, onLogout }) {
   };
   const handleCancelLogout = () => setShowLogoutConfirm(false);
 
+  const handleToggle = () => {
+    setIsSpinning(true);
+    setSpinDirection(!collapsed ? 'logo-spin-counter-clockwise' : 'logo-spin-clockwise');
+    setCollapsed(!collapsed);
+    setTimeout(() => setIsSpinning(false), 200);
+  };
+
   const initials = user.first_name && user.last_name 
     ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase() 
     : "U";
 
   return (
     <>
-      <aside className="w-64 hidden md:flex flex-col bg-[rgb(28,26,136)] text-white h-screen sticky top-0">
-        <div className="h-20 flex items-center px-6 border-b border-white/10">
-          <img src="/images/dict-logo.png" alt="DICT Logo" className="h-10 w-auto" />
+      <aside className={`${collapsed ? 'w-20' : 'w-64'} hidden md:flex flex-col bg-[#09095C] text-white h-screen sticky top-0 transition-all duration-200 relative`}>        
+        <div className="h-20 flex items-center px-6">
+          <div className="flex items-center flex-shrink-0">
+            <img
+              src="/images/dict_logo.png"
+              alt="DICT Logo"
+              className={`h-10 max-w-full w-auto object-contain ${isSpinning ? spinDirection : ''}`}
+            />
+            {!collapsed && (
+              <img
+                src="/images/dict_logo2.png"
+                alt="DICT Text"
+                className="h-12 max-w-full w-auto ml-2 object-contain"
+              />
+            )}
+          </div>
         </div>
+
+        {/* Floating Toggle Button */}
+        <button
+          onClick={handleToggle}
+          className="absolute -right-6 top-1/2 transform -translate-y-1/2 w-12 h-12 rounded-full bg-[#FDC700] hover:bg-[#FDB700] flex items-center justify-center shadow-lg transition-all duration-200 z-50"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? (
+            <ChevronRight size={24} className="text-white" />
+          ) : (
+            <ChevronLeft size={24} className="text-white" />
+          )}
+        </button>
 
         <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
           {currentMenu.map(({ label, icon: Icon, path }) => {
@@ -91,7 +142,7 @@ export default function Sidebar({ role, onLogout }) {
               <Link
                 key={label}
                 to={path}
-                className={`w-full flex items-center gap-3 px-6 py-3 text-sm transition-all duration-200 relative group ${
+                className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-6'} py-3 text-sm transition-all duration-200 relative group ${
                   isActive
                     ? "bg-white/10 text-white font-semibold"
                     : "text-white/70 hover:bg-white/5 hover:text-white"
@@ -101,20 +152,19 @@ export default function Sidebar({ role, onLogout }) {
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-400 rounded-r"></div>
                 )}
                 <Icon size={18} className={isActive ? "text-yellow-400" : ""} />
-                <span>{label}</span>
+                <span className={`${collapsed ? 'hidden' : ''}`}>{label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/10 bg-[rgb(28,26,136)]">
+        <div className="p-4 bg-[#09095C]">
           <button
             onClick={handleLogoutClick}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold
-                       bg-red-600/90 hover:bg-red-600 text-white rounded-lg shadow-sm transition-colors"
+            className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center' : 'px-4'} py-3 text-sm font-semibold bg-red-600/90 hover:bg-red-600 text-white rounded-lg shadow-sm transition-colors`}
           >
             <LogOut size={18} />
-            Logout
+            {!collapsed && 'Logout'}
           </button>
         </div>
       </aside>

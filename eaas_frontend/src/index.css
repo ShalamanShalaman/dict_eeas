@@ -23,3 +23,30 @@ body {
   color: #2563eb;
   border-right: 3px solid #2563eb;
 }
+
+/* Logo spin animations */
+@keyframes spin-clockwise {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-counter-clockwise {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.logo-spin-clockwise {
+  animation: spin-clockwise 0.2s ease-in-out;
+}
+
+.logo-spin-counter-clockwise {
+  animation: spin-counter-clockwise 0.2s ease-in-out;
+}
