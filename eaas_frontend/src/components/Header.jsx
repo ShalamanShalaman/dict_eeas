@@ -83,8 +83,8 @@ export default function Header({ role, setRole, user, onLogout }) {
           </div>
         )}
 
-        {/* Notification Bell - Show for employees */}
-        {user?.role === 'employee' && (
+        {/* Notification Bell - Show for employees, reviewers, and admins */}
+        {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
