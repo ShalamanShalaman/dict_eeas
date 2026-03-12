@@ -124,10 +124,11 @@ export default function Sidebar({ role, onLogout }) {
         onClose={handleCancelLogout}
         onConfirm={handleConfirmLogout}
         title="Log Out"
-        message="Are you sure you want to log out?"
+        message="Are you sure you want to log out of your account?"
         confirmText="Log Out"
         cancelText="Cancel"
         confirmVariant="danger"
+        user={user}
       />
     </>
   );
