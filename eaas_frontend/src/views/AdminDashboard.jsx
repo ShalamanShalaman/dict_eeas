@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const PlusIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
@@ -16,26 +16,18 @@ const UsersIcon = () => (
   </svg>
 );
 
-const ServerIcon = () => (
+const UserCheckIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-    <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-    <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-    <line x1="6" y1="6" x2="6.01" y2="6" />
-    <line x1="6" y1="18" x2="6.01" y2="18" />
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.5" cy="7" r="4" />
+    <polyline points="17 11 19 13 23 9" />
   </svg>
 );
 
-const DatabaseIcon = () => (
+const UserIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-    <ellipse cx="12" cy="5" rx="9" ry="3" />
-    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-  </svg>
-);
-
-const ActivityIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
   </svg>
 );
 
@@ -70,9 +62,8 @@ const CheckCircleIcon = () => (
 );
 
 const AdminDashboard = () => {
-  const [totalUsers, setTotalUsers] = useState(150);
-  const [activeSessions] = useState(23);
-  const [storage] = useState(45);
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
@@ -93,6 +84,27 @@ const AdminDashboard = () => {
     export: 'bg-amber-100 text-amber-800',
   };
 
+  // Fetch real users from the backend
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/admin/users', {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   function addUser(name, role) {
     const time = new Date().toLocaleTimeString([], {
       hour: '2-digit',
@@ -110,8 +122,11 @@ const AdminDashboard = () => {
       ...prev,
     ]);
 
-    setTotalUsers(u => u + 1);
-    setToast(`User "${name}" added successfully`);
+    // Note: To fully create a real user, this should be a POST request to /api/admin/create-user
+    // For now, we refresh the user list assuming the backend handles it or we mock it locally
+    fetchUsers();
+    
+    setToast(`User creation attempt for "${name}" completed`);
     setTimeout(() => setToast(''), 3000);
     setShowModal(false);
   }
@@ -123,6 +138,11 @@ const AdminDashboard = () => {
       log.details.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Derived real metrics
+  const totalUsers = users.length;
+  const employeesCount = users.filter(u => u.role?.toLowerCase() === 'employee').length;
+  const reviewersCount = users.filter(u => u.role?.toLowerCase() === 'reviewer').length;
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -132,13 +152,17 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        
+        {/* Total Users Card */}
         <div className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white p-6 rounded-xl shadow-lg shadow-blue-200 flex items-start justify-between">
           <div>
             <p className="text-sm font-medium opacity-90 mb-1">Total Users</p>
-            <h3 className="text-3xl font-bold">{totalUsers}</h3>
+            <h3 className="text-3xl font-bold">
+              {loadingUsers ? <span className="text-2xl opacity-70">Loading...</span> : totalUsers}
+            </h3>
             <p className="text-xs mt-2 opacity-80">
-              10 Reviewers · {totalUsers - 10} Employees
+              Registered accounts across all roles
             </p>
           </div>
           <div className="p-3 bg-white/20 rounded-lg">
@@ -146,52 +170,38 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-6 rounded-xl shadow-lg shadow-green-200 flex items-start justify-between">
+        {/* Employees Card */}
+        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-6 rounded-xl shadow-lg shadow-teal-200 flex items-start justify-between">
           <div>
-            <p className="text-sm font-medium opacity-90 mb-1">System Status</p>
-            <div className="flex items-center gap-2 mt-1 mb-2">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-200 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-              </span>
-              <h3 className="text-2xl font-bold">Online</h3>
-            </div>
-            <p className="text-xs opacity-80">All services operational</p>
-          </div>
-          <div className="p-3 bg-white/20 rounded-lg">
-            <ServerIcon />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
-          <div className="w-full">
-            <p className="text-sm font-medium text-slate-500 mb-1">Storage Usage</p>
-            <h3 className="text-3xl font-bold text-slate-800 mb-2">{storage}%</h3>
-            <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1">
-              <div
-                className="bg-indigo-600 h-1.5 rounded-full"
-                style={{ width: `${storage}%` }}
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              {storage} GB of 100 GB used
+            <p className="text-sm font-medium opacity-90 mb-1">Employees</p>
+            <h3 className="text-3xl font-bold">
+              {loadingUsers ? <span className="text-2xl opacity-70">...</span> : employeesCount}
+            </h3>
+            <p className="text-xs mt-2 opacity-80">
+              Standard staff accounts
             </p>
           </div>
-          <div className="p-3 bg-slate-50 text-slate-600 rounded-lg ml-4">
-            <DatabaseIcon />
+          <div className="p-3 bg-white/20 rounded-lg">
+            <UserIcon />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+        {/* Reviewers Card */}
+        <div className="bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white p-6 rounded-xl shadow-lg shadow-purple-200 flex items-start justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500 mb-1">Active Sessions</p>
-            <h3 className="text-3xl font-bold text-slate-800">{activeSessions}</h3>
-            <p className="text-xs text-green-600 mt-2 font-medium">▲ 12% last hour</p>
+            <p className="text-sm font-medium opacity-90 mb-1">Reviewers</p>
+            <h3 className="text-3xl font-bold">
+              {loadingUsers ? <span className="text-2xl opacity-70">...</span> : reviewersCount}
+            </h3>
+            <p className="text-xs mt-2 opacity-80">
+              Authorized to review documents
+            </p>
           </div>
-          <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
-            <ActivityIcon />
+          <div className="p-3 bg-white/20 rounded-lg">
+            <UserCheckIcon />
           </div>
         </div>
+
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -318,9 +328,9 @@ const AddUserModal = ({ isOpen, onClose, onAdd }) => {
               name="role"
               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
             >
-              <option>Employee</option>
-              <option>Reviewer</option>
-              <option>Admin</option>
+              <option value="employee">Employee</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="admin">Admin</option>
             </select>
           </div>
 

@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
 use App\Helpers\LogHelper;
 
 class AdminController extends Controller
@@ -200,6 +201,53 @@ class AdminController extends Controller
             'force_change_password' => true
         ]);
 
+        // Send Email to the new user with their credentials
+        $emailSent = false;
+        try {
+            $emailContent = "
+            <div style=\"font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);\">
+                <div style=\"text-align: center; margin-bottom: 25px;\">
+                    <h2 style=\"color: #4f46e5; margin: 0; font-size: 24px;\">Welcome to DICT-EAAS!</h2>
+                </div>
+                
+                <p style=\"font-size: 16px;\">Greetings <strong>{$user->first_name}</strong>,</p>
+                
+                <p style=\"font-size: 16px;\">Your new account has been successfully created for the <strong>Employee Attendance and Accomplishment System (DICT-EAAS)</strong>.</p>
+                
+                <p style=\"font-size: 16px;\">Below are your official temporary login credentials:</p>
+                
+                <div style=\"background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 20px; border-radius: 8px; margin: 25px 0;\">
+                    <p style=\"margin: 0 0 15px 0; font-size: 16px;\">
+                        <strong style=\"display: inline-block; width: 90px;\">User ID:</strong> 
+                        <span style=\"font-family: monospace; background: #e2e8f0; padding: 6px 10px; border-radius: 6px; color: #1e293b; font-size: 18px; font-weight: bold;\">{$user->user_id}</span>
+                    </p>
+                    <p style=\"margin: 0; font-size: 16px;\">
+                        <strong style=\"display: inline-block; width: 90px;\">Password:</strong> 
+                        <span style=\"font-family: monospace; background: #e2e8f0; padding: 6px 10px; border-radius: 6px; color: #1e293b; font-size: 18px; font-weight: bold;\">{$tempPassword}</span>
+                    </p>
+                </div>
+                
+                <p style=\"color: #b91c1c; font-size: 14px; background-color: #fef2f2; padding: 12px; border-left: 4px solid #ef4444; border-radius: 4px;\">
+                    <strong>Important:</strong> Please log in and change your password immediately upon your first login for your own security.
+                </p>
+                
+                <p style=\"margin-top: 35px; font-size: 14px; color: #64748b; border-top: 1px solid #e5e7eb; padding-top: 20px;\">
+                    Best regards,<br>
+                    <strong>DICT-EAAS Admin Team</strong>
+                </p>
+            </div>
+            ";
+
+            Mail::html($emailContent, function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Welcome to DICT-EAAS - Your Account Credentials');
+            });
+            $emailSent = true;
+        } catch (\Exception $e) {
+            error_log("Failed to send welcome email to {$user->email}: " . $e->getMessage());
+            // Email failure won't stop the user creation process
+        }
+
         // Only notify admins about new user registrations
         $this->createAdminNotification(
             'user_registered',
@@ -217,12 +265,14 @@ class AdminController extends Controller
         error_log(" Role     : " . ucfirst($user->role));
         error_log(" User ID  : " . $user->user_id);
         error_log(" Password : " . $tempPassword);
+        error_log(" Email Sent: " . ($emailSent ? 'Yes' : 'No'));
         error_log("=======================================================\n");
 
         return response()->json([
-            'message' => 'User created', 
+            'message' => 'User created successfully', 
             'user' => $user->toArray(),
-            'generated_password' => $tempPassword 
+            'generated_password' => $tempPassword,
+            'email_sent' => $emailSent
         ], 201);
     }
 

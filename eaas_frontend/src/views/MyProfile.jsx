@@ -76,7 +76,10 @@ export default function MyProfile() {
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
-  const [phoneVerified, setPhoneVerified] = useState(false); 
+  
+  // Replaced phoneVerified with emailVerified for the new email OTP flow
+  const [emailVerified, setEmailVerified] = useState(true); 
+  const [verifiedProfileOtp, setVerifiedProfileOtp] = useState(""); // Holds the OTP to pass on final save
 
   const [usingOtpForPassword, setUsingOtpForPassword] = useState(false);
   const [passwordResetOtp, setPasswordResetOtp] = useState("");
@@ -106,8 +109,14 @@ export default function MyProfile() {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
     
-    if (field === "contact_no" && profile && value !== profile.contact_no) {
-        setPhoneVerified(false);
+    // Trigger verification requirement if they change their email
+    if (field === "email" && profile && value !== profile.email) {
+        setEmailVerified(false);
+        setVerifiedProfileOtp(""); // Reset any previously verified OTP
+    } else if (field === "email" && profile && value === profile.email) {
+        // If they revert back to original email, it is automatically verified
+        setEmailVerified(true);
+        setVerifiedProfileOtp("");
     }
   };
 
@@ -131,6 +140,7 @@ export default function MyProfile() {
     setIsEditing(false);
     setUsingOtpForPassword(false);
     setPasswordResetOtp("");
+    setVerifiedProfileOtp("");
     if (profile) {
       setFormData({
         first_name: profile.first_name || "",
@@ -141,7 +151,7 @@ export default function MyProfile() {
         password: "",
         old_password: ""
       });
-      setPhoneVerified(true); 
+      setEmailVerified(true); 
     }
     setHasUnsavedChanges(false);
   };
@@ -168,8 +178,8 @@ export default function MyProfile() {
   };
 
   const handleSendOtp = async () => {
-    if (!formData.contact_no) {
-        setUiModal({ show: true, type: 'error', title: 'Error', message: 'Please enter a phone number first.' });
+    if (!formData.email) {
+        setUiModal({ show: true, type: 'error', title: 'Error', message: 'Please enter an email address first.' });
         return;
     }
 
@@ -177,21 +187,31 @@ export default function MyProfile() {
     try {
         const response = await fetch('http://127.0.0.1:8000/api/profile/send-otp', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({ 
                 user_id: profile.user_id,
-                contact_no: formData.contact_no 
+                email: formData.email 
             })
         });
 
-        if (!response.ok) throw new Error("Failed to send OTP");
+        let data;
+        try {
+            data = await response.json(); 
+        } catch (parseError) {
+            throw new Error(`Server Error (${response.status}): The backend returned HTML instead of JSON.`);
+        }
+
+        if (!response.ok) {
+            throw new Error(data.error || data.message || "Failed to send OTP"); 
+        }
         
-        const data = await response.json();
         setOtpModalOpen(true);
-        console.log("OTP Sent:", data.debug_otp); 
         
     } catch (err) {
-        setUiModal({ show: true, type: 'error', title: 'Error', message: 'Could not send verification code.' });
+        setUiModal({ show: true, type: 'error', title: 'Mail Error', message: err.message });
     } finally {
         setOtpLoading(false);
     }
@@ -202,33 +222,42 @@ export default function MyProfile() {
     try {
         const response = await fetch('http://127.0.0.1:8000/api/profile/verify-otp', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({ 
                 user_id: profile.user_id,
                 otp: otpCode 
             })
         });
 
-        const data = await response.json();
+        let data;
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            throw new Error(`Server Error (${response.status}): The backend returned HTML instead of JSON.`);
+        }
         
         if (response.ok) {
-            setPhoneVerified(true);
+            setEmailVerified(true);
+            setVerifiedProfileOtp(otpCode); // Store to pass to handleSave
             setOtpModalOpen(false);
             setOtpCode("");
-            setUiModal({ show: true, type: 'success', title: 'Verified', message: 'Phone number verified successfully!' });
+            setUiModal({ show: true, type: 'success', title: 'Verified', message: 'Email verified successfully! Don\'t forget to click Save Changes.' });
         } else {
-            setUiModal({ show: true, type: 'error', title: 'Error', message: data.error || 'Invalid Code' });
+            setUiModal({ show: true, type: 'error', title: 'Error', message: data.error || data.message || 'Invalid Code' });
         }
     } catch (err) {
-        setUiModal({ show: true, type: 'error', title: 'Error', message: 'Verification failed.' });
+        setUiModal({ show: true, type: 'error', title: 'Error', message: err.message || 'Verification failed.' });
     } finally {
         setOtpLoading(false);
     }
   };
 
   const handleStartPasswordReset = async () => {
-      if (!profile.contact_no) {
-          setUiModal({ show: true, type: 'error', title: 'No Phone Number', message: 'You need a registered phone number to reset your password via SMS.' });
+      if (!profile.email) {
+          setUiModal({ show: true, type: 'error', title: 'No Email', message: 'You need a registered email address to reset your password.' });
           return;
       }
 
@@ -236,24 +265,34 @@ export default function MyProfile() {
       try {
           const response = await fetch('http://127.0.0.1:8000/api/profile/send-otp', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+              },
               body: JSON.stringify({ 
                   user_id: profile.user_id,
-                  contact_no: profile.contact_no 
+                  email: profile.email 
               })
           });
 
-          if (!response.ok) throw new Error("Failed to send OTP");
+          let data;
+          try {
+              data = await response.json(); 
+          } catch (parseError) {
+              throw new Error(`Server Error (${response.status}): The backend returned HTML instead of JSON.`);
+          }
+
+          if (!response.ok) {
+              throw new Error(data.error || data.message || "Failed to send OTP");
+          }
           
-          const data = await response.json();
           setUsingOtpForPassword(true);
           setFormData(prev => ({ ...prev, old_password: "" }));
-          console.log("Password Reset OTP:", data.debug_otp);
           
-          setUiModal({ show: true, type: 'success', title: 'Code Sent', message: `Verification code sent to ${profile.contact_no}. Check your console.` });
+          setUiModal({ show: true, type: 'success', title: 'Code Sent', message: `Verification code sent to ${profile.email}.` });
 
       } catch (err) {
-          setUiModal({ show: true, type: 'error', title: 'Error', message: 'Could not send verification code.' });
+          setUiModal({ show: true, type: 'error', title: 'Mail Error', message: err.message });
       } finally {
           setResetOtpLoading(false);
       }
@@ -263,7 +302,6 @@ export default function MyProfile() {
       setUsingOtpForPassword(false);
       setPasswordResetOtp("");
   };
-
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -282,10 +320,21 @@ export default function MyProfile() {
       }
 
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/profile/${publicId}`);
-        if (!response.ok) throw new Error("Failed to fetch profile");
+        const response = await fetch(`http://127.0.0.1:8000/api/profile/${publicId}`, {
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
         
-        const data = await response.json();
+        let data;
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            throw new Error(`Server Error (${response.status}): Could not load profile.`);
+        }
+
+        if (!response.ok) throw new Error(data.error || data.message || "Failed to fetch profile");
+        
         setProfile(data);
         
         setFormData({
@@ -297,12 +346,12 @@ export default function MyProfile() {
             password: "",
             old_password: ""
         });
-        setPhoneVerified(!!data.contact_no);
+        setEmailVerified(true);
         setHasUnsavedChanges(false);
         setIsEditing(false); 
       } catch (err) {
         console.error(err);
-        setUiModal({ show: true, type: 'error', title: 'Error', message: 'Failed to load profile data.' });
+        setUiModal({ show: true, type: 'error', title: 'Error', message: err.message || 'Failed to load profile data.' });
       } finally {
         setLoading(false);
       }
@@ -326,13 +375,18 @@ export default function MyProfile() {
     e.preventDefault();
     if (!profile) return;
 
+    if (!emailVerified) {
+        setUiModal({ show: true, type: 'error', title: 'Verification Required', message: 'Please verify your new email address before saving.' });
+        return;
+    }
+
     if (formData.password) {
         if (!usingOtpForPassword && !formData.old_password) {
             setUiModal({ show: true, type: 'error', title: 'Authentication Required', message: 'Please enter your old password or use the "Forgot Password" option.' });
             return;
         }
         if (usingOtpForPassword && !passwordResetOtp) {
-             setUiModal({ show: true, type: 'error', title: 'Authentication Required', message: 'Please enter the verification code sent to your phone.' });
+             setUiModal({ show: true, type: 'error', title: 'Authentication Required', message: 'Please enter the verification code sent to your email.' });
              return;
         }
     }
@@ -347,6 +401,11 @@ export default function MyProfile() {
             contact_no: formData.contact_no,
         };
 
+        // Attach OTP if they verified an email change OR if they are resetting password
+        if (verifiedProfileOtp) {
+            payload.otp = verifiedProfileOtp;
+        }
+
         if (formData.password) {
             payload.password = formData.password;
             
@@ -359,14 +418,22 @@ export default function MyProfile() {
 
         const response = await fetch(`http://127.0.0.1:8000/api/profile/${profile.public_id}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
             body: JSON.stringify(payload)
         });
 
-        const result = await response.json();
+        let result;
+        try {
+            result = await response.json();
+        } catch (parseError) {
+             throw new Error(`Server Error (${response.status}): Failed to save changes.`);
+        }
 
         if (!response.ok) {
-            throw new Error(result.error || "Update failed");
+            throw new Error(result.error || result.message || "Update failed");
         }
 
         setProfile(result.user);
@@ -376,6 +443,7 @@ export default function MyProfile() {
         setFormData(prev => ({ ...prev, password: "", old_password: "" }));
         setUsingOtpForPassword(false);
         setPasswordResetOtp("");
+        setVerifiedProfileOtp("");
         setHasUnsavedChanges(false);
         setIsEditing(false);
         
@@ -404,7 +472,6 @@ export default function MyProfile() {
 
   const handlePictureSelect = (e) => {
     const file = e.target.files?.[0];
-    console.log("File selected:", file);
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
@@ -430,7 +497,6 @@ export default function MyProfile() {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      console.log("Preview set");
       setProfilePicturePreview(reader.result);
       setSelectedFile(file);
     };
@@ -438,32 +504,32 @@ export default function MyProfile() {
   };
 
   const handleUploadPicture = async (file) => {
-    console.log("Upload started. File:", file, "Profile:", profile);
-    if (!file || !profile) {
-      console.log("Missing file or profile");
-      return;
-    }
+    if (!file || !profile) return;
 
     setUploadingPicture(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      console.log("Sending to:", `http://127.0.0.1:8000/api/profile/${profile.public_id}/upload-picture`);
       const response = await fetch(`http://127.0.0.1:8000/api/profile/${profile.public_id}/upload-picture`, {
         method: 'POST',
+        headers: {
+            'Accept': 'application/json'
+        },
         body: formData
       });
 
-      console.log("Response status:", response.status);
-      const result = await response.json();
-      console.log("Response data:", result);
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Upload failed');
+      let result;
+      try {
+          result = await response.json();
+      } catch (parseError) {
+          throw new Error(`Server Error (${response.status}): Failed to upload picture.`);
       }
 
-      console.log("Upload successful, updating profile");
+      if (!response.ok) {
+        throw new Error(result.error || result.message || 'Upload failed');
+      }
+
       setProfile(result.user);
       localStorage.setItem("user", JSON.stringify(result.user));
       window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }));
@@ -471,7 +537,6 @@ export default function MyProfile() {
       setSelectedFile(null);
       setPictureInputKey(prev => prev + 1);
       
-      // Update image hash to bypass cache
       setImageHash(Date.now());
       
       setUiModal({
@@ -481,7 +546,6 @@ export default function MyProfile() {
         message: 'Profile picture uploaded successfully!'
       });
     } catch (err) {
-      console.error("Upload error:", err);
       setUiModal({
         show: true,
         type: 'error',
@@ -499,13 +563,21 @@ export default function MyProfile() {
     setUploadingPicture(true);
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/profile/${profile.public_id}/picture`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+            'Accept': 'application/json'
+        }
       });
 
-      const result = await response.json();
+      let result;
+      try {
+          result = await response.json();
+      } catch (parseError) {
+          throw new Error(`Server Error (${response.status}): Failed to delete picture.`);
+      }
 
       if (!response.ok) {
-        throw new Error(result.error || 'Delete failed');
+        throw new Error(result.error || result.message || 'Delete failed');
       }
 
       setProfile(result.user || profile);
@@ -513,7 +585,6 @@ export default function MyProfile() {
       window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user || profile }));
       setProfilePicturePreview(null);
       
-      // Update image hash to bypass cache
       setImageHash(Date.now());
       
       setUiModal({
@@ -830,7 +901,7 @@ export default function MyProfile() {
                         ) : (
                           <>
                             <Save className="w-4 h-4" />
-                            Save Changes
+                            Save Picture
                           </>
                         )}
                       </button>
@@ -892,43 +963,30 @@ export default function MyProfile() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-600">Email</label>
-                  <input
-                    type="email"
-                    required
-                    id="email"
-                    disabled={!isEditing}
-                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
-                    value={formData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
-                  />
-                </div>
-                
-                <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-600 flex items-center justify-between">
-                    <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> Contact No.</span>
-                    {isEditing && !phoneVerified && formData.contact_no && (
+                    <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> Email</span>
+                    {isEditing && !emailVerified && formData.email && (
                         <span className="text-xs text-amber-600 font-semibold flex items-center gap-1">
                             Unverified
                         </span>
                     )}
-                    {phoneVerified && formData.contact_no && (
+                    {emailVerified && formData.email && (
                          <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
                             <CheckCircle className="w-3 h-3" /> Verified
                         </span>
                     )}
                   </label>
                   <div className="relative flex gap-2">
-                    <input 
-                        type="text"
-                        id="contact_no"
-                        disabled={!isEditing}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
-                        value={formData.contact_no}
-                        onChange={(e) => handleInputChange("contact_no", e.target.value)}
-                        placeholder="09XX XXX XXXX"
+                    <input
+                      type="email"
+                      required
+                      id="email"
+                      disabled={!isEditing}
+                      className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
+                      value={formData.email}
+                      onChange={(e) => handleInputChange("email", e.target.value)}
                     />
-                    {isEditing && !phoneVerified && formData.contact_no && (
+                    {isEditing && !emailVerified && formData.email && (
                          <button
                             type="button"
                             onClick={handleSendOtp}
@@ -939,6 +997,21 @@ export default function MyProfile() {
                          </button>
                     )}
                   </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
+                    <Phone className="w-3 h-3" /> Contact No.
+                  </label>
+                  <input 
+                      type="text"
+                      id="contact_no"
+                      disabled={!isEditing}
+                      className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition-all ${isEditing ? 'border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50/50' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
+                      value={formData.contact_no}
+                      onChange={(e) => handleInputChange("contact_no", e.target.value)}
+                      placeholder="09XX XXX XXXX"
+                  />
                 </div>
 
               </div>
@@ -967,8 +1040,8 @@ export default function MyProfile() {
                 <div className="space-y-1">
                     <div className="flex justify-between items-center">
                          <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
-                            {usingOtpForPassword ? <Smartphone className="w-3 h-3"/> : <Key className="w-3 h-3" />}
-                            {usingOtpForPassword ? "Verification Code" : "Current Password"}
+                            {usingOtpForPassword ? <Mail className="w-3 h-3"/> : <Key className="w-3 h-3" />}
+                            {usingOtpForPassword ? "Email Verification Code" : "Current Password"}
                         </label>
                         {!usingOtpForPassword && (
                             <button 
@@ -1178,13 +1251,12 @@ export default function MyProfile() {
              <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-6 text-center">
                     <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Smartphone className="w-6 h-6 text-indigo-600" />
+                        <Mail className="w-6 h-6 text-indigo-600" />
                     </div>
                     <h3 className="text-lg font-bold text-slate-800 mb-2">Enter Verification Code</h3>
                     <p className="text-sm text-slate-500 mb-6">
-                        We sent a 6-digit code to <strong>{formData.contact_no}</strong>. 
+                        We sent a 6-digit code to <strong>{formData.email}</strong>. 
                         <br/>
-                        <span className="text-xs text-indigo-500 font-medium">(Check your backend console for the code)</span>
                     </p>
                     
                     <input 
