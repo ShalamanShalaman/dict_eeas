@@ -18,7 +18,8 @@ import {
   AlertCircle
 } from "lucide-react";
 
-// Inline ConfirmDialog using createPortal to fix z-index overlay issues
+let globalLogoutLock = false;
+
 const ConfirmDialog = ({
   isOpen,
   onClose,
@@ -29,13 +30,16 @@ const ConfirmDialog = ({
   cancelText = "Cancel",
   confirmVariant = "danger",
   user = null,
+  isProcessing = false
 }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (!isOpen) return;
+      if (!isOpen || isProcessing) return;
       if (e.key === "Escape") {
+        e.preventDefault();
         onClose();
       } else if (e.key === "Enter" && confirmVariant === "danger") {
+        e.preventDefault(); 
         onConfirm();
       }
     };
@@ -44,42 +48,32 @@ const ConfirmDialog = ({
       document.addEventListener("keydown", handleKeyDown);
       return () => document.removeEventListener("keydown", handleKeyDown);
     }
-  }, [isOpen, onClose, onConfirm, confirmVariant]);
+  }, [isOpen, onClose, onConfirm, confirmVariant, isProcessing]);
 
   if (!isOpen) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[999999] flex items-center justify-center">
-      {/* Semi-transparent backdrop with pulse animation */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={onClose}
+        onClick={isProcessing ? undefined : onClose}
       />
       
-      {/* Dialog box */}
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in slide-in-from-bottom-4 fade-in zoom-in-95 duration-300">
-        {/* Decorative gradient top border */}
         <div className="h-1.5 bg-gradient-to-r from-red-500 via-red-600 to-red-500" />
         
-        {/* Header */}
         <div className="px-6 py-5 border-b border-gray-100">
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-full ${confirmVariant === 'danger' ? 'bg-red-100' : 'bg-blue-100'} animate-in pulse`}>
               {confirmVariant === 'danger' ? (
-                <LogOut 
-                  size={28} 
-                  className="text-red-600" 
-                />
+                <LogOut size={28} className="text-red-600" />
               ) : (
-                <AlertCircle 
-                  size={28} 
-                  className="text-blue-600" 
-                />
+                <AlertCircle size={28} className="text-blue-600" />
               )}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-              {user && (
+              <h3 className="text-xl font-bold text-gray-900">{isProcessing ? "Logging out..." : title}</h3>
+              {user && !isProcessing && (
                 <p className="text-sm text-gray-500 mt-0.5">
                   Signing out {user.first_name} {user.last_name}
                 </p>
@@ -88,41 +82,45 @@ const ConfirmDialog = ({
           </div>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5">
           <p className="text-gray-600 text-base leading-relaxed">
-            {message}
+            {isProcessing ? "Please wait..." : message}
           </p>
-          {confirmVariant === 'danger' && (
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-sm text-amber-800 flex items-start gap-2">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                <span>You'll need to sign in again to access your account.</span>
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 flex items-center justify-end gap-3 rounded-b-2xl">
           <button
-            onClick={onClose}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            disabled={isProcessing}
             className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 
                        rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-all duration-200
-                       focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2"
+                       focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 disabled:opacity-50"
           >
             {cancelText}
           </button>
           <button
-            onClick={onConfirm}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation(); 
+              onConfirm();
+            }}
+            disabled={isProcessing}
             className={`px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200
-                       flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2
+                       flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50
                        ${confirmVariant === 'danger' 
                          ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 shadow-sm hover:shadow' 
                          : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'}`}
           >
-            {confirmVariant === 'danger' && <LogOut size={16} />}
-            {confirmText}
+            {isProcessing ? (
+               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+               confirmVariant === 'danger' && <LogOut size={16} />
+            )}
+            {isProcessing ? "Processing..." : confirmText}
           </button>
         </div>
       </div>
@@ -133,6 +131,8 @@ const ConfirmDialog = ({
 
 export default function Sidebar({ role, onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
   const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
   const [collapsed, setCollapsed] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -146,7 +146,6 @@ export default function Sidebar({ role, onLogout }) {
   });
   const location = useLocation();
   
-  // restore collapse state from localStorage so we remember if sidebar was hidden
   useEffect(() => {
     const stored = localStorage.getItem('sidebarCollapsed');
     if (stored !== null) {
@@ -168,26 +167,13 @@ export default function Sidebar({ role, onLogout }) {
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
-  
-  useEffect(() => {
-    const handleUserUpdate = (e) => {
-      setUser(e.detail);
-    };
-    
-    window.addEventListener("userUpdated", handleUserUpdate);
-    return () => window.removeEventListener("userUpdated", handleUserUpdate);
-  }, []);
 
   const toggleCategory = (category) => {
     if (collapsed) {
-      // If expanding a category while sidebar is collapsed, force sidebar to open
       handleToggle();
       setExpandedCategories(prev => ({ ...prev, [category]: true }));
     } else {
-      setExpandedCategories(prev => ({
-        ...prev,
-        [category]: !prev[category]
-      }));
+      setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
     }
   };
 
@@ -246,11 +232,42 @@ export default function Sidebar({ role, onLogout }) {
 
   const menuStructure = getMenuStructure();
 
-  const handleLogoutClick = () => setShowLogoutConfirm(true);
-  const handleConfirmLogout = () => {
-    setShowLogoutConfirm(false);
-    onLogout();
+  const handleLogoutClick = () => {
+    globalLogoutLock = false; 
+    setShowLogoutConfirm(true);
   };
+  
+  const handleConfirmLogout = async () => {
+    if (globalLogoutLock) return; 
+    globalLogoutLock = true;
+    
+    setIsLoggingOut(true); 
+
+    const freshUserStr = localStorage.getItem("user");
+    const freshUser = freshUserStr ? JSON.parse(freshUserStr) : {};
+    const finalUserId = freshUser.user_id || freshUser.id || user?.user_id || user?.id;
+    const token = localStorage.getItem("token") || "";
+
+    if (finalUserId) {
+      try {
+        await fetch("http://127.0.0.1:8000/api/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ user_id: finalUserId })
+        });
+      } catch (err) {
+      }
+    }
+
+    setShowLogoutConfirm(false);
+    setIsLoggingOut(false);
+    if (onLogout) onLogout(); 
+  };
+  
   const handleCancelLogout = () => setShowLogoutConfirm(false);
 
   return (
@@ -277,17 +294,11 @@ export default function Sidebar({ role, onLogout }) {
           </div>
         </div>
 
-        {/* Retractable UI Toggle Button */}
         <button
           onClick={handleToggle}
           className={`absolute ${collapsed ? '-right-3 border border-gray-400/50 bg-[#09095C]' : 'right-1'} top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-all duration-200 ${sidebarHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} group-hover:opacity-100 group-hover:scale-100 z-50`}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? (
-            <ChevronRight size={20} className="text-white" />
-          ) : (
-            <ChevronLeft size={20} className="text-white" />
-          )}
+          {collapsed ? <ChevronRight size={20} className="text-white" /> : <ChevronLeft size={20} className="text-white" />}
         </button>
 
         <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar overflow-x-hidden">
@@ -316,7 +327,6 @@ export default function Sidebar({ role, onLogout }) {
                     <Link
                       key={label}
                       to={path}
-                      title={collapsed ? label : undefined}
                       className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-6'} py-2.5 text-sm transition-all duration-200 relative group/item ${
                         isActive
                           ? "bg-white/10 text-white font-semibold"
@@ -340,7 +350,6 @@ export default function Sidebar({ role, onLogout }) {
         <div className="p-4 border-t border-white/10 bg-[#09095C] shrink-0">
           <button
             onClick={handleLogoutClick}
-            title={collapsed ? "Logout" : undefined}
             className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-0' : 'px-4'} py-3 text-sm font-semibold bg-red-600/90 hover:bg-red-600 text-white rounded-lg shadow-sm transition-colors`}
           >
             <LogOut size={18} />
@@ -359,37 +368,18 @@ export default function Sidebar({ role, onLogout }) {
         cancelText="Cancel"
         confirmVariant="danger"
         user={user}
+        isProcessing={isLoggingOut} 
       />
 
       <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(255, 255, 255, 0.2);
-        }
-
-        @keyframes spin-cw {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes spin-ccw {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(-360deg); }
-        }
-        .logo-spin-clockwise {
-          animation: spin-cw 0.3s ease-in-out;
-        }
-        .logo-spin-counter-clockwise {
-          animation: spin-ccw 0.3s ease-in-out;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.2); }
+        @keyframes spin-cw { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes spin-ccw { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+        .logo-spin-clockwise { animation: spin-cw 0.3s ease-in-out; }
+        .logo-spin-counter-clockwise { animation: spin-ccw 0.3s ease-in-out; }
       `}</style>
     </>
   );

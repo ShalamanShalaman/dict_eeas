@@ -33,4 +33,21 @@ class AuthController extends Controller
             'user' => $user->toArray()
         ], 200);
     }
+
+    public function logout(Request $request)
+    {
+        $identifier = $request->input('user_id');
+
+        if ($identifier) {
+            $user = User::where('user_id', $identifier)
+                        ->orWhere('id', $identifier)
+                        ->first();
+
+            if ($user) {
+                LogHelper::log($user->id, 'LOGOUT', 'Authentication', "User {$user->user_id} logged out", $user->id);
+            }
+        }
+
+        return response()->json(['message' => 'Logged out successfully'], 200);
+    }
 }

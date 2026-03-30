@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const PlusIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
@@ -62,29 +63,27 @@ const CheckCircleIcon = () => (
 );
 
 const AdminDashboard = () => {
+  const navigate = useNavigate(); // ADDED: Safe router navigation
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+  
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState('');
-
-  const [logs, setLogs] = useState([
-    { time: '10:05 AM', user: 'Admin_01', action: 'Update', type: 'update', details: 'Modified permissions' },
-    { time: '09:45 AM', user: 'Sarah_M', action: 'Create', type: 'create', details: 'Added employee' },
-    { time: '09:30 AM', user: 'Admin_01', action: 'Delete', type: 'delete', details: 'Removed inactive user' },
-    { time: '09:15 AM', user: 'John_D', action: 'Login', type: 'login', details: 'Successful login' },
-    { time: '08:50 AM', user: 'Admin_01', action: 'Export', type: 'export', details: 'Downloaded report' },
-  ]);
 
   const styles = {
     update: 'bg-blue-100 text-blue-800',
     create: 'bg-green-100 text-green-800',
     delete: 'bg-red-100 text-red-800',
     login: 'bg-violet-100 text-violet-800',
+    logout: 'bg-slate-200 text-slate-700',
     export: 'bg-amber-100 text-amber-800',
+    default: 'bg-slate-100 text-slate-800',
   };
 
-  // Fetch real users from the backend
   const fetchUsers = async () => {
     try {
       const res = await fetch('http://127.0.0.1:8000/api/admin/users', {
@@ -101,11 +100,70 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchLogs = async (isInitial = false) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/admin/logs?_t=${Date.now()}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        
+        const formattedLogs = data.map(log => {
+          const actionLower = log.action ? log.action.toLowerCase() : '';
+          let type = 'default';
+          
+          if (actionLower.includes('create') || actionLower.includes('add')) type = 'create';
+          else if (actionLower.includes('delete') || actionLower.includes('remove')) type = 'delete';
+          else if (actionLower.includes('login') || actionLower.includes('auth')) type = 'login';
+          else if (actionLower.includes('logout')) type = 'logout';
+          else if (actionLower.includes('export') || actionLower.includes('download')) type = 'export';
+          else if (actionLower.includes('update') || actionLower.includes('edit') || actionLower.includes('modify')) type = 'update';
+
+          let timeString = 'Unknown Time';
+          if (log.created_at) {
+            const dateObj = new Date(log.created_at);
+            timeString = dateObj.toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          }
+
+          let displayDetails = log.details;
+          if (!displayDetails && log.entity_type) {
+             displayDetails = `${log.action} on ${log.entity_type}`;
+          }
+
+          return {
+            id: log.id,
+            time: timeString,
+            user: log.user_name || 'System',
+            action: log.action || 'Unknown Action',
+            type: type,
+            details: displayDetails || 'No details provided'
+          };
+        });
+        
+        setLogs(formattedLogs);
+      }
+    } catch (error) {
+      console.error('Failed to fetch logs:', error);
+    } finally {
+      if (isInitial) setLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchLogs(true);
+
+    const interval = setInterval(() => {
+      fetchLogs(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  function addUser(name, role) {
+  async function addUser(name, role) {
     const time = new Date().toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -113,8 +171,9 @@ const AdminDashboard = () => {
 
     setLogs(prev => [
       {
+        id: Date.now(), 
         time,
-        user: 'Admin_01',
+        user: 'Admin_01', 
         action: 'Create',
         type: 'create',
         details: `Added ${role}: ${name}`,
@@ -122,8 +181,6 @@ const AdminDashboard = () => {
       ...prev,
     ]);
 
-    // Note: To fully create a real user, this should be a POST request to /api/admin/create-user
-    // For now, we refresh the user list assuming the backend handles it or we mock it locally
     fetchUsers();
     
     setToast(`User creation attempt for "${name}" completed`);
@@ -137,8 +194,9 @@ const AdminDashboard = () => {
       log.action.toLowerCase().includes(search.toLowerCase()) ||
       log.details.toLowerCase().includes(search.toLowerCase())
   );
+  
+  const displayLogs = filteredLogs.slice(0, 20);
 
-  // Derived real metrics
   const totalUsers = users.length;
   const employeesCount = users.filter(u => u.role?.toLowerCase() === 'employee').length;
   const reviewersCount = users.filter(u => u.role?.toLowerCase() === 'reviewer').length;
@@ -153,8 +211,6 @@ const AdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        
-        {/* Total Users Card */}
         <div className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white p-6 rounded-xl shadow-lg shadow-blue-200 flex items-start justify-between">
           <div>
             <p className="text-sm font-medium opacity-90 mb-1">Total Users</p>
@@ -170,7 +226,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Employees Card */}
         <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-6 rounded-xl shadow-lg shadow-teal-200 flex items-start justify-between">
           <div>
             <p className="text-sm font-medium opacity-90 mb-1">Employees</p>
@@ -186,7 +241,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Reviewers Card */}
         <div className="bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white p-6 rounded-xl shadow-lg shadow-purple-200 flex items-start justify-between">
           <div>
             <p className="text-sm font-medium opacity-90 mb-1">Reviewers</p>
@@ -204,17 +258,25 @@ const AdminDashboard = () => {
 
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-800">Audit Logs</h3>
-          <div className="relative w-full sm:w-64">
+      <div 
+        className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+        onClick={() => navigate('/audits')} // FIX: Points to exact route defined in App.jsx
+      >
+        <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50 group-hover:bg-indigo-50/30 transition-colors">
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
+            Audit Logs Preview
+            <span className="text-xs font-semibold text-indigo-600 bg-indigo-100 px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-[-10px] group-hover:translate-x-0">
+              View Full Audits →
+            </span>
+          </h3>
+          <div className="relative w-full sm:w-64" onClick={(e) => e.stopPropagation()}>
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <SearchIcon />
             </div>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search logs..."
+              placeholder="Search latest logs..."
               className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
             />
           </div>
@@ -231,7 +293,16 @@ const AdminDashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredLogs.length === 0 ? (
+              {loadingLogs ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center">
+                      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                      <p>Loading audit logs...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : displayLogs.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-6 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center">
@@ -241,8 +312,8 @@ const AdminDashboard = () => {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                displayLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 text-xs text-slate-500 font-mono whitespace-nowrap">
                       {log.time}
                     </td>
@@ -250,11 +321,11 @@ const AdminDashboard = () => {
                       {log.user}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${styles[log.type]}`}>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${styles[log.type] || styles.default}`}>
                         {log.action}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-500">
+                    <td className="px-6 py-4 text-slate-500 truncate max-w-xs">
                       {log.details}
                     </td>
                   </tr>
@@ -262,6 +333,11 @@ const AdminDashboard = () => {
               )}
             </tbody>
           </table>
+          {filteredLogs.length > 20 && (
+            <div className="bg-slate-50 text-center py-3 border-t border-slate-100 text-xs font-medium text-slate-500">
+              Showing 20 most recent logs. Click to view all.
+            </div>
+          )}
         </div>
       </div>
 

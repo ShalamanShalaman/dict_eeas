@@ -28,7 +28,6 @@ export default function App() {
     }
   }, [user]);
 
-  // Listen for user updates (e.g., profile picture changes)
   useEffect(() => {
     const handleUserUpdate = (e) => {
       setUser(e.detail);
@@ -42,6 +41,7 @@ export default function App() {
     setUser(null);
     setViewRole("");
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
   };
 
   const Protected = ({ children }) => {

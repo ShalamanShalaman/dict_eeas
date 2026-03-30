@@ -119,7 +119,8 @@ const SystemAudits = () => {
     if (['CREATE', 'APPROVE'].includes(act)) return 'bg-green-100 text-green-800 border-green-200';
     if (['DELETE', 'DECLINE'].includes(act)) return 'bg-red-100 text-red-800 border-red-200';
     if (['UPDATE', 'SUBMIT', 'UPLOAD', 'UPLOAD_REVIEW'].includes(act)) return 'bg-blue-100 text-blue-800 border-blue-200';
-    if (['LOGIN', 'AUTH'].includes(act)) return 'bg-purple-100 text-purple-800 border-purple-200';
+    // Included LOGOUT here
+    if (['LOGIN', 'AUTH', 'LOGOUT'].includes(act)) return 'bg-purple-100 text-purple-800 border-purple-200';
     if (['GENERATE', 'EXPORT'].includes(act)) return 'bg-amber-100 text-amber-800 border-amber-200';
     if (['RENAME'].includes(act)) return 'bg-indigo-100 text-indigo-800 border-indigo-200';
     return 'bg-slate-100 text-slate-800 border-slate-200';
@@ -201,17 +202,14 @@ const SystemAudits = () => {
     });
   };
 
-  // Function to highlight specific text patterns in the details
   const HighlightedDetails = ({ text }) => {
     if (!text) return null;
 
-    // Split the text by single quotes to find filenames
     const parts = text.split(/('[^']+')/g);
     
     return (
       <>
         {parts.map((part, index) => {
-          // If it's a quoted string (like a filename)
           if (part.startsWith("'") && part.endsWith("'")) {
             return (
               <span key={index} className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded font-mono text-xs text-indigo-700">
@@ -220,31 +218,23 @@ const SystemAudits = () => {
             );
           }
           
-          // Match patterns like "User ADMIN001", "Reviewer: John Doe", "submitted by Jane Doe"
           let processedPart = part;
           
-          // Match "User [ID or Name]"
           const userRegex = /(User |User\s)([A-Z0-9-]+|\b[A-Z][a-z]+ [A-Z][a-z]+\b)/g;
-          // Match "Reviewer: [Name]"
           const reviewerRegex = /(Reviewer:\s)(.+?)(?=[.,]|$)/g;
-          // Match "submitted by [Name]"
           const submittedByRegex = /(submitted by\s)(.+?)(?=[.,]|$)/g;
 
           const fragments = [];
           let lastIndex = 0;
 
-          // Helper to process regex matches and push them into fragments array
           const processMatch = (regex, type) => {
             let match;
-            const tempRegex = new RegExp(regex); // Reset regex state
+            const tempRegex = new RegExp(regex); 
             while ((match = tempRegex.exec(processedPart)) !== null) {
-              // Add text before the match
               if (match.index > lastIndex) {
                 fragments.push(processedPart.substring(lastIndex, match.index));
               }
-              // Add the matched prefix (e.g., "User ", "Reviewer: ")
               fragments.push(match[1]);
-              // Add the highlighted name/ID
               fragments.push(
                 <span key={`${type}-${index}-${match.index}`} className="font-semibold text-slate-800 bg-slate-100 px-1 py-0.5 rounded">
                   {match[2]}
@@ -254,11 +244,7 @@ const SystemAudits = () => {
             }
           };
 
-          // Prioritize matches. We'll do a simple sequential pass for now, assuming they don't heavily overlap
           let finalElements = [];
-          
-          // A bit hacky, but simpler for React rendering without complex AST parsing:
-          // We'll replace the target strings with a unique token, then split by that token.
           let tempString = part;
           const replacements = [];
 

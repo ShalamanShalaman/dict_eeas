@@ -9,6 +9,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\MessageController;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/logout', [AuthController::class, 'logout']); // <--- ADDED THIS LINE
 
 Route::prefix('admin')->group(function () {
     Route::get('/logs', [AdminController::class, 'getActivityLogs']);
