@@ -51,10 +51,17 @@ def build_tasks_from_attendance(employee_data, overrides=None):
         if not day_str.isdigit():
             continue
 
-        if not any([
+        # 1. Check if there are physical time logs
+        has_attendance = any([
             data.get("am_in"), data.get("am_out"),
             data.get("pm_in"), data.get("pm_out"),
-        ]):
+        ])
+        
+        # 2. Check if a task was provided (this catches your manual highlights)
+        has_task = day_str in override_tasks
+
+        # If it has NO attendance AND NO task was typed, skip it
+        if not has_attendance and not has_task:
             continue
 
         try:
