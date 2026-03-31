@@ -11,24 +11,33 @@ class LogHelper
     {
         try {
             $userId = null;
+            $actorName = 'System / Unknown';
+
             if ($actorIdentifier) {
                 if (is_numeric($actorIdentifier)) {
                     $user = User::find((int) $actorIdentifier);
-                    if ($user) $userId = $user->id;
                 } else {
                     $user = User::where('user_id', $actorIdentifier)->orWhere('public_id', $actorIdentifier)->first();
-                    if ($user) $userId = $user->id;
+                }
+
+                if ($user) {
+                    $userId = $user->id;
+                    $actorName = $user->full_name; 
                 }
             }
+
+            $formattedDetails = "{$actorName} - {$details}";
 
             ActivityLog::create([
                 'user_id' => $userId,
                 'action' => strtoupper($action),
                 'entity_type' => $entityType,
                 'entity_id' => $entityId ? (string) $entityId : null,
-                'details' => $details
+                'details' => $formattedDetails // Save the new string to the DB
             ]);
         } catch (\Exception $e) {
+
+            error_log("Failed to write to activity log: " . $e->getMessage());
         }
     }
 }

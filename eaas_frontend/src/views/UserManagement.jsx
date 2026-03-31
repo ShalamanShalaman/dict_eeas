@@ -6,6 +6,7 @@ export default function UserManagement() {
   const [locations, setLocations] = useState([]);
   const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
@@ -39,6 +40,10 @@ export default function UserManagement() {
   const API_URL = "http://127.0.0.1:8000/api";
 
   useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      setCurrentUser(JSON.parse(userStr));
+    }
     fetchUsers();
     fetchLocations();
     fetchPositions();
@@ -94,10 +99,15 @@ export default function UserManagement() {
         : `${API_URL}/admin/create-user`;
       const method = editingUser ? "PUT" : "POST";
 
+      const payload = {
+        ...formData,
+        action_by: currentUser?.user_id || currentUser?.id
+      };
+
       const res = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       const result = await res.json();
 
@@ -158,7 +168,8 @@ export default function UserManagement() {
         message: `Are you sure you want to delete ${user.full_name}? This action cannot be undone.`,
         onConfirm: async () => {
             try {
-                const res = await fetch(`${API_URL}/admin/delete-user/${user.public_id}`, {
+                const actionBy = currentUser?.user_id || currentUser?.id || '';
+                const res = await fetch(`${API_URL}/admin/delete-user/${user.public_id}?action_by=${actionBy}`, {
                     method: "DELETE"
                 });
                 if (res.ok) {
@@ -219,10 +230,15 @@ export default function UserManagement() {
         : `${API_URL}/admin/create-location`;
       const method = editingLocation ? "PUT" : "POST";
 
+      const payload = {
+        ...locationForm,
+        action_by: currentUser?.user_id || currentUser?.id
+      };
+
       const res = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(locationForm)
+        body: JSON.stringify(payload)
       });
       const result = await res.json();
 
@@ -260,7 +276,8 @@ export default function UserManagement() {
         message: `Are you sure you want to delete "${loc.location}"?`,
         onConfirm: async () => {
             try {
-                const res = await fetch(`${API_URL}/admin/delete-location/${loc.id}`, {
+                const actionBy = currentUser?.user_id || currentUser?.id || '';
+                const res = await fetch(`${API_URL}/admin/delete-location/${loc.id}?action_by=${actionBy}`, {
                     method: "DELETE"
                 });
                 if (res.ok) {

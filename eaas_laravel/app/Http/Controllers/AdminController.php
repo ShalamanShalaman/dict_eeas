@@ -17,12 +17,9 @@ use App\Helpers\LogHelper;
 
 class AdminController extends Controller
 {
-    /**
-     * Create a notification for admin users
-     */
+
     private function createAdminNotification($type, $title, $message, $data = null)
     {
-        // Get all admin users
         $admins = User::where('role', 'admin')->where('is_active', true)->get();
         
         foreach ($admins as $admin) {
@@ -162,7 +159,6 @@ class AdminController extends Controller
             return response()->json(['error' => 'Email already exists'], 409);
         }
 
-        // Generate a random password for new users
         $tempPassword = Str::random(12);
 
         $pos_id = null;
@@ -201,7 +197,6 @@ class AdminController extends Controller
             'force_change_password' => true
         ]);
 
-        // Send Email to the new user with their credentials
         $emailSent = false;
         try {
             $emailContent = "
@@ -245,10 +240,8 @@ class AdminController extends Controller
             $emailSent = true;
         } catch (\Exception $e) {
             error_log("Failed to send welcome email to {$user->email}: " . $e->getMessage());
-            // Email failure won't stop the user creation process
         }
 
-        // Only notify admins about new user registrations
         $this->createAdminNotification(
             'user_registered',
             'New User Registered',
@@ -256,7 +249,7 @@ class AdminController extends Controller
             ['user_id' => $user->id, 'user_name' => $user->full_name, 'role' => $user->role]
         );
 
-        LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'CREATE', 'User', "Created user: {$user->user_id} ({$user->role})", $user->id);
+        LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'CREATE', 'User', "Created user: {$user->full_name} ({$user->user_id})", $user->id);
 
         error_log("\n=======================================================");
         error_log(" 🚀 NEW USER ACCOUNT CREATED! ");
@@ -331,7 +324,7 @@ class AdminController extends Controller
 
         $user->update($updateData);
 
-        LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'UPDATE', 'User', "Updated user profile: {$user->user_id}", $user->id);
+        LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'UPDATE', 'User', "Updated user profile: {$user->full_name} ({$user->user_id})", $user->id);
 
         return response()->json(['message' => 'User updated', 'user' => $user->toArray()]);
     }
@@ -340,6 +333,7 @@ class AdminController extends Controller
     {
         $user = User::where('public_id', $public_id)->firstOrFail();
         $user_id_str = $user->user_id;
+        $user_name = $user->full_name; 
         $user_id_int = $user->id;
 
         if ($user->profile_picture) {
@@ -357,7 +351,7 @@ class AdminController extends Controller
 
         $user->delete();
 
-        LogHelper::log($request->query('action_by'), 'DELETE', 'User', "Deleted user: {$user_id_str}", $user_id_int);
+        LogHelper::log($request->query('action_by'), 'DELETE', 'User', "Deleted user: {$user_name} ({$user_id_str})", $user_id_int);
 
         return response()->json(['message' => 'User deleted']);
     }
