@@ -88,18 +88,30 @@ def parse_employees_data(text):
                     continue
                 
                 cleaned_logs = clean_daily_logs(raw_logs)
-                for idx, (action, time) in enumerate(cleaned_logs):
+                for action, time in cleaned_logs:
                     display_time = to_12h(time)
+                    
+                    try:
+                        hour = int(time.split(':')[0])
+                    except ValueError:
+                        hour = 0
+                        
                     if action == 'C/IN':
-                        if idx == 0: 
-                            emp_data[m_key][day]['am_in'] = display_time
-                        else: 
-                            emp_data[m_key][day]['pm_in'] = display_time
+                        if hour < 12:
+                            if not emp_data[m_key][day]['am_in']:
+                                emp_data[m_key][day]['am_in'] = display_time
+                        else:
+                            if not emp_data[m_key][day]['pm_in']:
+                                emp_data[m_key][day]['pm_in'] = display_time
+                                
                     elif action == 'C/OUT':
-                        if idx == 1 or (idx > 0 and not emp_data[m_key][day]['am_out']):
+                        if hour < 13:
                             emp_data[m_key][day]['am_out'] = display_time
                         else:
-                            emp_data[m_key][day]['pm_out'] = display_time
+                            if not emp_data[m_key][day]['am_out'] and hour < 14:
+                                emp_data[m_key][day]['am_out'] = display_time
+                            else:
+                                emp_data[m_key][day]['pm_out'] = display_time
 
     for line in lines:
         line = line.strip()
