@@ -88,22 +88,26 @@ export default function Header({ role, setRole, user, onLogout }) {
 
   return (
     <header
-      className="h-16 border-b flex items-center justify-between px-6"
-      style={{ backgroundColor: "rgb(28,26,136)" }}
+      className="h-20 border-b border-blue-900/40 flex items-center justify-between px-4 md:px-6 bg-gradient-to-r from-[#1c1a88] via-[#1b3baf] to-[#1554c9] shadow-sm"
     >
-      <h1 className="font-semibold capitalize text-white">
-        Employee Attendance and Accomplishment System
-      </h1>
+      <div className="min-w-0">
+        <h1 className="text-base md:text-lg font-semibold text-white truncate">
+          Employee Attendance and Accomplishment System
+        </h1>
+        <p className="hidden md:block text-xs text-blue-100/90 mt-0.5">
+          Attendance and document workflow
+        </p>
+      </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 md:gap-2.5">
         {canToggleRoles && (
-          <div className="hidden md:flex bg-slate-100 p-1 rounded-lg">
+          <div className="hidden md:flex bg-white/15 backdrop-blur-sm p-1 rounded-lg border border-white/20">
             {["employee", "reviewer", "admin"].map(r => (
               <button
                 key={r}
                 onClick={() => setRole(r)}
-                className={`px-3 py-1 text-sm rounded-md capitalize ${
-                  role === r ? "bg-white shadow text-blue-900" : "text-gray-500 hover:text-gray-700"
+                className={`px-3 py-1 text-sm rounded-md capitalize transition-all ${
+                  role === r ? "bg-white text-blue-900 shadow-sm font-semibold" : "text-blue-100 hover:text-white hover:bg-white/10"
                 }`}
               >
                 {r}
@@ -117,7 +121,7 @@ export default function Header({ role, setRole, user, onLogout }) {
           <div className="relative">
             <button
               onClick={handleNotificationClick}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
               title="Notifications"
             >
               <Bell size={20} />
@@ -144,7 +148,7 @@ export default function Header({ role, setRole, user, onLogout }) {
           <div className="relative">
             <button
               onClick={handleMessagesClick}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
               title="Messages"
             >
               <MessageSquare size={20} />
@@ -190,7 +194,7 @@ export default function Header({ role, setRole, user, onLogout }) {
             <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-400 flex items-center justify-center text-purple-900 font-bold text-sm shadow-md ${user?.profile_picture ? 'hidden' : ''}`}>
               {userName.charAt(0).toUpperCase()}
             </div>
-            <div className="hidden md:flex flex-col items-start">
+            <div className="hidden md:flex flex-col items-start pr-1">
               <span className="text-sm font-semibold leading-tight">{userName}</span>
               <span className="text-xs text-white/70 capitalize">{userRole}</span>
             </div>

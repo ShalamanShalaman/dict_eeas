@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Document;
+use App\Models\SharedPdf;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -298,6 +299,7 @@ class DocumentController extends Controller
         if ($doc->file_path) Storage::disk('public')->delete($doc->file_path);
         if ($doc->review_file_path) Storage::disk('public')->delete($doc->review_file_path);
         
+        SharedPdf::where('document_id', $doc->id)->delete();
         $doc->delete();
 
         LogHelper::log($userId, 'DELETE', 'Document', "This file has been deleted: '{$filename}'", $doc_id);
@@ -308,7 +310,9 @@ class DocumentController extends Controller
     public function getUserDocuments($user_id)
     {
         $user = User::where('user_id', $user_id)->firstOrFail();
-        $docs = Document::where('employee_id', $user->id)->orderBy('updated_at', 'desc')->get();
+        $docs = Document::where('employee_id', $user->id)
+                        ->where('is_shared', false)
+                        ->orderBy('updated_at', 'desc')->get();
         return response()->json($docs->map->toArray());
     }
 
@@ -456,6 +460,12 @@ class DocumentController extends Controller
             Storage::disk('public')->move($doc->file_path, $newPath);
             $doc->file_path = $newPath;
             $doc->save();
+
+            SharedPdf::where('document_id', $doc->id)->update([
+                'file_path' => $newPath,
+                'display_name' => $newFilename,
+                'updated_at' => now(),
+            ]);
             
             $userId = $request->input('user_id');
             $newFilenameBase = basename($newPath);
@@ -463,6 +473,141 @@ class DocumentController extends Controller
         }
         
         return response()->json(['message' => 'Renamed', 'document' => $doc->toArray(), 'file_path' => ltrim($doc->file_path, '/')]);
+    }
+
+    public function uploadSharedPDF(Request $request)
+    {
+        try {
+            $userId = $request->input('user_id');
+            $user = User::where('user_id', $userId)->firstOrFail();
+            
+            // Allow both 'files' and 'files[]' naming conventions
+            if (!$request->hasFile('files') && (!$request->hasFile('files[]'))) {
+                return response()->json(['error' => 'No files uploaded'], 400);
+            }
+
+            $rawFiles = $request->file('files') ?? $request->file('files[]');
+            
+            // Ensure $files is ALWAYS an array, even if a single file is uploaded
+            $files = is_array($rawFiles) ? $rawFiles : [$rawFiles];
+            if (count($files) > 5) {
+                return response()->json(['error' => 'You can upload up to 5 PDF files at a time.'], 400);
+            }
+
+            $tempDirName = 'temp_shared_pdf_' . uniqid();
+            $filePaths = [];
+
+            foreach ($files as $file) {
+                if ($file && $file->isValid()) {
+                    // Only process files that are not empty
+                    if ($file->getSize() > 0) {
+                        $path = $file->storeAs($tempDirName, $file->getClientOriginalName(), 'local');
+                        $filePaths[] = Storage::disk('local')->path($path);
+                    }
+                }
+            }
+
+            if (empty($filePaths)) {
+                 return response()->json(['error' => 'No valid files were uploaded. Make sure files are not empty.'], 400);
+            }
+
+            // Keep the original uploaded name visible across the app until renamed.
+            $displayName = count($files) === 1
+                ? $files[0]->getClientOriginalName()
+                : ('Merged_' . now()->format('Ymd_His') . '.pdf');
+            if (!str_ends_with(strtolower($displayName), '.pdf')) {
+                $displayName .= '.pdf';
+            }
+
+            $outputFilename = 'shared_' . uniqid() . '_' . ($user->last_name ?: 'AttendancePDF') . '.pdf';
+            $publicPath = 'documents/' . $outputFilename;
+            $absoluteOutputPath = Storage::disk('public')->path($publicPath);
+
+            $dir = dirname($absoluteOutputPath);
+            if (!file_exists($dir)) mkdir($dir, 0755, true);
+
+            $this->runPythonScript('merge_pdfs', [
+                'input_files' => $filePaths,
+                'output_path' => $absoluteOutputPath
+            ]);
+
+            Storage::disk('local')->deleteDirectory($tempDirName);
+            
+            // Auto-create SHARED document
+            $doc = Document::create([
+                'employee_id' => $user->id,
+                'file_path' => $publicPath,
+                'status' => 'shared',
+                'is_draft' => false,
+                'is_shared' => true
+            ]);
+
+            SharedPdf::updateOrCreate(
+                ['document_id' => $doc->id],
+                [
+                    'uploader_id' => $user->id,
+                    'uploader_name' => $user->full_name,
+                    'office_name' => $user->officeLocation ? $user->officeLocation->location : ($user->office_name ?? null),
+                    'file_path' => $publicPath,
+                    'display_name' => $displayName,
+                ]
+            );
+
+            LogHelper::log($user->id, 'CREATE_SHARED', 'Document', "User uploaded shared attendance PDF: '{$outputFilename}'", $doc->id);
+
+            $docArray = $doc->toArray();
+            $docArray['employee_name'] = $user->full_name;
+            $docArray['display_name'] = $displayName;
+
+            return response()->json([
+                'message' => 'Shared PDF uploaded', 
+                'file_path' => $publicPath,
+                'document' => $docArray
+            ], 200);
+
+        } catch (\Exception $e) {
+            // Clean up temp directory on failure
+            if (isset($tempDirName) && Storage::disk('local')->exists($tempDirName)) {
+                Storage::disk('local')->deleteDirectory($tempDirName);
+            }
+            return response()->json(['error' => 'Upload failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function listSharedPDFs(Request $request)
+    {
+        $office = $request->input('office');
+        $userId = $request->input('user_id');
+
+        // Fallback: derive office from user when office param is missing on refresh.
+        if (!$office && $userId) {
+            $user = User::where('user_id', $userId)->first();
+            if ($user && $user->officeLocation) {
+                $office = $user->officeLocation->location;
+            }
+        }
+
+        if (!$office) return response()->json([]);
+
+        $sharedRows = SharedPdf::where('office_name', 'like', '%' . $office . '%')
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
+
+        return response()->json($sharedRows->map(function ($row) {
+            $doc = Document::find($row->document_id);
+            if (!$doc) return null;
+
+            $arr = $doc->toArray();
+            $arr['id'] = $row->document_id;
+            $arr['employee_name'] = $row->uploader_name ?: ($arr['employee_name'] ?? 'Unknown');
+            $arr['file_path'] = $row->file_path ?: ($arr['file_path'] ?? '');
+            $arr['display_name'] = $row->display_name;
+            $arr['office_name'] = $row->office_name;
+            $arr['shared_id'] = $row->id;
+
+            return $arr;
+        })->filter()->values());
     }
 
     public function uploadAttachments(Request $request)
@@ -537,3 +682,4 @@ class DocumentController extends Controller
         }
     }
 }
+

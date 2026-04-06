@@ -40,6 +40,11 @@ Route::prefix('profile')->group(function () {
     Route::delete('/{public_id}/picture', [ProfileController::class, 'deleteProfilePicture']);
 });
 
+Route::prefix('shared-pdf')->group(function () {
+    Route::post('/upload', [DocumentController::class, 'uploadSharedPDF']);
+    Route::get('/list', [DocumentController::class, 'listSharedPDFs']); 
+});
+
 Route::prefix('document')->group(function () {
     Route::post('/upload', [DocumentController::class, 'uploadDocument']);
     Route::post('/autosave/{doc_id}', [DocumentController::class, 'autosaveDocument']);

@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Document extends Model
 {
-    protected $fillable = [
+protected $fillable = [
         'employee_id',
+        'is_shared',
         'reviewer_id',
         'file_path',
         'review_file_path',
@@ -22,9 +23,19 @@ class Document extends Model
     {
         return [
             'is_draft' => 'boolean',
+            'is_shared' => 'boolean',
             'submitted_at' => 'datetime',
             'reviewed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Scope for shared PDFs within last 30 days
+     */
+    public function scopeRecentShared($query)
+    {
+        return $query->where('is_shared', true)
+                     ->where('created_at', '>=', now()->subDays(30));
     }
 
     public function employee()

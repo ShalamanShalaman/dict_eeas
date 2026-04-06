@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import SharedPDFList from "../components/SharedPDFList.jsx";
+import PDFViewerModal from "../components/PDFViewerModal.jsx";
 import { useSearchParams, useBlocker, useNavigate } from "react-router-dom";
 
 // --- MODALS & ICONS ---
@@ -70,6 +72,7 @@ const FileWarningIcon = ({ className }) => (<Icon className={className}><path d=
 const AlertCircleIcon = ({ className }) => (<Icon className={className}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></Icon>);
 const PlusIcon = ({ className }) => (<Icon className={className}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></Icon>);
 const XIcon = ({ className }) => (<Icon className={className}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon>);
+const PencilIcon = ({ className }) => (<Icon className={className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></Icon>);
 
 const GripIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -93,6 +96,10 @@ export default function UploadAttendance({ onNavigate }) {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [viewMode, setViewMode] = useState("dtr");
   const [isDragging, setIsDragging] = useState(false);
+  const [isSharedDragging, setIsSharedDragging] = useState(false);
+  const [sharedLoading, setSharedLoading] = useState(false);
+  const [sharedAlert, setSharedAlert] = useState("");
+  const [sharedUploadResults, setSharedUploadResults] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   
   const [savedDocId, setSavedDocId] = useState(null);
@@ -194,6 +201,35 @@ export default function UploadAttendance({ onNavigate }) {
     };
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    const fetchLatestSharedPdf = async () => {
+      if (!currentUser?.user_id) return;
+      const officeName = currentUser?.office_name || "";
+      try {
+        const params = new URLSearchParams({
+          user_id: String(currentUser.user_id),
+          days: "0",
+        });
+        if (officeName) params.set("office", officeName);
+
+        const response = await fetch(
+          `http://127.0.0.1:8000/api/shared-pdf/list?${params.toString()}`
+        );
+        if (!response.ok) return;
+        const list = await response.json();
+        if (Array.isArray(list) && list.length > 0) {
+          // Keep latest shared items visible after refresh.
+          setSharedUploadResults(list.slice(0, 5));
+        } else {
+          setSharedUploadResults([]);
+        }
+      } catch (err) {
+        console.error("Failed to load latest shared PDF:", err);
+      }
+    };
+    fetchLatestSharedPdf();
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -304,6 +340,139 @@ export default function UploadAttendance({ onNavigate }) {
         setAppAlert("Failed to load saved document: " + err.message);
     } finally {
         setLoading(false);
+    }
+  };
+
+  const handleSharedFileUpload = async (files) => {
+    if (!currentUser || !files.length) return;
+    if (files.length > 5) {
+      setSharedAlert("You can upload up to 5 PDF files at a time.");
+      return;
+    }
+    
+    setSharedLoading(true);
+    const formData = new FormData();
+    Array.from(files).forEach(file => {
+      formData.append('files[]', file);
+    });
+    formData.append('user_id', currentUser.user_id);
+    
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/shared-pdf/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+
+      if (!response.ok) {
+        const err = result.error || 'Upload failed';
+        throw new Error(err);
+      }
+      
+      setSharedUploadResults((prev) => [result.document, ...prev.filter((d) => d.id !== result.document.id)].slice(0, 5));
+      setSharedAlert('Shared PDF uploaded successfully!');
+      setTimeout(() => {
+        setSharedAlert('');
+      }, 3000);
+    } catch (err) {
+      setSharedAlert('Upload failed: ' + err.message);
+    } finally {
+      setSharedLoading(false);
+    }
+  };
+
+  const handleSharedPDFUse = async (input) => {
+    try {
+      let pdfFile = null;
+
+      // Case 1: already a File object from shared list callback
+      if (input instanceof File) {
+        pdfFile = input;
+      }
+
+      // Case 2: shared document metadata (e.g., from "Use PDF Now" card)
+      if (!pdfFile && input?.id) {
+        const response = await fetch(`http://127.0.0.1:8000/api/document/view/${input.id}`);
+        if (!response.ok) throw new Error("Failed to load shared PDF");
+
+        const blob = await response.blob();
+        if (!blob || blob.size === 0) throw new Error("Empty PDF file received");
+
+        const fromDisplayName = input.display_name ? input.display_name.trim() : "";
+        const fromPath = input.file_path ? input.file_path.split('/').pop() : "";
+        const fallbackName = `shared_${input.id}.pdf`;
+        const fileName = fromDisplayName || fromPath || fallbackName;
+        pdfFile = new File([blob], fileName, { type: "application/pdf" });
+      }
+
+      if (!pdfFile || !pdfFile.size) {
+        setAppAlert("No valid PDF file received from shared list");
+        return;
+      }
+
+      setFile(pdfFile);
+
+      // Trigger extraction with the resolved file directly (avoid stale state timing)
+      setTimeout(() => {
+        handlePersonalUpload(pdfFile);
+      }, 250);
+    } catch (err) {
+      setAppAlert("Failed to use shared PDF: " + err.message);
+    }
+  };
+
+  const handleRenameSharedCard = async (doc) => {
+    if (!doc?.id) return;
+    const currentName = doc.display_name || (doc.file_path ? doc.file_path.split('/').pop() : `shared_${doc.id}.pdf`);
+    const nextName = window.prompt("Rename shared PDF:", currentName);
+    if (!nextName) return;
+    const trimmed = nextName.trim();
+    if (!trimmed) return;
+    if (trimmed === currentName) return;
+
+    const renameConfirmed = window.confirm(`Rename "${currentName}" to "${trimmed}"?`);
+    if (!renameConfirmed) return;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/document/rename/${doc.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: trimmed, user_id: currentUser?.user_id })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Rename failed");
+      setSharedUploadResults((prev) =>
+        prev.map((item) =>
+          item.id === doc.id ? { ...item, file_path: result.file_path || item.file_path, display_name: trimmed } : item
+        )
+      );
+      setSharedAlert("Shared PDF renamed successfully!");
+      setTimeout(() => setSharedAlert(""), 2500);
+    } catch (err) {
+      setSharedAlert("Rename failed: " + err.message);
+    }
+  };
+
+  const handleDeleteSharedCard = async (doc) => {
+    if (!doc?.id) return;
+    const label = doc.display_name || "this shared PDF";
+    const ok = window.confirm(`Delete "${label}"?\n\nThis cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/document/${doc.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUser?.user_id })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Delete failed");
+      setSharedUploadResults((prev) => prev.filter((item) => item.id !== doc.id));
+      setSharedAlert("Shared PDF deleted.");
+      setTimeout(() => setSharedAlert(""), 2500);
+    } catch (err) {
+      setSharedAlert("Delete failed: " + err.message);
     }
   };
 
@@ -431,12 +600,13 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const handlePersonalUpload = async (overrideFile = null) => {
+    const selectedFile = overrideFile || file;
+    if (!selectedFile) return;
 
     setLoading(true);
     const formData = new FormData();
-    formData.append("attendanceFile", file);
+    formData.append("attendanceFile", selectedFile);
     if (currentUser && currentUser.user_id) {
         formData.append("user_id", currentUser.user_id);
         formData.append("action_by", currentUser.user_id);
@@ -841,6 +1011,119 @@ export default function UploadAttendance({ onNavigate }) {
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen pb-32">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        {/* SHARED PDF UPLOAD ZONE */}
+        {currentUser && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+            <div className="text-center mb-4">
+              <h3 className="text-lg font-bold text-blue-800 mb-1 flex items-center justify-center gap-2 mx-auto">
+                <UploadIcon className="w-5 h-5 text-blue-700" />
+                Share PDF with Office
+              </h3>
+              <p className="text-sm text-blue-700">Upload PDFs to make them available to your office</p>
+            </div>
+            
+            <div
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsSharedDragging(false);
+                handleSharedFileUpload(e.dataTransfer.files);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsSharedDragging(true);
+              }}
+              onDragLeave={() => setIsSharedDragging(false)}
+              className={`rounded-xl h-32 flex flex-col items-center justify-center border-2 border-dashed transition-all mx-auto max-w-3xl ${
+                isSharedDragging
+                  ? "border-blue-400 bg-blue-50 shadow-md scale-[1.01]"
+                  : "border-blue-300 bg-white/70 hover:border-blue-400"
+              } p-5`}
+            >
+              <UploadIcon className={`w-9 h-9 mb-2 ${sharedLoading ? "text-blue-500 animate-pulse" : "text-blue-400"}`} />
+              <div className="text-center">
+                <div className="font-semibold text-base text-blue-800 mb-1">
+                  {sharedLoading ? "Uploading..." : "Drag PDFs here"}
+                </div>
+                <p className="text-xs text-blue-600 mb-3">Up to 5 files per upload (auto-merged)</p>
+                <input
+                  multiple
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => handleSharedFileUpload(e.target.files)}
+                  className="hidden"
+                  id="sharedUpload"
+                />
+                <label
+                  htmlFor="sharedUpload"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all cursor-pointer shadow-sm"
+                >
+                  Select Files
+                </label>
+              </div>
+            </div>
+            
+            {sharedAlert && (
+              <div className={`mt-4 p-3 rounded-xl text-sm font-medium text-center animate-in slide-in-from-top-2 ${
+                sharedAlert.toLowerCase().includes('success') ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-red-100 text-red-800 border border-red-200'
+              }`}>
+                {sharedAlert}
+              </div>
+            )}
+
+            {/* SHARED UPLOAD PREVIEW CARD */}
+            {sharedUploadResults.length > 0 && (
+              <div className={`mt-4 grid gap-3 ${sharedUploadResults.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                {sharedUploadResults.map((sharedDoc) => (
+                  <div key={sharedDoc.id} className={`p-3 bg-white border border-blue-200 rounded-xl shadow-sm animate-in slide-in-from-top-2 ${sharedUploadResults.length === 1 ? 'max-w-4xl mx-auto w-full' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <FileTextIcon className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-blue-800 truncate text-sm">
+                            {sharedDoc.display_name || (sharedDoc.file_path ? sharedDoc.file_path.split('_').pop() : 'Shared PDF')}
+                          </h4>
+                          <p className="text-xs text-blue-600 truncate">
+                            Uploaded by {sharedDoc.employee_name || "Unknown"} · Shared w/ office · {new Date(sharedDoc.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <button
+                          onClick={() => {
+                            handleSharedPDFUse({ id: sharedDoc.id, file_path: sharedDoc.file_path, display_name: sharedDoc.display_name });
+                          }}
+                          className="px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 shadow-sm transition-all flex items-center gap-1"
+                        >
+                          <DownloadIcon className="w-3.5 h-3.5" />
+                          Use
+                        </button>
+                        <button
+                          onClick={() => handleRenameSharedCard(sharedDoc)}
+                          className="w-8 h-8 bg-white text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all inline-flex items-center justify-center"
+                          title="Rename shared PDF"
+                          aria-label="Rename shared PDF"
+                        >
+                          <PencilIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSharedCard(sharedDoc)}
+                          className="w-8 h-8 bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-all inline-flex items-center justify-center"
+                          title="Delete shared PDF"
+                          aria-label="Delete shared PDF"
+                        >
+                          <Trash2Icon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
           <FileTextIcon className="w-6 h-6 text-blue-600" />
           Attendance Processor
@@ -894,7 +1177,7 @@ export default function UploadAttendance({ onNavigate }) {
             </button>
 
             <button
-              onClick={handleUpload}
+              onClick={handlePersonalUpload}
               disabled={!file || loading || (file && file.type === "application/json")} 
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -959,7 +1242,7 @@ export default function UploadAttendance({ onNavigate }) {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex justify-center mb-6">
             <div className="inline-flex bg-white rounded-lg p-1 shadow-sm border border-gray-100">
-            <button
+              <button
                 onClick={() => handleTabChange("dtr")}
                 className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
                   viewMode === "dtr"
