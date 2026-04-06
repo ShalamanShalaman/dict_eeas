@@ -119,7 +119,8 @@ def parse_employees_data(text):
             continue
 
         try:
-            match = re.match(r'^([A-Za-z0-9\s,]+)\((\d+)\)$', line)
+            # FIXED REGEX: Uses (.+?) to accept periods, hyphens, and any character forming the name
+            match = re.match(r'^(.+?)\((\d+)\)$', line)
             if match:
                 process_employee_data(current_employee, employee_data, day_checkins)
 
