@@ -661,7 +661,6 @@ export default function SubmitForApproval({ user, onNavigate }) {
                 </div>
               </div>
 
-              {/* Rename File Section */}
               <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                 <p className="text-sm font-medium text-indigo-700 mb-2">Rename PDF File (Optional)</p>
                 <div className="flex items-center gap-2">

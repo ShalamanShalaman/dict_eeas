@@ -13,6 +13,7 @@ class SharedPdf extends Model
         'office_name',
         'file_path',
         'display_name',
+        'content_hash',
     ];
 
     public function document()

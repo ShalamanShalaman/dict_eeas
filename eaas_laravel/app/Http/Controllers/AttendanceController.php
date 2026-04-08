@@ -100,18 +100,32 @@ class AttendanceController extends Controller
 
     public function uploadAttendance(Request $request)
     {
-        if (!$request->hasFile('attendanceFile')) {
-            return response()->json(['error' => 'No file part'], 400);
+        // Get the file using either key
+        $file = $request->file('attendanceFile') ?? $request->file('file');
+
+        if (!$file) {
+            // Check if the request exceeded PHP's post_max_size or upload_max_filesize
+            if (empty($_FILES) && empty($_POST) && isset($_SERVER['CONTENT_LENGTH']) && $_SERVER['CONTENT_LENGTH'] > 0) {
+                return response()->json(['error' => 'The file is too large. It exceeds the server upload limits (upload_max_filesize or post_max_size in php.ini).'], 400);
+            }
+
+            // Return whatever keys we actually received to help debug
+            $keys = implode(', ', array_keys($request->all()));
+            return response()->json(['error' => 'No file part found in request. Received keys: ' . ($keys ?: 'None')], 400);
         }
 
-        $file = $request->file('attendanceFile');
+        // Check if the file failed during the PHP upload process
+        if (!$file->isValid()) {
+            return response()->json(['error' => 'File upload failed with error code: ' . $file->getError()], 400);
+        }
+
         $path = $file->storeAs('temp', uniqid() . '_' . $file->getClientOriginalName(), 'local');
         $fullPath = Storage::disk('local')->path($path);
 
         try {
             $output = $this->runPythonScript('parse_attendance', ['file_path' => $fullPath]);
 
-            $actionBy = $request->input('action_by') ?? $request->input('user_id');
+            $actionBy = $request->input('action_by') ?? $request->input('user_id') ?? 'system';
             LogHelper::log($actionBy, 'UPLOAD', 'Attendance', "Uploaded and parsed biometric attendance PDF", null);
 
             Storage::disk('local')->delete($path);

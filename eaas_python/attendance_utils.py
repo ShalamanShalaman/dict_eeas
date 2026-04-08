@@ -5,6 +5,7 @@ import copy
 from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font
+from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 from datetime import datetime
 from docx import Document
 from docx.shared import Pt
@@ -119,7 +120,6 @@ def parse_employees_data(text):
             continue
 
         try:
-            # FIXED REGEX: Uses (.+?) to accept periods, hyphens, and any character forming the name
             match = re.match(r'^(.+?)\((\d+)\)$', line)
             if match:
                 process_employee_data(current_employee, employee_data, day_checkins)
@@ -190,7 +190,7 @@ def parse_employees_data(text):
 
     return employees
 
-def generate_dtr(employee_name, employee_data, template_path, approver_name="", period_text="", period_format="full"):
+def generate_dtr(employee_name, employee_data, template_path, approver_name="", approver_title="", period_text="", period_format="full"):
     raw_data = dict(employee_data)
     month_name = raw_data.pop('month_name', '')
     year = raw_data.pop('year', '')
@@ -202,20 +202,45 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
     wb = load_workbook(template_path)
     ws = wb.active
 
-    for cell in ['C6', 'K6', 'C55', 'K55']:
-        ws[cell] = employee_name
+    def safe_write(coord, val, align=None):
+        try:
+            col_str, row_str = coordinate_from_string(coord)
+            col_idx = column_index_from_string(col_str)
+            row_idx = int(row_str)
+            
+            target = ws.cell(row=row_idx, column=col_idx)
+            
+            if type(target).__name__ == 'MergedCell':
+                for mr in ws.merged_cells.ranges:
+                    if mr.min_col <= col_idx <= mr.max_col and mr.min_row <= row_idx <= mr.max_row:
+                        target = ws.cell(row=mr.min_row, column=mr.min_col)
+                        break
+            
+            if type(target).__name__ != 'MergedCell':
+                target.value = val
+                if align:
+                    target.alignment = align
+        except Exception:
+            pass
+
+    safe_write('C6', employee_name)
+    safe_write('K6', employee_name)
+    safe_write('C55', employee_name)
+    safe_write('K55', employee_name)
 
     header_val = period_text if period_text else (f"{month_name} {year}" if month_name else "")
     
     if header_val:
-        for cell in ['E8', 'M8']:
-            ws[cell] = header_val
-            ws[cell].alignment = Alignment(horizontal='center', vertical='center')
+        safe_write('E8', header_val, Alignment(horizontal='center', vertical='center'))
+        safe_write('M8', header_val, Alignment(horizontal='center', vertical='center'))
 
     if approver_name:
-        for cell in ['C61', 'K61']:
-            ws[cell] = approver_name
-            ws[cell].alignment = Alignment(horizontal='center', vertical='bottom')
+        safe_write('C61', approver_name, Alignment(horizontal='center', vertical='bottom'))
+        safe_write('K61', approver_name, Alignment(horizontal='center', vertical='bottom'))
+
+    if approver_title:
+        safe_write('C62', approver_title, Alignment(horizontal='center', vertical='center'))
+        safe_write('K62', approver_title, Alignment(horizontal='center', vertical='center'))
 
     center = Alignment(horizontal='center', vertical='center')
     bold_font = Font(bold=True)
@@ -235,12 +260,12 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
         row = 13 + day
         if row > 44: break
         
-        ws[f'B{row}'] = day
-        ws[f'J{row}'] = day
+        safe_write(f'B{row}', day)
+        safe_write(f'J{row}', day)
 
         if day < active_start or day > active_end:
             for col in ['C', 'D', 'E', 'F', 'G', 'H', 'K', 'L', 'M', 'N', 'O', 'P']:
-                ws[f'{col}{row}'] = ""
+                safe_write(f'{col}{row}', "")
             continue
 
         day_data = employee_data.get(day, {})
@@ -263,22 +288,36 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
             end_row = row + span - 1
             
             ws.merge_cells(start_row=row, start_column=3, end_row=end_row, end_column=6)
-            cell_left = ws[f'C{row}']
-            cell_left.value = current_remark
-            cell_left.alignment = center
-            cell_left.font = bold_font 
+            
+            target_left = ws.cell(row=row, column=3)
+            if type(target_left).__name__ == 'MergedCell':
+                for mr in ws.merged_cells.ranges:
+                    if mr.min_col <= 3 <= mr.max_col and mr.min_row <= row <= mr.max_row:
+                        target_left = ws.cell(row=mr.min_row, column=mr.min_col)
+                        break
+            
+            target_left.value = current_remark
+            target_left.alignment = center
+            target_left.font = bold_font 
 
             ws.merge_cells(start_row=row, start_column=11, end_row=end_row, end_column=14)
-            cell_right = ws[f'K{row}']
-            cell_right.value = current_remark
-            cell_right.alignment = center
-            cell_right.font = bold_font
+            
+            target_right = ws.cell(row=row, column=11)
+            if type(target_right).__name__ == 'MergedCell':
+                for mr in ws.merged_cells.ranges:
+                    if mr.min_col <= 11 <= mr.max_col and mr.min_row <= row <= mr.max_row:
+                        target_right = ws.cell(row=mr.min_row, column=mr.min_col)
+                        break
+
+            target_right.value = current_remark
+            target_right.alignment = center
+            target_right.font = bold_font
 
             for r in range(row, end_row + 1):
-                ws[f'G{r}'] = ""
-                ws[f'H{r}'] = ""
-                ws[f'O{r}'] = ""
-                ws[f'P{r}'] = ""
+                safe_write(f'G{r}', "")
+                safe_write(f'H{r}', "")
+                safe_write(f'O{r}', "")
+                safe_write(f'P{r}', "")
 
         else:
             updates = {
@@ -298,10 +337,7 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
             }
 
             for col, value in updates.items():
-                cell = ws[f'{col}{row}']
-                cell.value = value
-                cell.alignment = center
-                cell.font = bold_font
+                safe_write(f'{col}{row}', value, center)
 
     output = BytesIO()
     wb.save(output)

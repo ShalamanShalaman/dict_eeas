@@ -43,6 +43,7 @@ def main():
                 data.get('employee_data'),
                 template_path=template_path,
                 approver_name=data.get('approver', ''),
+                approver_title=data.get('approver_title', ''),
                 period_text=data.get('period_text', ''),
                 period_format=data.get('period_format', 'full')
             )

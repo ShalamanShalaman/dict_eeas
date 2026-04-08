@@ -13,9 +13,6 @@ use Symfony\Component\Process\Process;
 
 class DocumentController extends Controller
 {
-    /**
-     * Create a notification for a user
-     */
     private function createNotification($userId, $type, $title, $message, $documentId = null, $data = null)
     {
         return Notification::create([
@@ -150,7 +147,6 @@ class DocumentController extends Controller
         $doc->is_draft = true;
         $doc->save();
 
-        // Create notification for auto-save
         $this->createNotification(
             $user->id,
             'document_autosaved',
@@ -176,7 +172,7 @@ class DocumentController extends Controller
 
         $reviewerId = $request->input('reviewer_id');
         if ($reviewerId) {
-            $reviewer = User::where('id', $reviewerId)->where('role', 'reviewer')->where('is_active', true)->first();
+            $reviewer = User::where('id', $reviewerId)->whereIn('role', ['reviewer', 'admin'])->where('is_active', true)->first();
             if (!$reviewer) return response()->json(['error' => 'Invalid or inactive reviewer selected'], 400);
         } else {
             $office = $user->officeLocation;
@@ -190,7 +186,6 @@ class DocumentController extends Controller
         $doc->submitted_at = now();
         $doc->save();
 
-        // Create notification for the reviewer
         $this->createNotification(
             $reviewer->id,
             'submitted',
@@ -223,7 +218,6 @@ class DocumentController extends Controller
             $doc->reviewed_at = now();
             $doc->save();
 
-            // Create notification for the employee (document approved)
             $this->createNotification(
                 $doc->employee_id,
                 'approved',
@@ -243,7 +237,6 @@ class DocumentController extends Controller
             $doc->reviewed_at = now();
             $doc->save();
 
-            // Create notification for the employee (document declined)
             $this->createNotification(
                 $doc->employee_id,
                 'declined',
@@ -331,9 +324,15 @@ class DocumentController extends Controller
 
     public function getReviewers()
     {
-        $reviewers = User::where('role', 'reviewer')->where('is_active', true)->get();
+        $reviewers = User::whereIn('role', ['reviewer', 'admin'])->where('is_active', true)->get();
         return response()->json($reviewers->map(function ($r) {
-            return ['id' => $r->id, 'user_id' => $r->user_id, 'full_name' => $r->full_name, 'office_location' => $r->officeLocation ? $r->officeLocation->location : null];
+            return [
+                'id' => $r->id, 
+                'user_id' => $r->user_id, 
+                'full_name' => $r->full_name, 
+                'office_location' => $r->officeLocation ? $r->officeLocation->location : null,
+                'position' => $r->position ? $r->position->name : null
+            ];
         }));
     }
 
@@ -355,7 +354,6 @@ class DocumentController extends Controller
         $filename = basename($doc->file_path);
         $employeeName = $doc->employee ? $doc->employee->full_name : 'Unknown Employee';
 
-        // Create notification for the employee (document approved with reviewed file)
         $this->createNotification(
             $doc->employee_id,
             'approved',
@@ -374,7 +372,6 @@ class DocumentController extends Controller
     {
         $user = User::where('user_id', $user_id)->firstOrFail();
         
-        // Fetch notifications from the new notifications table
         $notifications = Notification::where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->limit(50)
@@ -405,7 +402,6 @@ class DocumentController extends Controller
     {
         $user = User::where('user_id', $user_id)->firstOrFail();
         
-        // Mark all notifications as read for this user
         Notification::where('user_id', $user->id)
             ->where('is_read', false)
             ->update(['is_read' => true, 'read_at' => now()]);
@@ -417,15 +413,11 @@ class DocumentController extends Controller
     {
         $user = User::where('user_id', $user_id)->firstOrFail();
         
-        // Delete all notifications for this user
         Notification::where('user_id', $user->id)->delete();
 
         return response()->json(['message' => 'All notifications cleared']);
     }
 
-    /**
-     * Mark a single notification as read
-     */
     public function markNotificationRead(Request $request, $notification_id)
     {
         $notification = Notification::findOrFail($notification_id);
@@ -434,9 +426,6 @@ class DocumentController extends Controller
         return response()->json(['message' => 'Notification marked as read']);
     }
 
-    /**
-     * Delete a single notification
-     */
     public function deleteNotification(Request $request, $notification_id)
     {
         $notification = Notification::findOrFail($notification_id);
@@ -481,14 +470,12 @@ class DocumentController extends Controller
             $userId = $request->input('user_id');
             $user = User::where('user_id', $userId)->firstOrFail();
             
-            // Allow both 'files' and 'files[]' naming conventions
             if (!$request->hasFile('files') && (!$request->hasFile('files[]'))) {
                 return response()->json(['error' => 'No files uploaded'], 400);
             }
 
             $rawFiles = $request->file('files') ?? $request->file('files[]');
             
-            // Ensure $files is ALWAYS an array, even if a single file is uploaded
             $files = is_array($rawFiles) ? $rawFiles : [$rawFiles];
             if (count($files) > 5) {
                 return response()->json(['error' => 'You can upload up to 5 PDF files at a time.'], 400);
@@ -499,10 +486,10 @@ class DocumentController extends Controller
 
             foreach ($files as $file) {
                 if ($file && $file->isValid()) {
-                    // Only process files that are not empty
                     if ($file->getSize() > 0) {
                         $path = $file->storeAs($tempDirName, $file->getClientOriginalName(), 'local');
-                        $filePaths[] = Storage::disk('local')->path($path);
+                        $absolutePath = Storage::disk('local')->path($path);
+                        $filePaths[] = $absolutePath;
                     }
                 }
             }
@@ -511,7 +498,6 @@ class DocumentController extends Controller
                  return response()->json(['error' => 'No valid files were uploaded. Make sure files are not empty.'], 400);
             }
 
-            // Keep the original uploaded name visible across the app until renamed.
             $displayName = count($files) === 1
                 ? $files[0]->getClientOriginalName()
                 : ('Merged_' . now()->format('Ymd_His') . '.pdf');
@@ -533,7 +519,6 @@ class DocumentController extends Controller
 
             Storage::disk('local')->deleteDirectory($tempDirName);
             
-            // Auto-create SHARED document
             $doc = Document::create([
                 'employee_id' => $user->id,
                 'file_path' => $publicPath,
@@ -555,6 +540,30 @@ class DocumentController extends Controller
 
             LogHelper::log($user->id, 'CREATE_SHARED', 'Document', "User uploaded shared attendance PDF: '{$outputFilename}'", $doc->id);
 
+            $officeNameLimit = $user->officeLocation ? $user->officeLocation->location : ($user->office_name ?? null);
+            if ($officeNameLimit) {
+                $officeSharedFiles = SharedPdf::where('office_name', $officeNameLimit)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+                    
+                if ($officeSharedFiles->count() > 5) {
+                    $filesToDelete = $officeSharedFiles->slice(5); 
+                    foreach ($filesToDelete as $oldFile) {
+                        $parentDoc = Document::find($oldFile->document_id);
+                        if ($parentDoc) {
+                            if ($parentDoc->file_path && Storage::disk('public')->exists($parentDoc->file_path)) {
+                                Storage::disk('public')->delete($parentDoc->file_path);
+                            }
+                            if ($parentDoc->review_file_path && Storage::disk('public')->exists($parentDoc->review_file_path)) {
+                                Storage::disk('public')->delete($parentDoc->review_file_path);
+                            }
+                            $parentDoc->delete();
+                        }
+                        $oldFile->delete();
+                    }
+                }
+            }
+
             $docArray = $doc->toArray();
             $docArray['employee_name'] = $user->full_name;
             $docArray['display_name'] = $displayName;
@@ -566,7 +575,6 @@ class DocumentController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            // Clean up temp directory on failure
             if (isset($tempDirName) && Storage::disk('local')->exists($tempDirName)) {
                 Storage::disk('local')->deleteDirectory($tempDirName);
             }
@@ -579,7 +587,6 @@ class DocumentController extends Controller
         $office = $request->input('office');
         $userId = $request->input('user_id');
 
-        // Fallback: derive office from user when office param is missing on refresh.
         if (!$office && $userId) {
             $user = User::where('user_id', $userId)->first();
             if ($user && $user->officeLocation) {
@@ -616,14 +623,12 @@ class DocumentController extends Controller
             $userId = $request->input('user_id');
             $user = User::where('user_id', $userId)->firstOrFail();
             
-            // Allow both 'files' and 'files[]' naming conventions
             if (!$request->hasFile('files') && (!$request->hasFile('files[]'))) {
                 return response()->json(['error' => 'No files uploaded'], 400);
             }
 
             $rawFiles = $request->file('files') ?? $request->file('files[]');
             
-            // Ensure $files is ALWAYS an array, even if a single file is uploaded
             $files = is_array($rawFiles) ? $rawFiles : [$rawFiles];
 
             $tempDirName = 'temp_attachments_' . uniqid();
@@ -631,7 +636,6 @@ class DocumentController extends Controller
 
             foreach ($files as $file) {
                 if ($file && $file->isValid()) {
-                    // Only process files that are not empty
                     if ($file->getSize() > 0) {
                         $path = $file->storeAs($tempDirName, $file->getClientOriginalName(), 'local');
                         $filePaths[] = Storage::disk('local')->path($path);
@@ -657,7 +661,6 @@ class DocumentController extends Controller
 
             Storage::disk('local')->deleteDirectory($tempDirName);
             
-            // Auto-create document to bypass static CORS block on frontend
             $doc = Document::create([
                 'employee_id' => $user->id,
                 'file_path' => $publicPath,
@@ -674,7 +677,6 @@ class DocumentController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            // Clean up temp directory on failure
             if (isset($tempDirName) && Storage::disk('local')->exists($tempDirName)) {
                 Storage::disk('local')->deleteDirectory($tempDirName);
             }
@@ -682,4 +684,3 @@ class DocumentController extends Controller
         }
     }
 }
-

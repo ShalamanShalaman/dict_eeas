@@ -4,8 +4,6 @@ import SharedPDFList from "../components/SharedPDFList.jsx";
 import PDFViewerModal from "../components/PDFViewerModal.jsx";
 import { useSearchParams, useBlocker, useNavigate } from "react-router-dom";
 
-// --- MODALS & ICONS ---
-
 const SuccessModal = ({ isOpen, message, subMessage, onClose, autoCloseDelay }) => {
   useEffect(() => {
     if (isOpen && autoCloseDelay) {
@@ -73,7 +71,7 @@ const AlertCircleIcon = ({ className }) => (<Icon className={className}><circle 
 const PlusIcon = ({ className }) => (<Icon className={className}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></Icon>);
 const XIcon = ({ className }) => (<Icon className={className}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon>);
 const PencilIcon = ({ className }) => (<Icon className={className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></Icon>);
-
+const ChevronDownIcon = ({ className }) => (<Icon className={className}><polyline points="6 9 12 15 18 9" /></Icon>);
 const GripIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
     <circle cx="9" cy="5" r="1.5" />
@@ -85,9 +83,6 @@ const GripIcon = ({ className }) => (
   </svg>
 );
 
-
-// --- MAIN UPLOAD ATTENDANCE COMPONENT ---
-
 export default function UploadAttendance({ onNavigate }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -96,9 +91,8 @@ export default function UploadAttendance({ onNavigate }) {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [viewMode, setViewMode] = useState("dtr");
   const [isDragging, setIsDragging] = useState(false);
-  const [isSharedDragging, setIsSharedDragging] = useState(false);
+  const [isSharedZoneOpen, setIsSharedZoneOpen] = useState(false);
   const [sharedLoading, setSharedLoading] = useState(false);
-  const [sharedAlert, setSharedAlert] = useState("");
   const [sharedUploadResults, setSharedUploadResults] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   
@@ -108,10 +102,18 @@ export default function UploadAttendance({ onNavigate }) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); 
   const [targetNavigatePath, setTargetNavigatePath] = useState(null);
+  
   const [showNameModal, setShowNameModal] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [appAlert, setAppAlert] = useState("");
+
+  const [renamingDoc, setRenamingDoc] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingDoc, setDeletingDoc] = useState(null);
+
+  const [reviewers, setReviewers] = useState([]);
+  const [showReviewerDropdown, setShowReviewerDropdown] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -123,11 +125,10 @@ export default function UploadAttendance({ onNavigate }) {
         hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
     );
   } catch (e) {
-    // Fallback if useBlocker is not available in the current router setup
   }
 
   const [arMeta, setArMeta] = useState({
-    name: "", adjustmentName: "", position: "", office: "", project: "", approver: "", approverTitle: "PROVINCIAL OFFICER, ISABELA - CAUAYAN II", periodFormat: "full", tasks: {},  manualHighlights: {}, employeeNo: "", controlNo: "", filingDate: "", adjustmentReason: "", adjustmentDetails: "", obWith: "", obAt: "",
+    name: "", adjustmentName: "", position: "", office: "", project: "", approver: "", approverTitle: "", periodFormat: "full", tasks: {},  manualHighlights: {}, employeeNo: "", controlNo: "", filingDate: "", adjustmentReason: "", adjustmentDetails: "", obWith: "", obAt: "",
     adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" })
   });
 
@@ -203,6 +204,28 @@ export default function UploadAttendance({ onNavigate }) {
   }, []);
 
   useEffect(() => {
+    const fetchReviewers = async () => {
+      if (!currentUser) return;
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/api/document/reviewers`);
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+              setReviewers(data);
+          } else {
+              setReviewers([]);
+          }
+        } else {
+            setReviewers([]);
+        }
+      } catch (err) {
+          setReviewers([]);
+      }
+    };
+    fetchReviewers();
+  }, [currentUser]);
+
+  useEffect(() => {
     const fetchLatestSharedPdf = async () => {
       if (!currentUser?.user_id) return;
       const officeName = currentUser?.office_name || "";
@@ -219,13 +242,11 @@ export default function UploadAttendance({ onNavigate }) {
         if (!response.ok) return;
         const list = await response.json();
         if (Array.isArray(list) && list.length > 0) {
-          // Keep latest shared items visible after refresh.
-          setSharedUploadResults(list.slice(0, 5));
+          setSharedUploadResults(list);
         } else {
           setSharedUploadResults([]);
         }
       } catch (err) {
-        console.error("Failed to load latest shared PDF:", err);
       }
     };
     fetchLatestSharedPdf();
@@ -237,8 +258,8 @@ export default function UploadAttendance({ onNavigate }) {
            ...prev,
            name: prev.name || currentUser.full_name || "", 
            adjustmentName: prev.adjustmentName || "",
-           position: prev.position || currentUser.position_name || "",
-           office: prev.office || currentUser.office_name || "",
+           position: prev.position || currentUser.position_name || currentUser.position_id || "",
+           office: prev.office || currentUser.office_name || currentUser.office_location_id || "",
            approver: prev.approver || currentUser.provincial_officer || ""
        }));
     }
@@ -336,7 +357,6 @@ export default function UploadAttendance({ onNavigate }) {
         if (stateData.viewMode) setViewMode(stateData.viewMode);
         setSavedDocId(docId);
     } catch (err) {
-        console.error("Load Error:", err);
         setAppAlert("Failed to load saved document: " + err.message);
     } finally {
         setLoading(false);
@@ -346,14 +366,14 @@ export default function UploadAttendance({ onNavigate }) {
   const handleSharedFileUpload = async (files) => {
     if (!currentUser || !files.length) return;
     if (files.length > 5) {
-      setSharedAlert("You can upload up to 5 PDF files at a time.");
+      setAppAlert("You can upload up to 5 PDF files at a time.");
       return;
     }
     
     setSharedLoading(true);
     const formData = new FormData();
-    Array.from(files).forEach(file => {
-      formData.append('files[]', file);
+    Array.from(files).forEach(f => {
+      formData.append('files[]', f);
     });
     formData.append('user_id', currentUser.user_id);
     
@@ -371,12 +391,10 @@ export default function UploadAttendance({ onNavigate }) {
       }
       
       setSharedUploadResults((prev) => [result.document, ...prev.filter((d) => d.id !== result.document.id)].slice(0, 5));
-      setSharedAlert('Shared PDF uploaded successfully!');
-      setTimeout(() => {
-        setSharedAlert('');
-      }, 3000);
+      setAppAlert('Shared PDF uploaded successfully!');
+      setIsSharedZoneOpen(true);
     } catch (err) {
-      setSharedAlert('Upload failed: ' + err.message);
+      setAppAlert('Upload failed: ' + err.message);
     } finally {
       setSharedLoading(false);
     }
@@ -386,12 +404,10 @@ export default function UploadAttendance({ onNavigate }) {
     try {
       let pdfFile = null;
 
-      // Case 1: already a File object from shared list callback
-      if (input instanceof File) {
+      if (input instanceof File || input instanceof Blob) {
         pdfFile = input;
       }
 
-      // Case 2: shared document metadata (e.g., from "Use PDF Now" card)
       if (!pdfFile && input?.id) {
         const response = await fetch(`http://127.0.0.1:8000/api/document/view/${input.id}`);
         if (!response.ok) throw new Error("Failed to load shared PDF");
@@ -413,7 +429,6 @@ export default function UploadAttendance({ onNavigate }) {
 
       setFile(pdfFile);
 
-      // Trigger extraction with the resolved file directly (avoid stale state timing)
       setTimeout(() => {
         handlePersonalUpload(pdfFile);
       }, 250);
@@ -422,57 +437,62 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
-  const handleRenameSharedCard = async (doc) => {
-    if (!doc?.id) return;
-    const currentName = doc.display_name || (doc.file_path ? doc.file_path.split('/').pop() : `shared_${doc.id}.pdf`);
-    const nextName = window.prompt("Rename shared PDF:", currentName);
-    if (!nextName) return;
-    const trimmed = nextName.trim();
-    if (!trimmed) return;
-    if (trimmed === currentName) return;
+  const openRenameModal = (doc) => {
+    const currentName = doc.display_name || (doc.file_path ? doc.file_path.split('_').pop() : `shared_${doc.id}.pdf`);
+    setRenamingDoc(doc);
+    setRenameValue(currentName);
+  };
 
-    const renameConfirmed = window.confirm(`Rename "${currentName}" to "${trimmed}"?`);
-    if (!renameConfirmed) return;
+  const submitRename = async () => {
+    if (!renamingDoc) return;
+    const trimmed = renameValue.trim();
+    
+    if (!trimmed || trimmed === renamingDoc.display_name) {
+      setRenamingDoc(null);
+      return;
+    }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/rename/${doc.id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/document/rename/${renamingDoc.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: trimmed, user_id: currentUser?.user_id })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Rename failed");
+      
       setSharedUploadResults((prev) =>
         prev.map((item) =>
-          item.id === doc.id ? { ...item, file_path: result.file_path || item.file_path, display_name: trimmed } : item
+          item.id === renamingDoc.id ? { ...item, file_path: result.file_path || item.file_path, display_name: trimmed } : item
         )
       );
-      setSharedAlert("Shared PDF renamed successfully!");
-      setTimeout(() => setSharedAlert(""), 2500);
+      setRenamingDoc(null);
+      setAppAlert("Shared PDF renamed successfully!");
     } catch (err) {
-      setSharedAlert("Rename failed: " + err.message);
+      setAppAlert("Rename failed: " + err.message);
     }
   };
 
-  const handleDeleteSharedCard = async (doc) => {
-    if (!doc?.id) return;
-    const label = doc.display_name || "this shared PDF";
-    const ok = window.confirm(`Delete "${label}"?\n\nThis cannot be undone.`);
-    if (!ok) return;
+  const openDeleteModal = (doc) => {
+    setDeletingDoc(doc);
+  };
 
+  const submitDelete = async () => {
+    if (!deletingDoc) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/${doc.id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/document/${deletingDoc.id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: currentUser?.user_id })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Delete failed");
-      setSharedUploadResults((prev) => prev.filter((item) => item.id !== doc.id));
-      setSharedAlert("Shared PDF deleted.");
-      setTimeout(() => setSharedAlert(""), 2500);
+      
+      setSharedUploadResults((prev) => prev.filter((item) => item.id !== deletingDoc.id));
+      setDeletingDoc(null);
+      setAppAlert("Shared PDF deleted.");
     } catch (err) {
-      setSharedAlert("Delete failed: " + err.message);
+      setAppAlert("Delete failed: " + err.message);
     }
   };
 
@@ -601,12 +621,15 @@ export default function UploadAttendance({ onNavigate }) {
   };
 
   const handlePersonalUpload = async (overrideFile = null) => {
-    const selectedFile = overrideFile || file;
+    const selectedFile = (overrideFile && (overrideFile instanceof File || overrideFile instanceof Blob)) ? overrideFile : file;
+    
     if (!selectedFile) return;
 
     setLoading(true);
     const formData = new FormData();
     formData.append("attendanceFile", selectedFile);
+    formData.append("file", selectedFile); 
+    
     if (currentUser && currentUser.user_id) {
         formData.append("user_id", currentUser.user_id);
         formData.append("action_by", currentUser.user_id);
@@ -621,7 +644,6 @@ export default function UploadAttendance({ onNavigate }) {
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textText = await response.text();
-        console.error("Backend Error:", textText);
         throw new Error(`Server returned ${response.status} ${response.statusText}. Check console for HTML error details.`);
       }
 
@@ -645,8 +667,8 @@ export default function UploadAttendance({ onNavigate }) {
             ...prev,
             name: currentUser?.full_name || firstEmp,
             adjustmentName: "",
-            position: currentUser?.position_name || "",
-            office: currentUser?.office_name || "",
+            position: currentUser?.position_name || currentUser?.position_id || "",
+            office: currentUser?.office_name || currentUser?.office_location_id || "",
             approver: currentUser?.provincial_officer || "",
             project: prev.project || "",
             periodFormat: "full",
@@ -713,10 +735,10 @@ export default function UploadAttendance({ onNavigate }) {
     setArMeta({ 
         name: currentUser?.full_name || "", 
         adjustmentName: "",
-        position: currentUser?.position_name || "", 
-        office: currentUser?.office_name || "", 
+        position: currentUser?.position_name || currentUser?.position_id || "", 
+        office: currentUser?.office_name || currentUser?.office_location_id || "", 
         approver: currentUser?.provincial_officer || "",
-        approverTitle: "PROVINCIAL OFFICER, ISABELA - CAUAYAN II",
+        approverTitle: "",
         project: "", 
         periodFormat: "full",
         tasks: {},
@@ -735,13 +757,20 @@ export default function UploadAttendance({ onNavigate }) {
       const { month_name, year } = currentEmployeeData;
       if (!month_name || !year) return "";
 
+      const monthIndex = new Date(`${month_name} 1, ${year}`).getMonth();
+      let lastDay = 31;
+      
+      if (!isNaN(monthIndex) && !isNaN(parseInt(year))) {
+          lastDay = new Date(parseInt(year), monthIndex + 1, 0).getDate();
+      }
+
       switch (arMeta.periodFormat) {
           case "1-15":
               return `${month_name} 1-15, ${year}`;
           case "16-end":
-              return `${month_name} 16-31, ${year}`;
+              return `${month_name} 16-${lastDay}, ${year}`;
           default:
-              return `${month_name} ${year}`;
+              return `${month_name} 1-${lastDay}, ${year}`;
       }
   };
 
@@ -866,6 +895,7 @@ export default function UploadAttendance({ onNavigate }) {
           employee_name: finalName,
           employee_data: filteredData,
           approver: arMeta.approver,
+          approver_title: arMeta.approverTitle,
           period_text: finalPeriod,
           period_format: arMeta.periodFormat,
           action_by: currentUser?.user_id
@@ -876,7 +906,6 @@ export default function UploadAttendance({ onNavigate }) {
       if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/vnd") && !contentType.includes("application/pdf"))) {
           if (!response.ok) {
              const text = await response.text();
-             console.error("DTR Download Error:", text);
              throw new Error(`Server returned ${response.status}. See console.`);
           }
       }
@@ -939,7 +968,6 @@ export default function UploadAttendance({ onNavigate }) {
       if (!contentType || (!contentType.includes("application/json") && !contentType.includes("application/vnd") && !contentType.includes("application/pdf"))) {
           if (!response.ok) {
              const text = await response.text();
-             console.error("AR Generation Error:", text);
              throw new Error(`Server returned ${response.status}. See console.`);
           }
       }
@@ -1008,117 +1036,112 @@ export default function UploadAttendance({ onNavigate }) {
     }
   };
 
+  const inputClass = (isDisabled) => `w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none ${isDisabled ? 'bg-gray-100 opacity-60 cursor-not-allowed' : 'bg-white'}`;
+  const labelClass = (isDisabled) => `text-xs font-semibold flex items-center gap-1 ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`;
+
+  const filteredReviewers = reviewers.filter(rev =>
+      rev.full_name.toLowerCase().includes((arMeta.approver || "").toLowerCase())
+  );
+
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen pb-32">
+      <style>{`
+        .marquee-hover-container {
+           width: 100%;
+           overflow: hidden;
+           white-space: nowrap;
+           position: relative;
+           mask-image: linear-gradient(to right, black 85%, transparent 100%);
+           -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+        }
+        .marquee-hover-text {
+           display: inline-block;
+           min-width: 100%;
+           transition: transform 0.3s ease;
+        }
+        .group:hover .marquee-hover-text {
+           animation: marquee-slide 6s linear infinite alternate;
+        }
+        @keyframes marquee-slide {
+           0%, 15% { transform: translateX(0); }
+           85%, 100% { transform: translateX(-30%); }
+        }
+      `}</style>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        {/* SHARED PDF UPLOAD ZONE */}
         {currentUser && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
-            <div className="text-center mb-4">
-              <h3 className="text-lg font-bold text-blue-800 mb-1 flex items-center justify-center gap-2 mx-auto">
-                <UploadIcon className="w-5 h-5 text-blue-700" />
-                Share PDF with Office
-              </h3>
-              <p className="text-sm text-blue-700">Upload PDFs to make them available to your office</p>
-            </div>
-            
-            <div
-              onDrop={(e) => {
-                e.preventDefault();
-                setIsSharedDragging(false);
-                handleSharedFileUpload(e.dataTransfer.files);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsSharedDragging(true);
-              }}
-              onDragLeave={() => setIsSharedDragging(false)}
-              className={`rounded-xl h-32 flex flex-col items-center justify-center border-2 border-dashed transition-all mx-auto max-w-3xl ${
-                isSharedDragging
-                  ? "border-blue-400 bg-blue-50 shadow-md scale-[1.01]"
-                  : "border-blue-300 bg-white/70 hover:border-blue-400"
-              } p-5`}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 transition-all">
+            <button
+              onClick={() => setIsSharedZoneOpen(!isSharedZoneOpen)}
+              className="w-full flex items-center justify-between text-left focus:outline-none group/accordion"
             >
-              <UploadIcon className={`w-9 h-9 mb-2 ${sharedLoading ? "text-blue-500 animate-pulse" : "text-blue-400"}`} />
-              <div className="text-center">
-                <div className="font-semibold text-base text-blue-800 mb-1">
-                  {sharedLoading ? "Uploading..." : "Drag PDFs here"}
-                </div>
-                <p className="text-xs text-blue-600 mb-3">Up to 5 files per upload (auto-merged)</p>
-                <input
-                  multiple
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => handleSharedFileUpload(e.target.files)}
-                  className="hidden"
-                  id="sharedUpload"
-                />
-                <label
-                  htmlFor="sharedUpload"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all cursor-pointer shadow-sm"
-                >
-                  Select Files
-                </label>
+              <div>
+                <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2">
+                  <LayersIcon className="w-5 h-5 text-blue-700" />
+                  Available Office Shared PDFs
+                </h3>
+                <p className="text-sm text-blue-700 mt-1">View and extract PDFs shared by your colleagues</p>
               </div>
-            </div>
+              <ChevronDownIcon className={`w-6 h-6 text-blue-700 transition-transform duration-300 ${isSharedZoneOpen ? 'rotate-180' : ''}`} />
+            </button>
             
-            {sharedAlert && (
-              <div className={`mt-4 p-3 rounded-xl text-sm font-medium text-center animate-in slide-in-from-top-2 ${
-                sharedAlert.toLowerCase().includes('success') ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-red-100 text-red-800 border border-red-200'
-              }`}>
-                {sharedAlert}
-              </div>
-            )}
-
-            {/* SHARED UPLOAD PREVIEW CARD */}
-            {sharedUploadResults.length > 0 && (
-              <div className={`mt-4 grid gap-3 ${sharedUploadResults.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
-                {sharedUploadResults.map((sharedDoc) => (
-                  <div key={sharedDoc.id} className={`p-3 bg-white border border-blue-200 rounded-xl shadow-sm animate-in slide-in-from-top-2 ${sharedUploadResults.length === 1 ? 'max-w-4xl mx-auto w-full' : ''}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <FileTextIcon className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-blue-800 truncate text-sm">
-                            {sharedDoc.display_name || (sharedDoc.file_path ? sharedDoc.file_path.split('_').pop() : 'Shared PDF')}
-                          </h4>
-                          <p className="text-xs text-blue-600 truncate">
-                            Uploaded by {sharedDoc.employee_name || "Unknown"} · Shared w/ office · {new Date(sharedDoc.created_at).toLocaleDateString()}
-                          </p>
+            {isSharedZoneOpen && (
+              <div className="mt-5 animate-in fade-in slide-in-from-top-2">
+                {sharedUploadResults.length > 0 ? (
+                  <div className={`grid gap-3 ${sharedUploadResults.length === 1 ? 'grid-cols-1 max-w-4xl mx-auto' : 'grid-cols-1 md:grid-cols-2'}`}>
+                    {sharedUploadResults.map((sharedDoc) => (
+                      <div key={sharedDoc.id} className="p-3 bg-white border border-blue-200 rounded-xl shadow-sm animate-in slide-in-from-top-2 group">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <FileTextIcon className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div className="min-w-0 marquee-hover-container flex-1">
+                              <h4 className="font-semibold text-blue-800 truncate text-sm">
+                                {sharedDoc.display_name || (sharedDoc.file_path ? sharedDoc.file_path.split('_').pop() : 'Shared PDF')}
+                              </h4>
+                              <div className="marquee-hover-text">
+                                <p className="text-xs text-blue-600">
+                                  Uploaded by {sharedDoc.employee_name || "Unknown"} &middot; Shared w/ office &middot; {new Date(sharedDoc.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 whitespace-nowrap bg-white pl-2">
+                            <button
+                              onClick={() => {
+                                handleSharedPDFUse({ id: sharedDoc.id, file_path: sharedDoc.file_path, display_name: sharedDoc.display_name });
+                              }}
+                              className="px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 shadow-sm transition-all flex items-center gap-1"
+                            >
+                              <DownloadIcon className="w-3.5 h-3.5" />
+                              Extract
+                            </button>
+                            <button
+                              onClick={() => openRenameModal(sharedDoc)}
+                              className="w-8 h-8 bg-white text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all inline-flex items-center justify-center"
+                              title="Rename shared PDF"
+                              aria-label="Rename shared PDF"
+                            >
+                              <PencilIcon className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => openDeleteModal(sharedDoc)}
+                              className="w-8 h-8 bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-all inline-flex items-center justify-center"
+                              title="Delete shared PDF"
+                              aria-label="Delete shared PDF"
+                            >
+                              <Trash2Icon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 whitespace-nowrap">
-                        <button
-                          onClick={() => {
-                            handleSharedPDFUse({ id: sharedDoc.id, file_path: sharedDoc.file_path, display_name: sharedDoc.display_name });
-                          }}
-                          className="px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 shadow-sm transition-all flex items-center gap-1"
-                        >
-                          <DownloadIcon className="w-3.5 h-3.5" />
-                          Use
-                        </button>
-                        <button
-                          onClick={() => handleRenameSharedCard(sharedDoc)}
-                          className="w-8 h-8 bg-white text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all inline-flex items-center justify-center"
-                          title="Rename shared PDF"
-                          aria-label="Rename shared PDF"
-                        >
-                          <PencilIcon className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSharedCard(sharedDoc)}
-                          className="w-8 h-8 bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-all inline-flex items-center justify-center"
-                          title="Delete shared PDF"
-                          aria-label="Delete shared PDF"
-                        >
-                          <Trash2Icon className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="text-center py-6 text-blue-600 bg-white/50 rounded-xl border border-blue-100">
+                    No shared PDFs available for your office yet.
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1141,7 +1164,7 @@ export default function UploadAttendance({ onNavigate }) {
               setIsDragging(true);
             }}
             onDragLeave={() => setIsDragging(false)}
-            className={`md:col-span-2 rounded-xl h-48 flex flex-col items-center justify-center border-2 border-dashed transition-colors ${
+            className={`md:col-span-2 rounded-xl h-64 flex flex-col items-center justify-center border-2 border-dashed transition-colors ${
               isDragging
                 ? "border-blue-400 bg-blue-50"
                 : "border-gray-200 bg-slate-50 hover:bg-slate-100"
@@ -1154,7 +1177,10 @@ export default function UploadAttendance({ onNavigate }) {
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.json" 
-                onChange={(e) => handleFile(e.target.files[0])}
+                onChange={(e) => {
+                  handleFile(e.target.files[0]);
+                  e.target.value = null; 
+                }}
                 className="hidden"
                 id="attendanceUpload"
               />
@@ -1177,7 +1203,7 @@ export default function UploadAttendance({ onNavigate }) {
             </button>
 
             <button
-              onClick={handlePersonalUpload}
+              onClick={() => handlePersonalUpload()}
               disabled={!file || loading || (file && file.type === "application/json")} 
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -1189,10 +1215,24 @@ export default function UploadAttendance({ onNavigate }) {
                 </>
               )}
             </button>
+            
+            <button
+              onClick={() => handleSharedFileUpload([file])}
+              disabled={!file || (file && file.type === "application/json") || sharedLoading}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {sharedLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <UploadIcon className="w-4 h-4" /> Share to Office
+                </>
+              )}
+            </button>
 
             <button
               onClick={handleClearClick}
-              className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              className="bg-red-500 text-white hover:bg-red-600 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               <Trash2Icon className="w-4 h-4" /> Clear
             </button>
@@ -1290,54 +1330,86 @@ export default function UploadAttendance({ onNavigate }) {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6 mb-6 border-b border-gray-100">
                 <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><UserIcon className="w-3 h-3"/> Employee Name</label>
+                    <label className={labelClass(false)}><UserIcon className="w-3 h-3"/> Employee Name</label>
                     <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className={inputClass(false)}
                         placeholder="e.g. Juan Dela Cruz"
                         value={arMeta.name}
                         onChange={(e) => { setArMeta({ ...arMeta, name: e.target.value }); setHasUnsavedChanges(true); }}
+                        disabled={false}
                     />
                 </div>
                 <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><BriefcaseIcon className="w-3 h-3"/> Position</label>
+                    <label className={labelClass(false)}><BriefcaseIcon className="w-3 h-3"/> Position (For AR)</label>
                     <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className={inputClass(false)}
                         placeholder="e.g. Project Officer I"
                         value={arMeta.position}
                         onChange={(e) => { setArMeta({ ...arMeta, position: e.target.value }); setHasUnsavedChanges(true); }}
+                        disabled={false}
                     />
                 </div>
                 <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> Office</label>
+                    <label className={labelClass(false)}><MapPinIcon className="w-3 h-3"/> Office (For AR)</label>
                     <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className={inputClass(false)}
                         placeholder="e.g. Cauayan Office"
                         value={arMeta.office}
                         onChange={(e) => { setArMeta({ ...arMeta, office: e.target.value }); setHasUnsavedChanges(true); }}
+                        disabled={false}
                     />
                 </div>
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><BadgeCheckIcon className="w-3 h-3"/> Approved By</label>
-                    <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                        placeholder="Provincial Officer Name"
-                        value={arMeta.approver}
-                        onChange={(e) => { setArMeta({ ...arMeta, approver: e.target.value }); setHasUnsavedChanges(true); }}
-                    />
+                <div className="space-y-1 relative">
+                    <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approved By</label>
+                    <div className="relative">
+                        <input
+                            className={inputClass(false) + " pr-8"}
+                            placeholder="Provincial Officer Name"
+                            value={arMeta.approver}
+                            onChange={(e) => {
+                                setArMeta({ ...arMeta, approver: e.target.value });
+                                setHasUnsavedChanges(true);
+                                setShowReviewerDropdown(true);
+                            }}
+                            onFocus={() => setShowReviewerDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowReviewerDropdown(false), 200)}
+                            disabled={false}
+                        />
+                        <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                    {showReviewerDropdown && filteredReviewers.length > 0 && (
+                        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+                            {filteredReviewers.map((rev, idx) => (
+                                <li
+                                    key={idx}
+                                    className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setArMeta({ ...arMeta, approver: rev.full_name, approverTitle: rev.position || rev.position_id || "" });
+                                        setHasUnsavedChanges(true);
+                                        setShowReviewerDropdown(false);
+                                    }}
+                                >
+                                    {rev.full_name}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
                 <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
+                    <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
                     <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className={inputClass(false)}
                         placeholder="e.g. PROVINCIAL OFFICER..."
                         value={arMeta.approverTitle}
                         onChange={(e) => { setArMeta({ ...arMeta, approverTitle: e.target.value }); setHasUnsavedChanges(true); }}
+                        disabled={false}
                     />
                 </div>
                 <div className="space-y-1">
                     <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><CalendarIcon className="w-3 h-3"/> Period Coverage</label>
                     <select
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                         value={arMeta.periodFormat}
                         onChange={(e) => { setArMeta({ ...arMeta, periodFormat: e.target.value }); setHasUnsavedChanges(true); }}
                     >
@@ -1412,6 +1484,52 @@ export default function UploadAttendance({ onNavigate }) {
             </div>
           </div>
         </div>
+      )}
+
+      {renamingDoc && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[999999]" onClick={() => setRenamingDoc(null)}>
+          <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Rename Shared PDF</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Name</label>
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitRename();
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setRenamingDoc(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={submitRename} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Rename</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {deletingDoc && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[999999]" onClick={() => setDeletingDoc(null)}>
+          <div className="bg-white p-6 rounded-xl text-center shadow-xl max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2Icon className="w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-lg text-gray-900 mb-2">Delete Shared PDF</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete "{deletingDoc.display_name || 'this file'}"? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeletingDoc(null)} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={submitDelete} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">Delete</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {showConfirmDialog && createPortal(
@@ -1510,8 +1628,6 @@ export default function UploadAttendance({ onNavigate }) {
     </div>
   );
 }
-
-// --- SUBCOMPONENTS (DTR Adjustment, Tables, Tools) ---
 
 function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUser }) {
   const handleFieldChange = (field, value) => {
@@ -1769,7 +1885,6 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
   const startPos = useRef({ x: 0, y: 0 });
 
   const handlePointerDown = (e) => {
-    // Only drag from the handle to keep forms usable
     setIsDragging(true);
     const clientX = e.clientX || (e.touches && e.touches[0].clientX);
     const clientY = e.clientY || (e.touches && e.touches[0].clientY);
@@ -1779,7 +1894,7 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
   useEffect(() => {
     const handlePointerMove = (e) => {
       if (!isDragging) return;
-      if (e.type === 'touchmove') e.preventDefault(); // Prevent scrolling while dragging on touch screens
+      if (e.type === 'touchmove') e.preventDefault(); 
       
       const clientX = e.clientX || (e.touches && e.touches[0].clientX);
       const clientY = e.clientY || (e.touches && e.touches[0].clientY);
@@ -1814,13 +1929,12 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
         ref={ref} 
         className={`fixed bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-blue-200 p-4 rounded-xl flex flex-col gap-4 w-[18rem] z-[999999] transition-shadow ${isDragging ? 'shadow-blue-500/30' : ''}`}
         style={{
-            top: '32px', // Default anchor at top left, it moves from here.
+            top: '32px',
             left: '32px', 
             transform: `translate(${position.x}px, ${position.y}px)`,
-            touchAction: 'none' // Ensures touch drag works correctly
+            touchAction: 'none'
         }}
     >
-      {/* DRAG HANDLE */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3 -mx-2 px-2 -mt-2">
          <div 
             className="flex items-center gap-2 text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing w-full py-1"
