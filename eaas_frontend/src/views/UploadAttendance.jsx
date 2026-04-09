@@ -656,7 +656,7 @@ export default function UploadAttendance({ user }) {
     }
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/upload-attendance", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload-attendance", {
         method: "POST",
         body: formData,
       });
@@ -889,7 +889,7 @@ export default function UploadAttendance({ user }) {
       const finalPeriod = getPeriodText();
       const { filteredData } = getFilteredPayload();
 
-      const response = await fetch("http://127.0.0.1:8000/api/download-dtr", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/download-dtr", {
         method: "POST",
         mode: 'cors',
         headers: { "Content-Type": "application/json" },
@@ -939,7 +939,7 @@ export default function UploadAttendance({ user }) {
       const finalPeriod = getPeriodText();
       const { filteredData, filteredTasks } = getFilteredPayload();
 
-      const response = await fetch("http://127.0.0.1:8000/api/generate-ar", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/generate-ar", {
         method: "POST",
         mode: 'cors',
         headers: { "Content-Type": "application/json" },
@@ -997,7 +997,7 @@ export default function UploadAttendance({ user }) {
     try {
       const finalName = arMeta.name || selectedEmployee || currentUser?.full_name;
 
-      const response = await fetch("http://127.0.0.1:8000/api/generate-dtr-adjustment", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/generate-dtr-adjustment", {
         method: "POST",
         mode: 'cors',
         headers: { "Content-Type": "application/json" },

@@ -251,7 +251,7 @@ export default function Sidebar({ role, onLogout }) {
 
     if (finalUserId) {
       try {
-        await fetch("http://127.0.0.1:8000/api/logout", {
+        await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/logout", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
