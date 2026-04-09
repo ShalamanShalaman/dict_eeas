@@ -93,7 +93,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
 
     setSending(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/messages/send", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/messages/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
