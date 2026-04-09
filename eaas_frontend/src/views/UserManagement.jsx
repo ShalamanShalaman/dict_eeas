@@ -471,7 +471,7 @@ export default function UserManagement() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   <option value="employee">Employee</option>
-                  <option value="reviewer">Reviewer (Provincial Officer)</option>
+                  <option value="reviewer">Reviewer</option>
                   <option value="admin">Administrator</option>
                 </select>
               </div>

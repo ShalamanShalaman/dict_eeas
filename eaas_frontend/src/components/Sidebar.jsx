@@ -199,7 +199,8 @@ export default function Sidebar({ role, onLogout }) {
         items: [
           { label: "Upload Attendance", icon: Upload, path: "/upload" },
           { label: "Saved Progress", icon: Save, path: "/saved-progress" },
-          { label: "Submit for Approval", icon: Clock, path: "/submit-for-approval" },
+          // Appending ?new=true to ensure proper state resetting when navigating directly
+          { label: "Submit for Approval", icon: Clock, path: "/submit-for-approval?new=true", matchPath: "/submit-for-approval" },
           { label: "My Submissions", icon: FileText, path: "/submissions" },
         ]
       }
@@ -321,8 +322,9 @@ export default function Sidebar({ role, onLogout }) {
               )}
               
               <div className={`space-y-0.5 overflow-hidden transition-all ${(expandedCategories[category.id] || collapsed) ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                {category.items.map(({ label, icon: Icon, path }) => {
-                  const isActive = location.pathname === path;
+                {category.items.map(({ label, icon: Icon, path, matchPath }) => {
+                  const checkPath = matchPath || path.split('?')[0];
+                  const isActive = location.pathname === checkPath;
                   return (
                     <Link
                       key={label}

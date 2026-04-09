@@ -1,5 +1,8 @@
 import os
 import io
+import subprocess
+import shutil
+import platform
 from datetime import datetime
 
 try:
@@ -37,6 +40,50 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
+def get_libreoffice_executable():
+    if platform.system() == 'Darwin':
+        return '/Applications/LibreOffice.app/Contents/MacOS/soffice'
+    if shutil.which('libreoffice'):
+        return 'libreoffice'
+    if shutil.which('soffice'):
+        return 'soffice'
+    
+    if platform.system() == 'Windows':
+        common_paths = [
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+        ]
+        for p in common_paths:
+            if os.path.exists(p):
+                return p
+    return None
+
+def _convert_with_libreoffice(input_path, expected_pdf_path):
+    lo_exec = get_libreoffice_executable()
+    if not lo_exec:
+        return False
+
+    out_dir = os.path.dirname(expected_pdf_path)
+    try:
+        subprocess.run(
+            [lo_exec, '--headless', '--convert-to', 'pdf', input_path, '--outdir', out_dir],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        input_basename = os.path.basename(input_path)
+        name_without_ext = os.path.splitext(input_basename)[0]
+        generated_pdf = os.path.join(out_dir, f"{name_without_ext}.pdf")
+        
+        if os.path.exists(generated_pdf):
+            if os.path.abspath(generated_pdf) != os.path.abspath(expected_pdf_path):
+                shutil.move(generated_pdf, expected_pdf_path)
+            return True
+        return False
+    except Exception:
+        return False
+
 def convert_file_to_pdf(file_path, output_dir):
     if not REPORTLAB_AVAILABLE:
         raise Exception("PDF generation library not available")
@@ -58,14 +105,13 @@ def convert_file_to_pdf(file_path, output_dir):
     elif ext == 'txt':
         return _convert_txt_to_pdf(file_path, output_path)
     elif ext == 'pdf':
-        import shutil
         shutil.copy2(file_path, output_path)
         return output_path
     else:
         return _convert_generic_to_pdf(file_path, output_path)
 
 def _convert_docx_to_pdf(docx_path, pdf_path):
-    if DOCX2PDF_AVAILABLE:
+    if DOCX2PDF_AVAILABLE and platform.system() == 'Windows':
         try:
             import pythoncom
             pythoncom.CoInitialize()
@@ -78,7 +124,6 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
                 generated_pdf = os.path.join(temp_dir, f"{name_without_ext}.pdf")
                 
                 if os.path.exists(generated_pdf):
-                    import shutil
                     shutil.move(generated_pdf, pdf_path)
                     return pdf_path
             finally:
@@ -86,7 +131,10 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
         except Exception as e:
             error_msg = str(e).lower()
             if "word" in error_msg or "com" in error_msg or "co_create_instance" in error_msg:
-                raise Exception("Microsoft Word is required to convert Word documents with full formatting. Please install Microsoft Word and try again.")
+                pass
+
+    if _convert_with_libreoffice(docx_path, pdf_path):
+        return pdf_path
     
     if not DOCX_AVAILABLE:
         raise Exception("python-docx not available for DOCX conversion")
@@ -145,7 +193,7 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
     return pdf_path
 
 def _convert_xlsx_to_pdf(xlsx_path, pdf_path):
-    if WIN32_AVAILABLE:
+    if WIN32_AVAILABLE and platform.system() == 'Windows':
         try:
             import pythoncom
             pythoncom.CoInitialize()
@@ -166,6 +214,9 @@ def _convert_xlsx_to_pdf(xlsx_path, pdf_path):
                 pythoncom.CoUninitialize()
         except Exception as e:
             pass
+    
+    if _convert_with_libreoffice(xlsx_path, pdf_path):
+        return pdf_path
     
     if not XLSX_AVAILABLE:
         raise Exception("openpyxl not available for Excel conversion")
@@ -265,7 +316,6 @@ def merge_pdfs_to_single(file_paths, output_path):
         from PyPDF2 import PdfMerger
         merger = PdfMerger()
         
-        # Create a temporary directory for pre-conversion
         temp_dir = os.path.join(os.path.dirname(output_path), 'temp_conversions')
         os.makedirs(temp_dir, exist_ok=True)
         
@@ -276,10 +326,8 @@ def merge_pdfs_to_single(file_paths, output_path):
                 ext = file_path.lower().split('.')[-1]
                 
                 if ext == 'pdf':
-                    # Already a PDF, merge directly
                     merger.append(file_path)
                 else:
-                    # Convert to PDF first
                     converted_pdf = convert_file_to_pdf(file_path, temp_dir)
                     if converted_pdf and os.path.exists(converted_pdf):
                         merger.append(converted_pdf)
@@ -290,7 +338,6 @@ def merge_pdfs_to_single(file_paths, output_path):
         
         merger.close()
         
-        # Cleanup temporary converted files
         for temp_file in temp_files_to_cleanup:
             try:
                 if os.path.exists(temp_file):
@@ -306,7 +353,6 @@ def merge_pdfs_to_single(file_paths, output_path):
         return output_path
     except ImportError:
         if file_paths and os.path.exists(file_paths[0]):
-            import shutil
             shutil.copy2(file_paths[0], output_path)
             return output_path
         raise Exception("PyPDF2 not available for PDF merging")

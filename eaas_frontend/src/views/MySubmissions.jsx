@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
@@ -148,7 +149,8 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-export default function MySubmissions({ user, onNavigate }) {
+export default function MySubmissions({ user }) {
+  const navigate = useNavigate();
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -226,11 +228,6 @@ export default function MySubmissions({ user, onNavigate }) {
     }
   };
 
-  const handleView = (doc) => {
-    onNavigate("Upload Attendance");
-    window.history.pushState({}, '', `?doc_id=${doc.id}`);
-  };
-
   const handleViewPdf = (doc) => {
     const filename = getFilename(doc);
     setViewPdfModal({
@@ -288,7 +285,7 @@ export default function MySubmissions({ user, onNavigate }) {
           </select>
 
           <button
-            onClick={() => onNavigate("Upload Attendance")}
+            onClick={() => navigate('/upload')}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
           >
             <UploadIcon className="w-4 h-4" />
@@ -326,7 +323,7 @@ export default function MySubmissions({ user, onNavigate }) {
             {search || filter !== 'all' ? "Try adjusting your search or filter criteria" : "Start by creating your first attendance submission"}
           </p>
           <button
-            onClick={() => onNavigate("Upload Attendance")}
+            onClick={() => navigate("/upload")}
             className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
           >
             Create Submission

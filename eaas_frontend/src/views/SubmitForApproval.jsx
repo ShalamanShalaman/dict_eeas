@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import SuccessModal from "../components/SuccessModal";
 
 const Icon = ({ children, className }) => (
@@ -93,7 +94,10 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
   );
 };
 
-export default function SubmitForApproval({ user, onNavigate }) {
+export default function SubmitForApproval({ user }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [files, setFiles] = useState([]);
   const [converting, setConverting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -116,40 +120,40 @@ export default function SubmitForApproval({ user, onNavigate }) {
   
   const fileInputRef = useRef(null);
 
-  const CACHE_KEY = `submitForApproval_${user?.user_id || 'default'}`;
-
   useEffect(() => {
-    const cached = sessionStorage.getItem(CACHE_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (parsed.convertedDocumentId) {
-          setCurrentStep(parsed.currentStep || 2);
-          setConvertedDocumentId(parsed.convertedDocumentId);
-          setConvertedFilePath(parsed.convertedFilePath);
-          setConvertedFileName(parsed.convertedFileName);
-          if (parsed.customFileName) setCustomFileName(parsed.customFileName);
-          if (parsed.selectedReviewerId) setSelectedReviewerId(parsed.selectedReviewerId);
+    const isNew = searchParams.get('new') === 'true';
+    if (isNew) {
+      resetForm();
+      navigate('/submit-for-approval', { replace: true });
+      return;
+    }
+
+    const step = parseInt(searchParams.get('step')) || 1;
+    const docId = searchParams.get('docId');
+
+    if (step === 2 && docId && docId !== convertedDocumentId?.toString()) {
+      setCurrentStep(2);
+      setConvertedDocumentId(docId);
+      
+      const fetchDocDetails = async () => {
+        try {
+          if (!user?.user_id) return;
+          const response = await fetch(`http://127.0.0.1:8000/api/document/user/${user.user_id}`);
+          if (response.ok) {
+            const docs = await response.json();
+            const targetDoc = docs.find(d => d.id.toString() === docId);
+            if (targetDoc) {
+              setConvertedFilePath(targetDoc.file_path);
+              setConvertedFileName(targetDoc.file_path.split(/[/\\]/).pop());
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch doc details", err);
         }
-      } catch (e) {
-        console.error("Failed to parse cache", e);
-      }
-    }
-  }, [user?.user_id]);
-
-  useEffect(() => {
-    if (convertedDocumentId) {
-      const cacheData = {
-        currentStep,
-        convertedDocumentId,
-        convertedFilePath,
-        convertedFileName,
-        customFileName,
-        selectedReviewerId
       };
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      fetchDocDetails();
     }
-  }, [currentStep, convertedDocumentId, convertedFilePath, convertedFileName, customFileName, selectedReviewerId, CACHE_KEY]);
+  }, [searchParams, user?.user_id]);
 
   useEffect(() => {
     const fetchReviewers = async () => {
@@ -270,6 +274,7 @@ export default function SubmitForApproval({ user, onNavigate }) {
       setConvertedFilePath(uploadResult.file_path);
       setConvertedFileName(uploadResult.file_path.split(/[/\\]/).pop());
       setCurrentStep(2);
+      navigate(`?step=2&docId=${uploadResult.document.id}`);
       setSuccessMessage("Files successfully merged and converted to PDF.");
       
     } catch (err) {
@@ -319,7 +324,9 @@ export default function SubmitForApproval({ user, onNavigate }) {
         
         setSuccessReviewerName(reviewerName);
         setShowSuccessModal(true);
-        resetForm();
+        setTimeout(() => {
+            navigate('/submissions');
+        }, 2000);
       } else {
         setError(submitResult.message || submitResult.error || 'Failed to submit document to reviewer');
       }
@@ -351,7 +358,6 @@ export default function SubmitForApproval({ user, onNavigate }) {
     }
     setError(null);
     setSuccessMessage(null);
-    sessionStorage.removeItem(CACHE_KEY);
   };
 
   const handleRenameFile = async () => {
@@ -397,13 +403,8 @@ export default function SubmitForApproval({ user, onNavigate }) {
   };
 
   const handleBackToStep1 = () => {
-    setCurrentStep(1);
-    setError(null);
-    sessionStorage.removeItem(CACHE_KEY);
-    setConvertedDocumentId(null);
-    setConvertedFilePath(null);
-    setConvertedFileName(null);
-    setFiles([]);
+    resetForm();
+    navigate('/submit-for-approval');
   };
 
   const handleViewPDF = () => {
@@ -776,8 +777,7 @@ export default function SubmitForApproval({ user, onNavigate }) {
         message="Successfully submitted to the designated reviewer"
         subMessage={successReviewerName ? `Submitted to: ${successReviewerName}` : undefined}
         onClose={() => setShowSuccessModal(false)}
-        autoClose={true}
-        autoCloseDelay={4000}
+        autoClose={false}
       />
     </div>
   );

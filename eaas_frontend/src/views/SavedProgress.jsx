@@ -127,7 +127,7 @@ const ChevronRightIcon = ({ className }) => (
   </Icon>
 );
 
-export default function SavedProgress({ onResumeWork, onNewProgress, user: propUser }) {
+export default function SavedProgress({ user: propUser }) {
   const [savedDocs, setSavedDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -138,6 +138,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
   const [markMode, setMarkMode] = useState(false);
   const [pinnedIds, setPinnedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab, setActiveTab] = useState('attendance');
   const itemsPerPage = 10;
   const navigate = useNavigate();
 
@@ -173,11 +174,11 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
 
       const result = await response.json();
       
-      // Filter out non-JSON drafts so merged PDFs do not show up here
       const drafts = (result || []).filter(doc => {
           const isDraftStatus = doc.is_draft || doc.status === 'draft';
           const isJsonFile = doc.file_path && doc.file_path.toLowerCase().endsWith('.json');
-          return isDraftStatus && isJsonFile;
+          const isPdfFile = doc.file_path && doc.file_path.toLowerCase().endsWith('.pdf');
+          return isDraftStatus && (isJsonFile || isPdfFile);
       });
       
       const sorted = drafts.sort((a, b) => {
@@ -287,8 +288,6 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       if (doc.file_path) {
           const parts = doc.file_path.split(/[/\\]/);
           let name = parts[parts.length - 1];
-          // Remove the Laravel uniqid prefix (e.g. 64abc123_filename.json -> filename.json)
-          // It looks for a 13-character hex string followed by an underscore
           if (/^[a-f0-9]{13}_/.test(name)) {
               name = name.substring(14);
           }
@@ -297,12 +296,19 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
       return doc.filename || "Untitled Document";
   };
 
+  const isJsonDocument = (doc) => getDisplayFilename(doc).toLowerCase().endsWith('.json');
+
   const filteredDocs = savedDocs.filter(doc => {
     const filename = getDisplayFilename(doc).toLowerCase();
     return filename.toLowerCase().includes(search.toLowerCase());
   });
 
-  const displayedDocs = [...filteredDocs].sort((a, b) => {
+  const attendanceDocs = filteredDocs.filter(isJsonDocument);
+  const pdfDocs = filteredDocs.filter(doc => !isJsonDocument(doc));
+
+  const activeTabDocs = activeTab === 'attendance' ? attendanceDocs : pdfDocs;
+
+  const displayedDocs = [...activeTabDocs].sort((a, b) => {
     const aPinned = pinnedIds.find(x => String(x) === String(a.id)) ? 1 : 0;
     const bPinned = pinnedIds.find(x => String(x) === String(b.id)) ? 1 : 0;
     return bPinned - aPinned;
@@ -417,7 +423,20 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
         </div>
       </div>
 
-      <hr className="border-slate-100" />
+      <div className="flex border-b border-slate-200 mb-6 mt-4">
+        <button
+          onClick={() => { setActiveTab('attendance'); setCurrentPage(1); setMarkedIds([]); setMarkMode(false); }}
+          className={`py-3 px-6 text-sm font-medium border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
+        >
+          Attendance Drafts <span className="ml-2 bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full text-xs">{attendanceDocs.length}</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('pdfs'); setCurrentPage(1); setMarkedIds([]); setMarkMode(false); }}
+          className={`py-3 px-6 text-sm font-medium border-b-2 transition-colors ${activeTab === 'pdfs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
+        >
+          Ready to Submit <span className="ml-2 bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full text-xs">{pdfDocs.length}</span>
+        </button>
+      </div>
 
       {!currentUser ? (
          <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center text-amber-800">
@@ -429,12 +448,14 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
           <p>Loading your library...</p>
         </div>
-      ) : filteredDocs.length === 0 ? (
+      ) : activeTabDocs.length === 0 ? (
         <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
           <FolderIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900">No saved progress found</h3>
+          <h3 className="text-lg font-medium text-slate-900">No documents found</h3>
           <p className="text-slate-500 max-w-sm mx-auto mt-2">
-            When you save your work in the Attendance Processor, it will appear here for you to resume later.
+            {activeTab === 'attendance' 
+              ? "When you save your work in the Attendance Processor, it will appear here for you to resume later."
+              : "When you convert attachments into a PDF, they will appear here waiting to be submitted to your reviewer."}
           </p>
         </div>
       ) : (
@@ -443,7 +464,7 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
             {currentDocs.map((doc) => {
               const isMarked = markedIds.find(x => String(x) === String(doc.id)) ? true : false;
               const isPinned = pinnedIds.find(x => String(x) === String(doc.id)) ? true : false;
-              const isJson = getDisplayFilename(doc).toLowerCase().endsWith('.json');
+              const isJson = isJsonDocument(doc);
 
               return (
               <div 
@@ -467,20 +488,15 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
                 )}
                 
                 <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 flex items-center gap-2">
+                  <div className={`p-2 rounded-lg flex items-center gap-2 ${isJson ? 'bg-indigo-50 text-indigo-600' : 'bg-red-50 text-red-600'}`}>
                      <Icon className="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></Icon>
                      {!markMode && isPinned && (
                        <PinIcon className="w-4 h-4 text-yellow-500 fill-current" />
                      )}
                   </div>
                   <div className="flex items-center gap-1">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
-                          doc.status === 'approved' ? 'bg-green-100 text-green-700' :
-                          doc.status === 'declined' ? 'bg-red-100 text-red-700' :
-                          doc.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
-                          'bg-slate-100 text-slate-600'
-                      }`}>
-                          {doc.status}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider bg-slate-100 text-slate-600`}>
+                          DRAFT
                       </span>
                       {!markMode && (
                       <button
@@ -526,15 +542,20 @@ export default function SavedProgress({ onResumeWork, onNewProgress, user: propU
                   <span>{new Date(doc.updated_at || doc.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
 
-                {isJson && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); navigate(`/upload?doc_id=${doc.id}`); }}
-                    className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
-                  >
-                    <ExternalLinkIcon className="w-4 h-4" />
-                    Resume Work
-                  </button>
-                )}
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if (isJson) {
+                      navigate(`/upload?doc_id=${doc.id}`); 
+                    } else {
+                      navigate(`/submit-for-approval?step=2&docId=${doc.id}`);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-700 py-2.5 rounded-lg font-medium transition-all"
+                >
+                  <ExternalLinkIcon className="w-4 h-4" />
+                  {isJson ? "Resume Work" : "Submit File"}
+                </button>
               </div>
               );
             })}

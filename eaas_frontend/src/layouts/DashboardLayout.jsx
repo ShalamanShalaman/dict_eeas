@@ -1,8 +1,9 @@
+import { Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 
 export default function DashboardLayout({
-  user, // <--- Receive user object
+  user,
   role,
   setRole,
   activePage,
@@ -19,10 +20,11 @@ export default function DashboardLayout({
         onLogout={onLogout}
       />
 
-      <div className="flex-1 flex flex-col">
-        {/* Pass user to Header for permission checks */}
+      <div className="flex-1 flex flex-col min-w-0">
         <Header role={role} setRole={setRole} user={user} onLogout={onLogout} />
-        <main className="flex-1 overflow-auto p-2">{children}</main>
+        <main className="flex-1 overflow-auto p-2">
+          {children || <Outlet context={{ user, role, setRole }} />}
+        </main>
       </div>
     </div>
   );

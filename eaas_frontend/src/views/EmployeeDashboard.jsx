@@ -1,10 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import UploadAttendance from "../views/UploadAttendance";
-import SavedProgress from "./SavedProgress";
-import AttachFiles from "./AttachFiles";
-import MySubmissions from "./MySubmissions";
-import SubmitForApproval from "./SubmitForApproval";
 
 // Icons
 const Icon = ({ children, className }) => (
@@ -90,15 +85,6 @@ const MapPinIcon = ({ className }) => (
   </Icon>
 );
 
-const CalendarIcon = ({ className }) => (
-  <Icon className={className}>
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </Icon>
-);
-
 const TrendingUpIcon = ({ className }) => (
   <Icon className={className}>
     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
@@ -109,28 +95,6 @@ const TrendingUpIcon = ({ className }) => (
 const ActivityIcon = ({ className }) => (
   <Icon className={className}>
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-  </Icon>
-);
-
-const TrashIcon = ({ className }) => (
-  <Icon className={className}>
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </Icon>
-);
-
-const EyeIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
-  </Icon>
-);
-
-const DownloadIcon = ({ className }) => (
-  <Icon className={className}>
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
   </Icon>
 );
 
@@ -158,7 +122,6 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// Stats Card Component matching ReviewerDashboard aesthetic
 function StatsCard({ title, value, icon: IconComponent, variant }) {
   if (variant === 'white') {
     return (
@@ -194,7 +157,6 @@ function StatsCard({ title, value, icon: IconComponent, variant }) {
   );
 }
 
-// Quick Action Button Component
 function QuickAction({ icon: IconComponent, title, description, onClick, color }) {
   const colorClasses = {
     blue: "hover:bg-blue-50 hover:border-blue-300 text-blue-600",
@@ -219,7 +181,6 @@ function QuickAction({ icon: IconComponent, title, description, onClick, color }
   );
 }
 
-// Activity Item Component
 function ActivityItem({ activity }) {
   const getIcon = () => {
     switch (activity.status) {
@@ -263,15 +224,14 @@ function ActivityItem({ activity }) {
   );
 }
 
-// Main Dashboard Component
-function DashboardHome({ user, onNavigate }) {
+export default function EmployeeDashboard({ user }) {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ total: 0, draft: 0, submitted: 0, approved: 0, declined: 0 });
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [imageHash, setImageHash] = useState(() => Date.now());
 
   useEffect(() => {
-    // Update hash whenever the user object changes (like after a profile picture upload)
     setImageHash(Date.now());
   }, [user]);
 
@@ -310,7 +270,7 @@ function DashboardHome({ user, onNavigate }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+      <div className="p-6 bg-slate-50 min-h-screen flex flex-col items-center justify-center text-slate-400">
         <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
         <p>Loading dashboard...</p>
       </div>
@@ -318,14 +278,14 @@ function DashboardHome({ user, onNavigate }) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="p-6 bg-slate-50 min-h-screen space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Welcome back, {user?.first_name || 'Employee'}! 👋</h2>
           <p className="text-slate-500 mt-1">Here's what's happening with your submissions today.</p>
         </div>
         <button
-          onClick={() => onNavigate("Upload Attendance")}
+          onClick={() => navigate("/upload")}
           className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm hover:shadow-md"
         >
           <UploadIcon className="w-4 h-4" />
@@ -346,10 +306,10 @@ function DashboardHome({ user, onNavigate }) {
           Quick Actions
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <QuickAction icon={UploadIcon} title="New Submission" description="Create attendance report" onClick={() => onNavigate("Upload Attendance")} color="blue" />
-          <QuickAction icon={SaveIcon} title="Saved Progress" description="Continue working on drafts" onClick={() => onNavigate("Saved Progress")} color="purple" />
-          <QuickAction icon={FileTextIcon} title="My Submissions" description="View all submissions" onClick={() => onNavigate("My Submissions")} color="green" />
-          <QuickAction icon={UserIcon} title="My Profile" description="Update your information" onClick={() => window.location.href = '/profile'} color="orange" />
+          <QuickAction icon={UploadIcon} title="New Submission" description="Create attendance report" onClick={() => navigate("/upload")} color="blue" />
+          <QuickAction icon={SaveIcon} title="Saved Progress" description="Continue working on drafts" onClick={() => navigate("/saved-progress")} color="purple" />
+          <QuickAction icon={FileTextIcon} title="My Submissions" description="View all submissions" onClick={() => navigate("/submissions")} color="green" />
+          <QuickAction icon={UserIcon} title="My Profile" description="Update your information" onClick={() => navigate("/profile")} color="orange" />
         </div>
       </div>
 
@@ -360,7 +320,7 @@ function DashboardHome({ user, onNavigate }) {
               <TrendingUpIcon className="w-5 h-5 text-indigo-600" />
               Recent Activity
             </h3>
-            <button onClick={() => onNavigate("My Submissions")} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            <button onClick={() => navigate("/submissions")} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
               View All →
             </button>
           </div>
@@ -420,7 +380,7 @@ function DashboardHome({ user, onNavigate }) {
                 <BriefcaseIcon className="w-4 h-4 text-slate-400 mt-0.5" />
                 <div>
                   <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-0.5">Position</p>
-                  <p className="font-semibold text-slate-800">{user?.position_name || 'Not assigned'}</p>
+                  <p className="font-semibold text-slate-800">{user?.position_name || user?.position_id || 'Not assigned'}</p>
                 </div>
               </div>
               
@@ -428,7 +388,7 @@ function DashboardHome({ user, onNavigate }) {
                 <MapPinIcon className="w-4 h-4 text-slate-400 mt-0.5" />
                 <div>
                   <p className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-0.5">Office</p>
-                  <p className="font-semibold text-slate-800">{user?.office_name || 'Not assigned'}</p>
+                  <p className="font-semibold text-slate-800">{user?.office_name || user?.office_location_id || 'Not assigned'}</p>
                 </div>
               </div>
               
@@ -441,7 +401,7 @@ function DashboardHome({ user, onNavigate }) {
               </div>
             </div>
 
-            <button onClick={() => window.location.href = '/profile'} className="w-full mt-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2.5 rounded-lg font-medium transition-colors text-sm">
+            <button onClick={() => navigate("/profile")} className="w-full mt-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2.5 rounded-lg font-medium transition-colors text-sm">
               Edit Profile
             </button>
           </div>
@@ -449,69 +409,4 @@ function DashboardHome({ user, onNavigate }) {
       </div>
     </div>
   );
-}
-
-// Main EmployeeDashboard Component
-export default function EmployeeDashboard({ selectedMenu, setActivePage, user }) {
-  const navigate = useNavigate();
-
-  const handleNavigate = (menu) => {
-    switch (menu) {
-      case "Dashboard":
-        navigate('/');
-        break;
-      case "Upload Attendance":
-        navigate('/upload');
-        break;
-      case "Saved Progress":
-        navigate('/saved-progress');
-        break;
-      case "Submit for Approval":
-        navigate('/submit-for-approval');
-        break;
-      case "My Submissions":
-        navigate('/submissions');
-        break;
-      default:
-        navigate('/');
-    }
-  };
-
-  switch (selectedMenu) {
-    case "Dashboard":
-      return (
-        <div className="p-6 bg-slate-50 min-h-screen">
-          <DashboardHome user={user} onNavigate={handleNavigate} />
-        </div>
-      );
-
-    case "Upload Attendance":
-      return <UploadAttendance user={user} />;
-
-    case "Saved Progress":
-      return <SavedProgress user={user} onResumeWork={(doc) => {
-        navigate(`/upload?doc_id=${doc.id}`);
-      }} onNewProgress={() => navigate('/upload')} />;
-
-    case "Submit for Approval":
-      return (
-        <div className="p-6 bg-slate-50 min-h-screen">
-          <SubmitForApproval user={user} onNavigate={handleNavigate} />
-        </div>
-      );
-
-    case "My Submissions":
-      return (
-        <div className="p-6 bg-slate-50 min-h-screen">
-          <MySubmissions user={user} onNavigate={handleNavigate} />
-        </div>
-      );
-
-    default:
-      return (
-        <div className="p-6 bg-slate-50 min-h-screen">
-          <DashboardHome user={user} onNavigate={handleNavigate} />
-        </div>
-      );
-  }
 }

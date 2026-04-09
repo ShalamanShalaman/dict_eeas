@@ -55,22 +55,19 @@ const UploadIcon = ({ className }) => (<Icon className={className}><path d="M21 
 const FileTextIcon = ({ className }) => (<Icon className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></Icon>);
 const DownloadIcon = ({ className }) => (<Icon className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></Icon>);
 const Trash2Icon = ({ className }) => (<Icon className={className}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></Icon>);
-const Edit3Icon = ({ className }) => (<Icon className={className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></Icon>);
+const Edit3Icon = ({ className }) => (<Icon className={className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1-4L16.5 3.5z" /></Icon>);
 const UserIcon = ({ className }) => (<Icon className={className}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Icon>);
 const BriefcaseIcon = ({ className }) => (<Icon className={className}><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></Icon>);
 const MapPinIcon = ({ className }) => (<Icon className={className}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></Icon>);
 const LayersIcon = ({ className }) => (<Icon className={className}><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></Icon>);
 const BadgeCheckIcon = ({ className }) => (<Icon className={className}><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.78 4.78 4 4 0 0 1-6.74 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" /><path d="m9 12 2 2 4-4" /></Icon>);
 const CalendarIcon = ({ className }) => (<Icon className={className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></Icon>);
-const ListIcon = ({ className }) => (<Icon className={className}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></Icon>);
 const CheckIcon = ({ className }) => (<Icon className={className}><polyline points="20 6 9 17 4 12" /></Icon>);
 const SaveIcon = ({ className }) => (<Icon className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></Icon>);
-const FileSignatureIcon = ({ className }) => (<Icon className={className}><path d="M20 19v2a2 2 0 0 1-2-2V6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8" /><path d="M18 13.5L21.5 10l-4.5-4.5L13.5 9" /><path d="M13.5 9L10 12.5V16h3.5L17 12.5" /></Icon>);
-const FileWarningIcon = ({ className }) => (<Icon className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M12 9v4" /><path d="M12 17h.01" /></Icon>);
 const AlertCircleIcon = ({ className }) => (<Icon className={className}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></Icon>);
 const PlusIcon = ({ className }) => (<Icon className={className}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></Icon>);
 const XIcon = ({ className }) => (<Icon className={className}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon>);
-const PencilIcon = ({ className }) => (<Icon className={className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></Icon>);
+const PencilIcon = ({ className }) => (<Icon className={className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1-4L16.5 3.5z" /></Icon>);
 const ChevronDownIcon = ({ className }) => (<Icon className={className}><polyline points="6 9 12 15 18 9" /></Icon>);
 const GripIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -83,7 +80,7 @@ const GripIcon = ({ className }) => (
   </svg>
 );
 
-export default function UploadAttendance({ onNavigate }) {
+export default function UploadAttendance({ user }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState({});
@@ -101,7 +98,6 @@ export default function UploadAttendance({ onNavigate }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); 
-  const [targetNavigatePath, setTargetNavigatePath] = useState(null);
   
   const [showNameModal, setShowNameModal] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -113,7 +109,6 @@ export default function UploadAttendance({ onNavigate }) {
   const [deletingDoc, setDeletingDoc] = useState(null);
 
   const [reviewers, setReviewers] = useState([]);
-  const [showReviewerDropdown, setShowReviewerDropdown] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -225,6 +220,37 @@ export default function UploadAttendance({ onNavigate }) {
     fetchReviewers();
   }, [currentUser]);
 
+  const getDefaultMeta = () => {
+    const defaultReviewer = reviewers.find(r => r.full_name === currentUser?.provincial_officer);
+    return {
+        name: currentUser?.full_name || "", 
+        adjustmentName: "",
+        position: currentUser?.position_name || currentUser?.position || currentUser?.position_id || "", 
+        office: currentUser?.office_name || currentUser?.office_location || currentUser?.office_location_id || "", 
+        approver: currentUser?.provincial_officer || "",
+        approverTitle: defaultReviewer ? (defaultReviewer.position || defaultReviewer.position_id || "") : "",
+        project: "", 
+        periodFormat: "full",
+        tasks: {},
+        manualHighlights: {},
+        employeeNo: "", controlNo: "", filingDate: "", adjustmentReason: "", adjustmentDetails: "", obWith: "", obAt: "",
+        adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" })
+    };
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+        setArMeta(prev => ({
+            ...prev,
+            name: prev.name || currentUser.full_name || "", 
+            position: prev.position || currentUser.position_name || currentUser.position || currentUser.position_id || "",
+            office: prev.office || currentUser.office_name || currentUser.office_location || currentUser.office_location_id || "",
+            approver: prev.approver || currentUser.provincial_officer || "",
+            approverTitle: prev.approverTitle || (reviewers.find(r => r.full_name === currentUser.provincial_officer)?.position || "")
+        }));
+    }
+  }, [currentUser, reviewers]);
+
   useEffect(() => {
     const fetchLatestSharedPdf = async () => {
       if (!currentUser?.user_id) return;
@@ -253,19 +279,6 @@ export default function UploadAttendance({ onNavigate }) {
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser) {
-       setArMeta(prev => ({
-           ...prev,
-           name: prev.name || currentUser.full_name || "", 
-           adjustmentName: prev.adjustmentName || "",
-           position: prev.position || currentUser.position_name || currentUser.position_id || "",
-           office: prev.office || currentUser.office_name || currentUser.office_location_id || "",
-           approver: prev.approver || currentUser.provincial_officer || ""
-       }));
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
     if (selectedEmployee && employees[selectedEmployee]) {
         const months = Object.keys(employees[selectedEmployee]);
         if (months.length > 0) {
@@ -287,6 +300,13 @@ export default function UploadAttendance({ onNavigate }) {
         loadSavedDocument(docId);
     }
   }, [currentUser, searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      handleClearAll();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -664,16 +684,9 @@ export default function UploadAttendance({ onNavigate }) {
         setSearchParams({}); 
         
         setArMeta(prev => ({
-            ...prev,
+            ...getDefaultMeta(),
             name: currentUser?.full_name || firstEmp,
-            adjustmentName: "",
-            position: currentUser?.position_name || currentUser?.position_id || "",
-            office: currentUser?.office_name || currentUser?.office_location_id || "",
-            approver: currentUser?.provincial_officer || "",
-            project: prev.project || "",
-            periodFormat: "full",
-            tasks: {},
-            manualHighlights: {}
+            project: prev.project || ""
         }));
       } else {
         setAppAlert(result.error || "Failed to process PDF.");
@@ -732,18 +745,7 @@ export default function UploadAttendance({ onNavigate }) {
     setSelectedMonth("");
     setSavedDocId(null);
     setHasUnsavedChanges(false);
-    setArMeta({ 
-        name: currentUser?.full_name || "", 
-        adjustmentName: "",
-        position: currentUser?.position_name || currentUser?.position_id || "", 
-        office: currentUser?.office_name || currentUser?.office_location_id || "", 
-        approver: currentUser?.provincial_officer || "",
-        approverTitle: "",
-        project: "", 
-        periodFormat: "full",
-        tasks: {},
-        manualHighlights: {}
-    });
+    setArMeta(getDefaultMeta());
     if (fileInputRef.current) fileInputRef.current.value = null;
     setSearchParams({});
   };
@@ -1038,10 +1040,6 @@ export default function UploadAttendance({ onNavigate }) {
 
   const inputClass = (isDisabled) => `w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none ${isDisabled ? 'bg-gray-100 opacity-60 cursor-not-allowed' : 'bg-white'}`;
   const labelClass = (isDisabled) => `text-xs font-semibold flex items-center gap-1 ${isDisabled ? 'text-gray-400' : 'text-gray-500'}`;
-
-  const filteredReviewers = reviewers.filter(rev =>
-      rev.full_name.toLowerCase().includes((arMeta.approver || "").toLowerCase())
-  );
 
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto min-h-screen pb-32">
@@ -1361,40 +1359,30 @@ export default function UploadAttendance({ onNavigate }) {
                 </div>
                 <div className="space-y-1 relative">
                     <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approved By</label>
-                    <div className="relative">
-                        <input
-                            className={inputClass(false) + " pr-8"}
-                            placeholder="Provincial Officer Name"
-                            value={arMeta.approver}
-                            onChange={(e) => {
-                                setArMeta({ ...arMeta, approver: e.target.value });
-                                setHasUnsavedChanges(true);
-                                setShowReviewerDropdown(true);
-                            }}
-                            onFocus={() => setShowReviewerDropdown(true)}
-                            onBlur={() => setTimeout(() => setShowReviewerDropdown(false), 200)}
-                            disabled={false}
-                        />
-                        <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    </div>
-                    {showReviewerDropdown && filteredReviewers.length > 0 && (
-                        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
-                            {filteredReviewers.map((rev, idx) => (
-                                <li
-                                    key={idx}
-                                    className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700"
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        setArMeta({ ...arMeta, approver: rev.full_name, approverTitle: rev.position || rev.position_id || "" });
-                                        setHasUnsavedChanges(true);
-                                        setShowReviewerDropdown(false);
-                                    }}
-                                >
-                                    {rev.full_name}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <input
+                        list="reviewer-options"
+                        className={inputClass(false)}
+                        placeholder="Provincial Officer Name"
+                        value={arMeta.approver}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            const rev = reviewers.find(r => r.full_name === val);
+                            setArMeta({ 
+                                ...arMeta, 
+                                approver: val,
+                                ...(rev && { approverTitle: rev.position || rev.position_id || "" })
+                            });
+                            setHasUnsavedChanges(true);
+                        }}
+                        disabled={false}
+                    />
+                    <datalist id="reviewer-options">
+                        {reviewers.map((rev, idx) => (
+                            <option key={idx} value={rev.full_name}>
+                                {rev.office_location ? `(${rev.office_location})` : ''}
+                            </option>
+                        ))}
+                    </datalist>
                 </div>
                 <div className="space-y-1">
                     <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
