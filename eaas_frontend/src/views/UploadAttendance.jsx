@@ -202,7 +202,7 @@ export default function UploadAttendance({ user }) {
     const fetchReviewers = async () => {
       if (!currentUser) return;
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/document/reviewers`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/reviewers`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
@@ -263,7 +263,7 @@ export default function UploadAttendance({ user }) {
         if (officeName) params.set("office", officeName);
 
         const response = await fetch(
-          `http://127.0.0.1:8000/api/shared-pdf/list?${params.toString()}`
+          `${import.meta.env.VITE_API_BASE_URL}/api/shared-pdf/list?${params.toString()}`
         );
         if (!response.ok) return;
         const list = await response.json();
@@ -334,7 +334,7 @@ export default function UploadAttendance({ user }) {
   const loadSavedDocument = async (docId) => {
     setLoading(true);
     try {
-        const response = await fetch(`http://127.0.0.1:8000/api/document/content/${docId}?user_id=${currentUser.user_id}`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/content/${docId}?user_id=${currentUser.user_id}`);
         
         if (response.status === 403 || response.status === 404) {
              setSearchParams({}); 
@@ -429,7 +429,7 @@ export default function UploadAttendance({ user }) {
       }
 
       if (!pdfFile && input?.id) {
-        const response = await fetch(`http://127.0.0.1:8000/api/document/view/${input.id}`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${input.id}`);
         if (!response.ok) throw new Error("Failed to load shared PDF");
 
         const blob = await response.blob();
@@ -473,7 +473,7 @@ export default function UploadAttendance({ user }) {
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/rename/${renamingDoc.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/rename/${renamingDoc.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: trimmed, user_id: currentUser?.user_id })
@@ -500,7 +500,7 @@ export default function UploadAttendance({ user }) {
   const submitDelete = async () => {
     if (!deletingDoc) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/${deletingDoc.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/${deletingDoc.id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: currentUser?.user_id })
@@ -606,7 +606,7 @@ export default function UploadAttendance({ user }) {
 
         let url = "http://127.0.0.1:8000/api/document/upload";
         if (savedDocId) {
-             url = `http://127.0.0.1:8000/api/document/autosave/${savedDocId}`;
+             url = `${import.meta.env.VITE_API_BASE_URL}/api/document/autosave/${savedDocId}`;
         }
 
         const response = await fetch(url, { method: "POST", body: formData });

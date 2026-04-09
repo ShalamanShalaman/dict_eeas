@@ -34,7 +34,7 @@ export default function PDFViewerModal({ isOpen, onClose, documentId, title }) {
 
   if (!isOpen) return null;
 
-  const pdfUrl = `http://127.0.0.1:8000/api/document/view/${documentId}`;
+  const pdfUrl = `${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -103,7 +103,7 @@ export default function PDFViewerModal({ isOpen, onClose, documentId, title }) {
           </p>
           <div className="flex items-center gap-2">
             <a
-              href={`http://127.0.0.1:8000/api/document/download/${documentId}`}
+              href={`${import.meta.env.VITE_API_BASE_URL}/api/document/download/${documentId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"

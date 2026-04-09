@@ -75,7 +75,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`http://127.0.0.1:8000/api/document/view/${documentId}`}
+              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -138,7 +138,7 @@ export default function SubmitForApproval({ user }) {
       const fetchDocDetails = async () => {
         try {
           if (!user?.user_id) return;
-          const response = await fetch(`http://127.0.0.1:8000/api/document/user/${user.user_id}`);
+          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/user/${user.user_id}`);
           if (response.ok) {
             const docs = await response.json();
             const targetDoc = docs.find(d => d.id.toString() === docId);
@@ -308,7 +308,7 @@ export default function SubmitForApproval({ user }) {
       submitFormData.append('user_id', user.user_id);
       submitFormData.append('reviewer_id', selectedReviewerId);
 
-      const submitResponse = await fetch(`http://127.0.0.1:8000/api/document/submit/${convertedDocumentId}`, {
+      const submitResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/submit/${convertedDocumentId}`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json'
@@ -370,7 +370,7 @@ export default function SubmitForApproval({ user }) {
     setError(null);
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/rename/${convertedDocumentId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/rename/${convertedDocumentId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

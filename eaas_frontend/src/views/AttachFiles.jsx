@@ -154,7 +154,7 @@ export default function AttachFiles({ user, onSubmit, onClose }) {
       submitFormData.append('user_id', user.user_id);
       submitFormData.append('reviewer_id', selectedReviewerId);
 
-      const submitResponse = await fetch(`http://127.0.0.1:8000/api/document/submit/${uploadResult.document.id}`, {
+      const submitResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/submit/${uploadResult.document.id}`, {
         method: 'POST',
         body: submitFormData
       });

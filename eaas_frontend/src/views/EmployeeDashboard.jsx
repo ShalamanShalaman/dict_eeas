@@ -240,7 +240,7 @@ export default function EmployeeDashboard({ user }) {
       if (!user?.user_id) return;
       
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/document/user/${user.user_id}`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/user/${user.user_id}`);
         if (response.ok) {
           const data = await response.json();
           

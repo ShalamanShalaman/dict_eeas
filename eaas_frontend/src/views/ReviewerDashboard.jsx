@@ -103,7 +103,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`http://127.0.0.1:8000/api/document/view/${documentId}`}
+              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -354,13 +354,13 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/reviewer/${user.id}`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/reviewer/${user.id}`);
       if (response.ok) {
         const data = await response.json();
         setPendingDocs(data);
       }
       
-      const archiveResponse = await fetch(`http://127.0.0.1:8000/api/document/reviewer-archive/${user.id}`);
+      const archiveResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/reviewer-archive/${user.id}`);
       if (archiveResponse.ok) {
         const archiveData = await archiveResponse.json();
         setArchivedDocs(archiveData);
@@ -375,7 +375,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
   const handleDownload = (doc) => {
     const url = doc.review_file_path 
       ? `http://127.0.0.1:8000/storage/${doc.review_file_path}`
-      : `http://127.0.0.1:8000/api/document/download/${doc.id}?reviewer_id=${user.user_id}`;
+      : `${import.meta.env.VITE_API_BASE_URL}/api/document/download/${doc.id}?reviewer_id=${user.user_id}`;
     window.open(url, '_blank');
   };
 
@@ -391,7 +391,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       formData.append('user_id', user.user_id);
       formData.append('file', file);
       
-      const response = await fetch(`http://127.0.0.1:8000/api/document/upload-review/${docId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/upload-review/${docId}`, {
         method: 'POST',
         body: formData
       });
@@ -417,7 +417,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       formData.append('user_id', user.user_id);
       formData.append('action', 'approve');
       
-      const response = await fetch(`http://127.0.0.1:8000/api/document/review/${docId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/review/${docId}`, {
         method: 'POST',
         body: formData
       });
@@ -446,7 +446,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       formData.append('action', 'decline');
       formData.append('reason', reason);
       
-      const response = await fetch(`http://127.0.0.1:8000/api/document/review/${docId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/review/${docId}`, {
         method: 'POST',
         body: formData
       });
@@ -499,7 +499,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
 
   const handleDelete = async (docId) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/${docId}?user_id=${user.user_id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/${docId}?user_id=${user.user_id}`, {
         method: 'DELETE'
       });
       

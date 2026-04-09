@@ -36,7 +36,7 @@ export default function Header({ role, setRole, user, onLogout }) {
   const fetchUnreadCount = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/document/notifications/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/document/notifications/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -50,7 +50,7 @@ export default function Header({ role, setRole, user, onLogout }) {
   const fetchUnreadMessageCount = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/messages/unread/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/unread/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();

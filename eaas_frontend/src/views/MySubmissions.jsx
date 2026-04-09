@@ -29,7 +29,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`http://127.0.0.1:8000/api/document/view/${documentId}`}
+              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -163,7 +163,7 @@ export default function MySubmissions({ user }) {
       if (!user?.user_id) return;
       
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/document/user/${user.user_id}`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/user/${user.user_id}`);
         if (response.ok) {
           const data = await response.json();
           const sorted = data.sort((a, b) => 
@@ -214,7 +214,7 @@ export default function MySubmissions({ user }) {
     setDeleteDialog({ isOpen: false, docId: null });
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/${docId}?user_id=${user.user_id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/${docId}?user_id=${user.user_id}`, {
         method: 'DELETE'
       });
       
@@ -238,7 +238,7 @@ export default function MySubmissions({ user }) {
   };
 
   const handleDownloadSigned = (doc) => {
-    window.open(`http://127.0.0.1:8000/api/document/download/${doc.id}`, '_blank');
+    window.open(`${import.meta.env.VITE_API_BASE_URL}/api/document/download/${doc.id}`, '_blank');
   };
 
   const filterOptions = [

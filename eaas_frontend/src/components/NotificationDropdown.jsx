@@ -19,7 +19,7 @@ const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) =>
     setLoading(true);
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/document/notifications/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/document/notifications/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -42,7 +42,7 @@ const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) =>
     if (e) e.stopPropagation();
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/document/notification/${id}/read`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/document/notification/${id}/read`,
         { method: "PUT" }
       );
       
@@ -67,7 +67,7 @@ const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) =>
   const handleClearAll = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/document/notifications/${user.user_id}/clear`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/document/notifications/${user.user_id}/clear`,
         { method: "DELETE" }
       );
       
@@ -86,7 +86,7 @@ const NotificationDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) =>
   const markAllAsRead = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/document/notifications/mark-read/${user.user_id}`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/document/notifications/mark-read/${user.user_id}`,
         { method: 'POST' }
       );
       if (response.ok) {

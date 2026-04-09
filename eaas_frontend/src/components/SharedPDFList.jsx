@@ -93,7 +93,7 @@ export default function SharedPDFList({ onUsePDF, refreshSharedPDFs }) {
         days: '0'
       });
       if (office) params.set('office', office);
-      const response = await fetch(`http://127.0.0.1:8000/api/shared-pdf/list?${params.toString()}`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/shared-pdf/list?${params.toString()}`);
       if (!response.ok) {
         throw new Error('Failed to fetch shared PDFs');
       }
@@ -110,7 +110,7 @@ export default function SharedPDFList({ onUsePDF, refreshSharedPDFs }) {
     try {
       console.log('Using shared PDF:', doc);
       // Fetch the PDF blob as stream to preserve file integrity
-      const response = await fetch(`http://127.0.0.1:8000/api/document/view/${doc.id}`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${doc.id}`);
       if (!response.ok) throw new Error('Failed to load PDF');
       
       const blob = await response.blob();
@@ -146,7 +146,7 @@ export default function SharedPDFList({ onUsePDF, refreshSharedPDFs }) {
     if (!renameConfirmed) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/rename/${doc.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/rename/${doc.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,7 +170,7 @@ export default function SharedPDFList({ onUsePDF, refreshSharedPDFs }) {
     if (!ok) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/document/${doc.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/${doc.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: currentUser?.user_id })

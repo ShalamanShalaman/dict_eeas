@@ -320,7 +320,7 @@ export default function MyProfile() {
       }
 
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/profile/${publicId}`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${publicId}`, {
             headers: {
                 'Accept': 'application/json'
             }
@@ -416,7 +416,7 @@ export default function MyProfile() {
             }
         }
 
-        const response = await fetch(`http://127.0.0.1:8000/api/profile/${profile.public_id}`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${profile.public_id}`, {
             method: "PUT",
             headers: { 
                 "Content-Type": "application/json",
@@ -511,7 +511,7 @@ export default function MyProfile() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`http://127.0.0.1:8000/api/profile/${profile.public_id}/upload-picture`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${profile.public_id}/upload-picture`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json'
@@ -562,7 +562,7 @@ export default function MyProfile() {
 
     setUploadingPicture(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/profile/${profile.public_id}/picture`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${profile.public_id}/picture`, {
         method: 'DELETE',
         headers: {
             'Accept': 'application/json'

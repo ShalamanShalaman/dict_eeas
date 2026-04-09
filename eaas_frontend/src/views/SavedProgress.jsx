@@ -28,7 +28,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`http://127.0.0.1:8000/api/document/view/${documentId}`}
+              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -166,7 +166,7 @@ export default function SavedProgress({ user: propUser }) {
 
     try {
       setLoading(true);
-      const response = await fetch(`http://127.0.0.1:8000/api/document/user/${userId}`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/user/${userId}`);
       
       if (!response.ok) {
          throw new Error(`Error: ${response.status}`);
@@ -255,7 +255,7 @@ export default function SavedProgress({ user: propUser }) {
     const userId = currentUser?.user_id || currentUser?.id;
     try {
       const responses = await Promise.all(
-        deleteTargetIds.map((id) => fetch(`http://127.0.0.1:8000/api/document/${id}?user_id=${userId}`, { method: "DELETE" }))
+        deleteTargetIds.map((id) => fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/${id}?user_id=${userId}`, { method: "DELETE" }))
       );
 
       setSavedDocs(prev => prev.filter(doc => !deleteTargetIds.map(String).includes(String(doc.id))));

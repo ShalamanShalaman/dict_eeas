@@ -28,7 +28,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`http://127.0.0.1:8000/api/document/view/${documentId}`}
+              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -67,7 +67,7 @@ const SystemAudits = () => {
   const fetchLogs = useCallback(async (isInitial = false) => {
     if (!isInitial) setIsRefreshing(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/admin/logs?_t=${Date.now()}`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/logs?_t=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
         setLogs(data);
@@ -95,7 +95,7 @@ const SystemAudits = () => {
       if (loading || isRefreshing || referenceLength === 0) return;
       
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/admin/logs?_t=${Date.now()}`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/logs?_t=${Date.now()}`);
         if (response.ok) {
           const data = await response.json();
           if (isMounted && data.length > referenceLength) {

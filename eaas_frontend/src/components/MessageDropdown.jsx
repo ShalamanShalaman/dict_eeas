@@ -32,7 +32,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/messages/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -54,7 +54,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/messages/sent/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/sent/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -70,7 +70,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
   const fetchAvailableUsers = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/messages/users/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/users/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -129,7 +129,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
   const handleMarkAsRead = async (messageId) => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/messages/${messageId}/read`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/${messageId}/read`,
         { method: "PUT" }
       );
       
@@ -154,7 +154,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
   const handleMarkAllAsRead = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/messages/mark-read/${user.user_id}`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/mark-read/${user.user_id}`,
         { method: 'POST' }
       );
       if (response.ok) {
@@ -172,7 +172,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
   const handleDeleteMessage = async (messageId) => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/messages/${messageId}`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/${messageId}`,
         { method: "DELETE" }
       );
       

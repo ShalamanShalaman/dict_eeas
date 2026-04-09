@@ -102,7 +102,7 @@ const AdminDashboard = () => {
 
   const fetchLogs = async (isInitial = false) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/admin/logs?_t=${Date.now()}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/logs?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' }
       });
       if (res.ok) {
