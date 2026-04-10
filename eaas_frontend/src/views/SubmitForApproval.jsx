@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import SuccessModal from "../components/SuccessModal";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -75,7 +77,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
+              src={`${API_BASE_URL}/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -138,7 +140,7 @@ export default function SubmitForApproval({ user }) {
       const fetchDocDetails = async () => {
         try {
           if (!user?.user_id) return;
-          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/user/${user.user_id}`);
+          const response = await fetch(`${API_BASE_URL}/api/document/user/${user.user_id}`);
           if (response.ok) {
             const docs = await response.json();
             const targetDoc = docs.find(d => d.id.toString() === docId);
@@ -158,7 +160,7 @@ export default function SubmitForApproval({ user }) {
   useEffect(() => {
     const fetchReviewers = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/document/reviewers', {
+        const response = await fetch(`${API_BASE_URL}/api/document/reviewers`, {
           headers: { 'Accept': 'application/json' }
         });
         const contentType = response.headers.get('content-type');
@@ -255,7 +257,7 @@ export default function SubmitForApproval({ user }) {
         formData.append('files[]', file);
       });
 
-      const uploadResponse = await fetch('http://127.0.0.1:8000/api/document/upload-attachments', {
+      const uploadResponse = await fetch(`${API_BASE_URL}/api/document/upload-attachments`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json'
@@ -308,7 +310,7 @@ export default function SubmitForApproval({ user }) {
       submitFormData.append('user_id', user.user_id);
       submitFormData.append('reviewer_id', selectedReviewerId);
 
-      const submitResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/submit/${convertedDocumentId}`, {
+      const submitResponse = await fetch(`${API_BASE_URL}/api/document/submit/${convertedDocumentId}`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json'
@@ -370,7 +372,7 @@ export default function SubmitForApproval({ user }) {
     setError(null);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/rename/${convertedDocumentId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/document/rename/${convertedDocumentId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

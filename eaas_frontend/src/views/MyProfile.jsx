@@ -7,6 +7,8 @@ import {
   RefreshCw, Camera
 } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 const TabButton = ({ icon: Icon, label, active, onClick }) => (
   <button
     onClick={onClick}
@@ -185,7 +187,7 @@ export default function MyProfile() {
 
     setOtpLoading(true);
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/profile/send-otp', {
+        const response = await fetch(`${API_BASE_URL}/api/profile/send-otp`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -220,7 +222,7 @@ export default function MyProfile() {
   const handleVerifyOtp = async () => {
     setOtpLoading(true);
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/profile/verify-otp', {
+        const response = await fetch(`${API_BASE_URL}/api/profile/verify-otp`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -263,7 +265,7 @@ export default function MyProfile() {
 
       setResetOtpLoading(true);
       try {
-          const response = await fetch('http://127.0.0.1:8000/api/profile/send-otp', {
+          const response = await fetch(`${API_BASE_URL}/api/profile/send-otp`, {
               method: 'POST',
               headers: { 
                   'Content-Type': 'application/json',
@@ -320,7 +322,7 @@ export default function MyProfile() {
       }
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${publicId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/profile/${publicId}`, {
             headers: {
                 'Accept': 'application/json'
             }
@@ -416,7 +418,7 @@ export default function MyProfile() {
             }
         }
 
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${profile.public_id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/profile/${profile.public_id}`, {
             method: "PUT",
             headers: { 
                 "Content-Type": "application/json",
@@ -511,7 +513,7 @@ export default function MyProfile() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${profile.public_id}/upload-picture`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile/${profile.public_id}/upload-picture`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json'
@@ -562,7 +564,7 @@ export default function MyProfile() {
 
     setUploadingPicture(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/profile/${profile.public_id}/picture`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile/${profile.public_id}/picture`, {
         method: 'DELETE',
         headers: {
             'Accept': 'application/json'
@@ -636,7 +638,7 @@ export default function MyProfile() {
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
                 <img
                   key={imageHash}
-                  src={`http://127.0.0.1:8000/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`}
+                  src={`${API_BASE_URL}/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`}
                   alt="Profile"
                   className="w-full h-full object-cover"
                   onError={(e) => { e.target.style.display = 'none'; }}
@@ -814,7 +816,7 @@ export default function MyProfile() {
                       <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
                         <img 
                           key={imageHash}
-                          src={`http://127.0.0.1:8000/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`} 
+                          src={`${API_BASE_URL}/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`} 
                           alt="Profile" 
                           className="w-full h-full object-cover"
                           onError={(e) => {

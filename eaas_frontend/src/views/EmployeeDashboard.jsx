@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 // Icons
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
@@ -240,7 +242,7 @@ export default function EmployeeDashboard({ user }) {
       if (!user?.user_id) return;
       
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/user/${user.user_id}`);
+        const response = await fetch(`${API_BASE_URL}/api/document/user/${user.user_id}`);
         if (response.ok) {
           const data = await response.json();
           
@@ -353,7 +355,7 @@ export default function EmployeeDashboard({ user }) {
               {user?.profile_picture ? (
                 <img 
                   key={imageHash}
-                  src={`http://127.0.0.1:8000/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
+                  src={`${API_BASE_URL}/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
                   alt="Profile"
                   className="w-16 h-16 rounded-full object-cover border-2 border-indigo-600 shadow-md"
                   onError={(e) => {

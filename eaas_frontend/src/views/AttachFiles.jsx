@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 // Icons
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
@@ -66,7 +68,7 @@ export default function AttachFiles({ user, onSubmit, onClose }) {
   useEffect(() => {
     const fetchReviewers = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/document/reviewers');
+        const response = await fetch(`${API_BASE_URL}/api/document/reviewers`);
         if (response.ok) {
           const data = await response.json();
           
@@ -128,7 +130,7 @@ export default function AttachFiles({ user, onSubmit, onClose }) {
         formData.append('files[]', file);
       });
 
-      const uploadResponse = await fetch('http://127.0.0.1:8000/api/document/upload-attachments', {
+      const uploadResponse = await fetch(`${API_BASE_URL}/api/document/upload-attachments`, {
         method: 'POST',
         body: formData
       });
@@ -154,7 +156,7 @@ export default function AttachFiles({ user, onSubmit, onClose }) {
       submitFormData.append('user_id', user.user_id);
       submitFormData.append('reviewer_id', selectedReviewerId);
 
-      const submitResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/submit/${uploadResult.document.id}`, {
+      const submitResponse = await fetch(`${API_BASE_URL}/api/document/submit/${uploadResult.document.id}`, {
         method: 'POST',
         body: submitFormData
       });

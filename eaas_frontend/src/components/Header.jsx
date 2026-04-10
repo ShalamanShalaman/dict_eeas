@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "./NotificationDropdown";
 import MessageDropdown from "./MessageDropdown";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function Header({ role, setRole, user, onLogout }) {
   const canToggleRoles = user && (user.role === 'admin' || user.role === 'hr');
   
@@ -36,7 +38,7 @@ export default function Header({ role, setRole, user, onLogout }) {
   const fetchUnreadCount = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/document/notifications/${user.user_id}`
+        `${API_BASE_URL}/api/document/notifications/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -50,7 +52,7 @@ export default function Header({ role, setRole, user, onLogout }) {
   const fetchUnreadMessageCount = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/messages/unread/${user.user_id}`
+        `${API_BASE_URL}/api/messages/unread/${user.user_id}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -182,7 +184,7 @@ export default function Header({ role, setRole, user, onLogout }) {
             {user?.profile_picture ? (
               <img 
                 key={imageHash}
-                src={`http://127.0.0.1:8000/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
+                src={`${API_BASE_URL}/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
                 alt="Profile"
                 className="w-8 h-8 rounded-full object-cover border-2 border-yellow-400 shadow-md"
                 onError={(e) => {

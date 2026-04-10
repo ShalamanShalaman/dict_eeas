@@ -398,7 +398,7 @@ export default function UploadAttendance({ user }) {
     formData.append('user_id', currentUser.user_id);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/shared-pdf/upload', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/shared-pdf/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -604,7 +604,7 @@ export default function UploadAttendance({ user }) {
         formData.append("file", fileObj);
         formData.append("user_id", currentUser.user_id); 
 
-        let url = "http://127.0.0.1:8000/api/document/upload";
+        let url = `${import.meta.env.VITE_API_BASE_URL}/api/document/upload`;
         if (savedDocId) {
              url = `${import.meta.env.VITE_API_BASE_URL}/api/document/autosave/${savedDocId}`;
         }
