@@ -65,7 +65,10 @@ class AttendanceController extends Controller
             $env['PATH'] = isset($_SERVER['PATH']) ? $_SERVER['PATH'] : '';
         }
 
-        $process = new Process(['python', $cliPath, $action, $tempPayload], $workingDir, $env);
+        // Fetch the Python executable path from the .env file, fallback to the venv path if not found
+        $pythonExec = env('PYTHON_EXECUTABLE', '/var/www/eaas/eaas_python/venv/bin/python');
+
+        $process = new Process([$pythonExec, $cliPath, $action, $tempPayload], $workingDir, $env);
         $process->setTimeout(120);
         $process->run();
 
