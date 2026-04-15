@@ -66,7 +66,7 @@ def _convert_with_libreoffice(input_path, expected_pdf_path):
     out_dir = os.path.dirname(expected_pdf_path)
     try:
         subprocess.run(
-            [lo_exec, '--headless', '--convert-to', 'pdf', input_path, '--outdir', out_dir],
+            [lo_exec, '-env:UserInstallation=file:///tmp/libreoffice_profile', '--headless', '--convert-to', 'pdf', input_path, '--outdir', out_dir],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
