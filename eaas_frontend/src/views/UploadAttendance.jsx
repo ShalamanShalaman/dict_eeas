@@ -100,10 +100,10 @@ export default function UploadAttendance({ user }) {
   const [pendingAction, setPendingAction] = useState(null); 
   
   const [showNameModal, setShowNameModal] = useState(false);
-  const [showFormatModal, setShowFormatModal] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [appAlert, setAppAlert] = useState("");
+  const [userDateFormat, setUserDateFormat] = useState("DMY");
 
   const [renamingDoc, setRenamingDoc] = useState(null);
   const [renameValue, setRenameValue] = useState("");
@@ -194,6 +194,9 @@ export default function UploadAttendance({ user }) {
       if (userStr) {
         const userData = JSON.parse(userStr);
         setCurrentUser(userData);
+        if (userData.date_format) {
+            setUserDateFormat(userData.date_format);
+        }
       }
     };
     fetchUser();
@@ -451,11 +454,30 @@ export default function UploadAttendance({ user }) {
       setFile(pdfFile);
 
       setTimeout(() => {
-        setShowFormatModal(true);
+        handlePersonalUpload(pdfFile, userDateFormat);
       }, 250);
     } catch (err) {
       setAppAlert("Failed to use shared PDF: " + err.message);
     }
+  };
+
+  const handleFormatChange = async (newFormat) => {
+      setUserDateFormat(newFormat);
+      if (currentUser && currentUser.user_id) {
+          try {
+              const updatedUser = { ...currentUser, date_format: newFormat };
+              setCurrentUser(updatedUser);
+              localStorage.setItem("user", JSON.stringify(updatedUser));
+              
+              await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/user/update-format`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: currentUser.user_id, date_format: newFormat })
+              });
+          } catch(e) {
+              console.error("Failed to save format preference globally", e);
+          }
+      }
   };
 
   const openRenameModal = (doc) => {
@@ -641,8 +663,9 @@ export default function UploadAttendance({ user }) {
     }
   };
 
-  const handlePersonalUpload = async (overrideFile = null, dateFormat = "DMY") => {
+  const handlePersonalUpload = async (overrideFile = null, format = null) => {
     const selectedFile = (overrideFile && (overrideFile instanceof File || overrideFile instanceof Blob)) ? overrideFile : file;
+    const selectedFormat = format || userDateFormat;
     
     if (!selectedFile) return;
 
@@ -650,7 +673,7 @@ export default function UploadAttendance({ user }) {
     const formData = new FormData();
     formData.append("attendanceFile", selectedFile);
     formData.append("file", selectedFile); 
-    formData.append("date_format", dateFormat);
+    formData.append("date_format", selectedFormat);
     
     if (currentUser && currentUser.user_id) {
         formData.append("user_id", currentUser.user_id);
@@ -1202,8 +1225,23 @@ export default function UploadAttendance({ user }) {
                 <SaveIcon className="w-4 h-4" /> Save Progress
             </button>
 
+            {/* Date Format Toggle - NEW */}
+            <div className="flex flex-col items-center bg-gray-50 border border-gray-200 rounded-lg p-2">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">PDF Date Format</span>
+                <div className="flex w-full bg-gray-200/50 p-1 rounded-md">
+                    <button 
+                        onClick={() => handleFormatChange("DMY")}
+                        className={`flex-1 text-xs py-1.5 font-bold rounded transition-all ${userDateFormat === 'DMY' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >DD/MM</button>
+                    <button 
+                        onClick={() => handleFormatChange("MDY")}
+                        className={`flex-1 text-xs py-1.5 font-bold rounded transition-all ${userDateFormat === 'MDY' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >MM/DD</button>
+                </div>
+            </div>
+
             <button
-              onClick={() => setShowFormatModal(true)}
+              onClick={() => handlePersonalUpload(null, userDateFormat)}
               disabled={!file || loading || (file && file.type === "application/json")} 
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -1598,36 +1636,6 @@ export default function UploadAttendance({ user }) {
                     Save
                 </button>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {showFormatModal && createPortal(
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[999999]" onClick={() => setShowFormatModal(false)}>
-          <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-900 mb-2 text-center">Date Format</h3>
-            <p className="text-sm text-gray-500 mb-6 text-center">Select the date format used in your PDF logs:</p>
-            
-            <div className="space-y-3">
-              <button 
-                onClick={() => { setShowFormatModal(false); handlePersonalUpload(null, "DMY"); }}
-                className="w-full py-3 px-4 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg text-left transition-all group"
-              >
-                <div className="font-bold text-gray-800 group-hover:text-blue-700">DD/MM/YYYY</div>
-                <div className="text-xs text-gray-500">Example: 31/12/2023 (Day first)</div>
-              </button>
-
-              <button 
-                onClick={() => { setShowFormatModal(false); handlePersonalUpload(null, "MDY"); }}
-                className="w-full py-3 px-4 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg text-left transition-all group"
-              >
-                <div className="font-bold text-gray-800 group-hover:text-blue-700">MM/DD/YYYY</div>
-                <div className="text-xs text-gray-500">Example: 12/31/2023 (Month first)</div>
-              </button>
-            </div>
-
-            <button onClick={() => setShowFormatModal(false)} className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors py-2">Cancel</button>
           </div>
         </div>,
         document.body
