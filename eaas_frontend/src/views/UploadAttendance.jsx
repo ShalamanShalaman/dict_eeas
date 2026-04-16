@@ -105,6 +105,10 @@ export default function UploadAttendance({ user }) {
   const [appAlert, setAppAlert] = useState("");
   const [userDateFormat, setUserDateFormat] = useState("DMY");
 
+  // Searchable Dropdown State
+  const [empSearch, setEmpSearch] = useState("");
+  const [showEmpDropdown, setShowEmpDropdown] = useState(false);
+
   const [renamingDoc, setRenamingDoc] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingDoc, setDeletingDoc] = useState(null);
@@ -1187,7 +1191,7 @@ export default function UploadAttendance({ user }) {
               setIsDragging(true);
             }}
             onDragLeave={() => setIsDragging(false)}
-            className={`md:col-span-2 rounded-xl h-64 flex flex-col items-center justify-center border-2 border-dashed transition-colors ${
+            className={`md:col-span-2 rounded-xl min-h-[24rem] h-full flex flex-col items-center justify-center border-2 border-dashed transition-colors ${
               isDragging
                 ? "border-blue-400 bg-blue-50"
                 : "border-gray-200 bg-slate-50 hover:bg-slate-100"
@@ -1225,7 +1229,7 @@ export default function UploadAttendance({ user }) {
                 <SaveIcon className="w-4 h-4" /> Save Progress
             </button>
 
-            {/* Date Format Toggle - NEW */}
+            {/* Date Format Toggle */}
             <div className="flex flex-col items-center bg-gray-50 border border-gray-200 rounded-lg p-2">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">PDF Date Format</span>
                 <div className="flex w-full bg-gray-200/50 p-1 rounded-md">
@@ -1281,15 +1285,49 @@ export default function UploadAttendance({ user }) {
                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Log Source</label>
                         <div className="relative">
                             <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <select
-                            value={selectedEmployee}
-                            onChange={(e) => setSelectedEmployee(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                            >
-                            {Object.keys(employees).map((name) => (
-                                <option key={name} value={name}>{name}</option>
-                            ))}
-                            </select>
+                            <input
+                                type="text"
+                                value={showEmpDropdown ? empSearch : (selectedEmployee || "")}
+                                onChange={(e) => {
+                                    setEmpSearch(e.target.value);
+                                    setShowEmpDropdown(true);
+                                }}
+                                onFocus={() => {
+                                    setShowEmpDropdown(true);
+                                    setEmpSearch("");
+                                }}
+                                onBlur={() => {
+                                    setTimeout(() => setShowEmpDropdown(false), 200);
+                                }}
+                                placeholder="Search or select employee..."
+                                className="w-full pl-9 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer text-gray-700"
+                            />
+                            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                            
+                            {showEmpDropdown && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                    {Object.keys(employees)
+                                        .filter(name => name.toLowerCase().includes(empSearch.toLowerCase()))
+                                        .map((name) => (
+                                            <div
+                                                key={name}
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    setSelectedEmployee(name);
+                                                    setShowEmpDropdown(false);
+                                                    setEmpSearch("");
+                                                }}
+                                                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${selectedEmployee === name ? 'bg-blue-50 font-semibold text-blue-700' : 'hover:bg-gray-50 text-gray-700'}`}
+                                            >
+                                                {name}
+                                            </div>
+                                        ))
+                                    }
+                                    {Object.keys(employees).filter(name => name.toLowerCase().includes(empSearch.toLowerCase())).length === 0 && (
+                                        <div className="px-4 py-3 text-sm text-gray-500 text-center italic bg-gray-50">No matches found</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
