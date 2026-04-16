@@ -19,26 +19,31 @@ export default function Header({ role, setRole, user, onLogout }) {
   const userName = user?.full_name || user?.name || user?.username || "User";
   const userRole = user?.role || "employee";
 
-  // Use state to force image re-render when user object updates
   const [imageHash, setImageHash] = useState(() => Date.now());
 
   useEffect(() => {
-    // Update hash whenever the user object changes (like after a profile picture upload)
     setImageHash(Date.now());
   }, [user]);
 
-  // Fetch unread notification and message count on mount
   useEffect(() => {
     if (user?.user_id) {
       fetchUnreadCount();
       fetchUnreadMessageCount();
+
+      const intervalId = setInterval(() => {
+        fetchUnreadCount();
+        fetchUnreadMessageCount();
+      }, 5000);
+
+      return () => clearInterval(intervalId);
     }
   }, [user?.user_id]);
 
   const fetchUnreadCount = async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/document/notifications/${user.user_id}`
+        `${API_BASE_URL}/api/document/notifications/${user.user_id}?_t=${Date.now()}`,
+        { headers: { 'Cache-Control': 'no-cache' } }
       );
       if (response.ok) {
         const data = await response.json();
@@ -52,7 +57,8 @@ export default function Header({ role, setRole, user, onLogout }) {
   const fetchUnreadMessageCount = async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/unread/${user.user_id}`
+        `${API_BASE_URL}/api/messages/unread/${user.user_id}?_t=${Date.now()}`,
+        { headers: { 'Cache-Control': 'no-cache' } }
       );
       if (response.ok) {
         const data = await response.json();
@@ -78,13 +84,13 @@ export default function Header({ role, setRole, user, onLogout }) {
 
   const handleNotificationClick = () => {
     setShowDropdown(false);
-    setShowMessages(false); // Close messages if open
+    setShowMessages(false);
     setShowNotifications(!showNotifications);
   };
 
   const handleMessagesClick = () => {
     setShowDropdown(false);
-    setShowNotifications(false); // Close notifications if open
+    setShowNotifications(false);
     setShowMessages(!showMessages);
   };
 
@@ -118,7 +124,6 @@ export default function Header({ role, setRole, user, onLogout }) {
           </div>
         )}
 
-        {/* Notification Bell - Show for employees, reviewers, and admins */}
         {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
           <div className="relative">
             <button
@@ -128,14 +133,12 @@ export default function Header({ role, setRole, user, onLogout }) {
             >
               <Bell size={20} />
             </button>
-            {/* Unread count badge outside the bell */}
             {unreadNotificationCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                 {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
               </span>
             )}
             
-            {/* Imported standalone component used here */}
             <NotificationDropdown 
               user={user}
               isOpen={showNotifications}
@@ -145,7 +148,6 @@ export default function Header({ role, setRole, user, onLogout }) {
           </div>
         )}
 
-        {/* Message Icon - Show for employees, reviewers, and admins */}
         {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
           <div className="relative">
             <button
@@ -155,7 +157,6 @@ export default function Header({ role, setRole, user, onLogout }) {
             >
               <MessageSquare size={20} />
             </button>
-            {/* Unread message count badge */}
             {unreadMessageCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                 {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
@@ -171,7 +172,6 @@ export default function Header({ role, setRole, user, onLogout }) {
           </div>
         )}
 
-        {/* Profile Dropdown */}
         <div className="relative">
           <button
             onClick={() => {
@@ -267,5 +267,5 @@ export default function Header({ role, setRole, user, onLogout }) {
         />
       )}
     </header>
-  );
+  )
 }

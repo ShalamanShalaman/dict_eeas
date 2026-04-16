@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Send, Inbox, Clock, Trash2, User, CheckCheck, Mail, MailOpen, MessageCircle, Bell, ChevronRight } from "lucide-react";
@@ -25,14 +24,24 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
     if (isOpen && user?.user_id) {
       fetchMessages();
       fetchAvailableUsers();
-    }
-  }, [isOpen, user?.user_id]);
 
-  const fetchMessages = async () => {
-    setLoading(true);
+      const intervalId = setInterval(() => {
+        if (showSent) {
+          fetchSentMessages(false);
+        } else {
+          fetchMessages(false);
+        }
+      }, 5000);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [isOpen, user?.user_id, showSent]);
+
+  const fetchMessages = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/messages/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/${user.user_id}?_t=${Date.now()}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -46,15 +55,15 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
     } catch (err) {
       console.error("Failed to fetch messages:", err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
-  const fetchSentMessages = async () => {
-    setLoading(true);
+  const fetchSentMessages = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/messages/sent/${user.user_id}`
+        `${import.meta.env.VITE_API_BASE_URL}/api/messages/sent/${user.user_id}?_t=${Date.now()}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -63,7 +72,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
     } catch (err) {
       console.error("Failed to fetch sent messages:", err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -140,10 +149,10 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
           )
         );
         
-        const unreadCount = messages.filter(m => m.id !== messageId && !m.is_read).length;
-        setUnreadCount(unreadCount);
+        const currentUnreadCount = messages.filter(m => m.id !== messageId && !m.is_read).length;
+        setUnreadCount(currentUnreadCount);
         if (onUnreadCountChange) {
-          onUnreadCountChange(unreadCount);
+          onUnreadCountChange(currentUnreadCount);
         }
       }
     } catch (err) {
@@ -197,7 +206,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
 
   const handleShowSent = () => {
     setShowSent(true);
-    fetchSentMessages();
+    fetchSentMessages(true);
   };
 
   const formatTimeAgo = (dateString) => {
@@ -257,7 +266,7 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
                 <MessageCircle size={20} className="text-white" />
               </div>
               <div>
-                <p className="text-l=sm font-bold text-white">Messages</p>
+                <p className="text-sm font-bold text-white">Messages</p>
                 
               </div>
             </div>
@@ -296,7 +305,10 @@ const MessageDropdown = ({ user, isOpen, onClose, onUnreadCountChange }) => {
         {!showCompose && !selectedMessage && (
           <div className="flex border-b border-gray-100 bg-white">
             <button
-              onClick={() => setShowSent(false)}
+              onClick={() => {
+                  setShowSent(false);
+                  fetchMessages(true);
+              }}
               className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${!showSent ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
             >
               <Inbox size={16} />
