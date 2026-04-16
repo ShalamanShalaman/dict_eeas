@@ -27,12 +27,13 @@ def main():
     try:
         if action == 'parse_attendance':
             file_path = data.get('file_path')
+            date_format = data.get('date_format', 'DMY')
             extracted_text = ""
             with open(file_path, 'rb') as f:
                 reader = PyPDF2.PdfReader(f)
                 for page in reader.pages:
                     extracted_text += page.extract_text() + "\n"
-            employees_data = parse_employees_data(extracted_text)
+            employees_data = parse_employees_data(extracted_text, date_format=date_format)
             print(json.dumps({"data": employees_data}))
 
         elif action == 'generate_dtr':

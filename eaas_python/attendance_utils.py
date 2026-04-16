@@ -71,7 +71,7 @@ def clean_daily_logs(logs):
 
     return cleaned
 
-def parse_employees_data(text):
+def parse_employees_data(text, date_format='DMY'):
     employees = {}
     lines = text.split('\n')
 
@@ -155,7 +155,15 @@ def parse_employees_data(text):
                 
                 time_part_24 = to_24h(time_part, is_pm, is_am)
 
-                day_str, month_str, year_str = date_str.split('/')
+                date_parts = date_str.split('/')
+                if date_format == "MDY":
+                    month_str = date_parts[0]
+                    day_str = date_parts[1]
+                    year_str = date_parts[2]
+                else:
+                    day_str = date_parts[0]
+                    month_str = date_parts[1]
+                    year_str = date_parts[2]
 
                 m_name = calendar.month_name[int(month_str)]
                 m_key = f"{m_name} {year_str}"

@@ -51,7 +51,6 @@ class AttendanceController extends Controller
         
         $cliPath = $workingDir . DIRECTORY_SEPARATOR . 'cli.py';
         
-        // Sanitize data: Convert nulls to empty strings to prevent 'NoneType' attribute errors in Python
         $data = $this->sanitizeNulls($data);
 
         $tempPayload = tempnam(sys_get_temp_dir(), 'payload_') . '.json';
@@ -65,7 +64,6 @@ class AttendanceController extends Controller
             $env['PATH'] = isset($_SERVER['PATH']) ? $_SERVER['PATH'] : '';
         }
 
-        // Fetch the Python executable path from the .env file, fallback to the venv path if not found
         $pythonExec = env('PYTHON_EXECUTABLE', '/var/www/eaas/eaas_python/venv/bin/python');
 
         $process = new Process([$pythonExec, $cliPath, $action, $tempPayload], $workingDir, $env);
@@ -103,30 +101,35 @@ class AttendanceController extends Controller
 
     public function uploadAttendance(Request $request)
     {
-        // Get the file using either key
         $file = $request->file('attendanceFile') ?? $request->file('file');
+        $dateFormat = $request->input('date_format', 'DMY');
 
         if (!$file) {
-            // Check if the request exceeded PHP's post_max_size or upload_max_filesize
             if (empty($_FILES) && empty($_POST) && isset($_SERVER['CONTENT_LENGTH']) && $_SERVER['CONTENT_LENGTH'] > 0) {
                 return response()->json(['error' => 'The file is too large. It exceeds the server upload limits (upload_max_filesize or post_max_size in php.ini).'], 400);
             }
 
-            // Return whatever keys we actually received to help debug
             $keys = implode(', ', array_keys($request->all()));
             return response()->json(['error' => 'No file part found in request. Received keys: ' . ($keys ?: 'None')], 400);
         }
 
-        // Check if the file failed during the PHP upload process
         if (!$file->isValid()) {
             return response()->json(['error' => 'File upload failed with error code: ' . $file->getError()], 400);
         }
 
         $path = $file->storeAs('temp', uniqid() . '_' . $file->getClientOriginalName(), 'local');
+        
+        if (!$path) {
+            return response()->json(['error' => 'Failed to save file to server. Please check storage folder permissions.'], 500);
+        }
+
         $fullPath = Storage::disk('local')->path($path);
 
         try {
-            $output = $this->runPythonScript('parse_attendance', ['file_path' => $fullPath]);
+            $output = $this->runPythonScript('parse_attendance', [
+                'file_path' => $fullPath,
+                'date_format' => $dateFormat
+            ]);
 
             $actionBy = $request->input('action_by') ?? $request->input('user_id') ?? 'system';
             LogHelper::log($actionBy, 'UPLOAD', 'Attendance', "Uploaded and parsed biometric attendance PDF", null);
