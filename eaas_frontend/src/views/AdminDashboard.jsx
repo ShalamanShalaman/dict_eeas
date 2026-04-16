@@ -63,7 +63,7 @@ const CheckCircleIcon = () => (
 );
 
 const AdminDashboard = () => {
-  const navigate = useNavigate(); // ADDED: Safe router navigation
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   
@@ -86,7 +86,7 @@ const AdminDashboard = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/admin/users', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/users`, {
         headers: { 'Accept': 'application/json' }
       });
       if (res.ok) {
@@ -260,7 +260,7 @@ const AdminDashboard = () => {
 
       <div 
         className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
-        onClick={() => navigate('/audits')} // FIX: Points to exact route defined in App.jsx
+        onClick={() => navigate('/audits')} 
       >
         <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50 group-hover:bg-indigo-50/30 transition-colors">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
