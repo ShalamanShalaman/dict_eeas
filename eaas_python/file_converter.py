@@ -3,6 +3,7 @@ import io
 import subprocess
 import shutil
 import platform
+import tempfile
 from datetime import datetime
 
 try:
@@ -43,11 +44,18 @@ except ImportError:
 def get_libreoffice_executable():
     if platform.system() == 'Darwin':
         return '/Applications/LibreOffice.app/Contents/MacOS/soffice'
-    if shutil.which('libreoffice'):
-        return 'libreoffice'
-    if shutil.which('soffice'):
-        return 'soffice'
     
+    if shutil.which('libreoffice'):
+        return shutil.which('libreoffice')
+    if shutil.which('soffice'):
+        return shutil.which('soffice')
+    
+    # Fallback for strict PHP/Nginx environments where PATH is missing
+    if platform.system() == 'Linux':
+        for p in ['/usr/bin/libreoffice', '/usr/bin/soffice']:
+            if os.path.exists(p):
+                return p
+                
     if platform.system() == 'Windows':
         common_paths = [
             r"C:\Program Files\LibreOffice\program\soffice.exe",
@@ -64,12 +72,32 @@ def _convert_with_libreoffice(input_path, expected_pdf_path):
         return False
 
     out_dir = os.path.dirname(expected_pdf_path)
+    
+    # Create a unique temporary directory for the LibreOffice profile
+    # This prevents permission denied errors if www-data tries to use a profile folder owned by root/ubuntu
+    profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
+    
     try:
+        # Force the HOME environment variable to /tmp so LibreOffice doesn't panic
+        env = os.environ.copy()
+        env['HOME'] = '/tmp'
+        
         subprocess.run(
-            [lo_exec, '-env:UserInstallation=file:///tmp/libreoffice_profile', '--headless', '--convert-to', 'pdf', input_path, '--outdir', out_dir],
+            [
+                lo_exec, 
+                f'-env:UserInstallation=file://{profile_dir}', 
+                '--headless', 
+                '--nologo',
+                '--nofirststartwizard',
+                '--norestore',
+                '--convert-to', 'pdf', 
+                input_path, 
+                '--outdir', out_dir
+            ],
             check=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            env=env
         )
         
         input_basename = os.path.basename(input_path)
@@ -83,6 +111,12 @@ def _convert_with_libreoffice(input_path, expected_pdf_path):
         return False
     except Exception:
         return False
+    finally:
+        # Clean up the temporary profile directory
+        try:
+            shutil.rmtree(profile_dir)
+        except Exception:
+            pass
 
 def convert_file_to_pdf(file_path, output_dir):
     if not REPORTLAB_AVAILABLE:
