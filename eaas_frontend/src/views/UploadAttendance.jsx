@@ -105,9 +105,9 @@ export default function UploadAttendance({ user }) {
   const [appAlert, setAppAlert] = useState("");
   const [userDateFormat, setUserDateFormat] = useState("DMY");
 
-  // Searchable Dropdown State
   const [empSearch, setEmpSearch] = useState("");
   const [showEmpDropdown, setShowEmpDropdown] = useState(false);
+  const [showApproverDropdown, setShowApproverDropdown] = useState(false);
 
   const [renamingDoc, setRenamingDoc] = useState(null);
   const [renameValue, setRenameValue] = useState("");
@@ -1229,7 +1229,6 @@ export default function UploadAttendance({ user }) {
                 <SaveIcon className="w-4 h-4" /> Save Progress
             </button>
 
-            {/* Date Format Toggle */}
             <div className="flex flex-col items-center bg-gray-50 border border-gray-200 rounded-lg p-2">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">PDF Date Format</span>
                 <div className="flex w-full bg-gray-200/50 p-1 rounded-md">
@@ -1437,30 +1436,56 @@ export default function UploadAttendance({ user }) {
                 </div>
                 <div className="space-y-1 relative">
                     <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approved By</label>
-                    <input
-                        list="reviewer-options"
-                        className={inputClass(false)}
-                        placeholder="Provincial Officer Name"
-                        value={arMeta.approver}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            const rev = reviewers.find(r => r.full_name === val);
-                            setArMeta({ 
-                                ...arMeta, 
-                                approver: val,
-                                ...(rev && { approverTitle: rev.position || rev.position_id || "" })
-                            });
-                            setHasUnsavedChanges(true);
-                        }}
-                        disabled={false}
-                    />
-                    <datalist id="reviewer-options">
-                        {reviewers.map((rev, idx) => (
-                            <option key={idx} value={rev.full_name}>
-                                {rev.office_location ? `(${rev.office_location})` : ''}
-                            </option>
-                        ))}
-                    </datalist>
+                    <div className="relative">
+                        <input
+                            className={inputClass(false)}
+                            placeholder="Provincial Officer Name"
+                            value={arMeta.approver}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                const rev = reviewers.find(r => r.full_name.toLowerCase() === val.toLowerCase());
+                                setArMeta(prev => ({ 
+                                    ...prev, 
+                                    approver: val,
+                                    ...(rev ? { approverTitle: rev.position || rev.position_id || "" } : {})
+                                }));
+                                setHasUnsavedChanges(true);
+                                setShowApproverDropdown(true);
+                            }}
+                            onFocus={() => setShowApproverDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowApproverDropdown(false), 200)}
+                            disabled={false}
+                        />
+                        {showApproverDropdown && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                {reviewers
+                                    .filter(rev => rev.full_name.toLowerCase().includes((arMeta.approver || "").toLowerCase()))
+                                    .map((rev, idx) => (
+                                        <div
+                                            key={idx}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                setArMeta(prev => ({
+                                                    ...prev,
+                                                    approver: rev.full_name,
+                                                    approverTitle: rev.position || rev.position_id || ""
+                                                }));
+                                                setHasUnsavedChanges(true);
+                                                setShowApproverDropdown(false);
+                                            }}
+                                            className="px-4 py-2.5 text-sm cursor-pointer transition-colors hover:bg-blue-50 text-gray-700"
+                                        >
+                                            <div className="font-semibold">{rev.full_name}</div>
+                                            {rev.office_location && <div className="text-xs text-gray-500">{rev.office_location}</div>}
+                                        </div>
+                                    ))
+                                }
+                                {reviewers.filter(rev => rev.full_name.toLowerCase().includes((arMeta.approver || "").toLowerCase())).length === 0 && (
+                                    <div className="px-4 py-3 text-sm text-gray-500 text-center italic bg-gray-50">No matches found. You can still type a custom name.</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="space-y-1">
                     <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
