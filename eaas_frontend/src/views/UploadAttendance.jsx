@@ -92,6 +92,7 @@ export default function UploadAttendance({ user }) {
   const [sharedLoading, setSharedLoading] = useState(false);
   const [sharedUploadResults, setSharedUploadResults] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   
   const [savedDocId, setSavedDocId] = useState(null);
 
@@ -303,8 +304,13 @@ export default function UploadAttendance({ user }) {
 
   useEffect(() => {
     const docId = searchParams.get('doc_id');
+    const viewOnlyId = searchParams.get('view_only_doc_id');
     
-    if (docId && currentUser && docId !== savedDocId) {
+    if (viewOnlyId && currentUser && viewOnlyId !== savedDocId) {
+        setIsReadOnly(true);
+        loadSavedDocument(viewOnlyId);
+    } else if (docId && currentUser && docId !== savedDocId) {
+        setIsReadOnly(false);
         loadSavedDocument(docId);
     }
   }, [currentUser, searchParams]);
@@ -544,7 +550,7 @@ export default function UploadAttendance({ user }) {
   };
 
   const handleFile = (f) => {
-    if (!f) return;
+    if (!f || isReadOnly) return;
     
     if (f.type === "application/json" || f.name.endsWith(".json")) {
         const reader = new FileReader();
@@ -774,6 +780,7 @@ export default function UploadAttendance({ user }) {
     setSelectedMonth("");
     setSavedDocId(null);
     setHasUnsavedChanges(false);
+    setIsReadOnly(false);
     setArMeta(getDefaultMeta());
     if (fileInputRef.current) fileInputRef.current.value = null;
     setSearchParams({});
@@ -806,6 +813,7 @@ export default function UploadAttendance({ user }) {
   };
 
   const handleDtrUpdate = (day, field, value) => {
+    if (isReadOnly) return;
     setEmployees((prev) => ({
       ...prev,
       [selectedEmployee]: {
@@ -823,6 +831,7 @@ export default function UploadAttendance({ user }) {
   };
 
   const handleBatchUpdate = (daysToUpdate, field, value) => {
+    if (isReadOnly) return;
     setEmployees((prev) => {
       const updatedMonthData = { ...prev[selectedEmployee][selectedMonth] };
       daysToUpdate.forEach(day => {
@@ -844,6 +853,7 @@ export default function UploadAttendance({ user }) {
   };
 
   const handleTaskChange = (day, value) => {
+    if (isReadOnly) return;
     setArMeta(prev => ({
         ...prev,
         tasks: {
@@ -1094,8 +1104,25 @@ export default function UploadAttendance({ user }) {
            85%, 100% { transform: translateX(-30%); }
         }
       `}</style>
+      
+      {isReadOnly && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center">
+                <div className="flex-shrink-0">
+                    <AlertCircleIcon className="h-6 w-6 text-amber-500" />
+                </div>
+                <div className="ml-3">
+                    <h3 className="text-sm font-bold text-amber-800 tracking-wide uppercase">READ-ONLY AUDIT MODE</h3>
+                    <div className="mt-1 text-sm text-amber-700">
+                        <p>You are viewing a saved draft belonging to another user. You cannot make changes to this document. Click <strong>Clear</strong> below to exit this mode and resume normal operation.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        {currentUser && (
+        {currentUser && !isReadOnly && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 transition-all">
             <button
               onClick={() => setIsSharedZoneOpen(!isSharedZoneOpen)}
@@ -1182,19 +1209,26 @@ export default function UploadAttendance({ user }) {
         <div className="grid md:grid-cols-3 gap-6">
           <div
             onDrop={(e) => {
+              if (isReadOnly) return;
               e.preventDefault();
               setIsDragging(false);
               handleFile(e.dataTransfer.files[0]);
             }}
             onDragOver={(e) => {
+              if (isReadOnly) return;
               e.preventDefault();
               setIsDragging(true);
             }}
-            onDragLeave={() => setIsDragging(false)}
+            onDragLeave={() => {
+              if (isReadOnly) return;
+              setIsDragging(false);
+            }}
             className={`md:col-span-2 rounded-xl min-h-[24rem] h-full flex flex-col items-center justify-center border-2 border-dashed transition-colors ${
-              isDragging
-                ? "border-blue-400 bg-blue-50"
-                : "border-gray-200 bg-slate-50 hover:bg-slate-100"
+              isReadOnly 
+                ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed" 
+                : isDragging
+                  ? "border-blue-400 bg-blue-50"
+                  : "border-gray-200 bg-slate-50 hover:bg-slate-100"
             }`}
           >
             <div className="text-center p-4">
@@ -1204,6 +1238,7 @@ export default function UploadAttendance({ user }) {
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.json" 
+                disabled={isReadOnly}
                 onChange={(e) => {
                   handleFile(e.target.files[0]);
                   e.target.value = null; 
@@ -1213,7 +1248,7 @@ export default function UploadAttendance({ user }) {
               />
               <label
                 htmlFor="attendanceUpload"
-                className="mt-2 inline-block text-sm text-blue-600 cursor-pointer hover:text-blue-700 font-medium"
+                className={`mt-2 inline-block text-sm font-medium ${isReadOnly ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 cursor-pointer hover:text-blue-700'}`}
               >
                 {file ? "Change File" : "Upload PDF or Saved JSON"}
               </label>
@@ -1221,71 +1256,84 @@ export default function UploadAttendance({ user }) {
           </div>
 
           <div className="flex flex-col gap-3 justify-center">
-            <button
-              onClick={openSaveModal}
-              disabled={!selectedEmployee} 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                <SaveIcon className="w-4 h-4" /> Save Progress
-            </button>
+            {!isReadOnly && (
+              <>
+                <button
+                  onClick={openSaveModal}
+                  disabled={!selectedEmployee} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <SaveIcon className="w-4 h-4" /> Save Progress
+                </button>
 
-            <div className="flex flex-col items-center bg-gray-50 border border-gray-200 rounded-lg p-2">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">PDF Date Format</span>
-                <div className="flex w-full bg-gray-200/50 p-1 rounded-md">
-                    <button 
-                        onClick={() => handleFormatChange("DMY")}
-                        className={`flex-1 text-xs py-1.5 font-bold rounded transition-all ${userDateFormat === 'DMY' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >DD/MM</button>
-                    <button 
-                        onClick={() => handleFormatChange("MDY")}
-                        className={`flex-1 text-xs py-1.5 font-bold rounded transition-all ${userDateFormat === 'MDY' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >MM/DD</button>
+                <div className="flex flex-col items-center bg-gray-50 border border-gray-200 rounded-lg p-2">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">PDF Date Format</span>
+                    <div className="flex w-full bg-gray-200/50 p-1 rounded-md">
+                        <button 
+                            onClick={() => handleFormatChange("DMY")}
+                            className={`flex-1 text-xs py-1.5 font-bold rounded transition-all ${userDateFormat === 'DMY' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >DD/MM</button>
+                        <button 
+                            onClick={() => handleFormatChange("MDY")}
+                            className={`flex-1 text-xs py-1.5 font-bold rounded transition-all ${userDateFormat === 'MDY' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >MM/DD</button>
+                    </div>
                 </div>
-            </div>
 
-            <button
-              onClick={() => handlePersonalUpload(null, userDateFormat)}
-              disabled={!file || loading || (file && file.type === "application/json")} 
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <UploadIcon className="w-4 h-4" /> Extract PDF
-                </>
-              )}
-            </button>
-            
-            <button
-              onClick={() => handleSharedFileUpload([file])}
-              disabled={!file || (file && file.type === "application/json") || sharedLoading}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {sharedLoading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <UploadIcon className="w-4 h-4" /> Share to Office
-                </>
-              )}
-            </button>
+                <button
+                  onClick={() => handlePersonalUpload(null, userDateFormat)}
+                  disabled={!file || loading || (file && file.type === "application/json")} 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <UploadIcon className="w-4 h-4" /> Extract PDF
+                    </>
+                  )}
+                </button>
+                
+                <button
+                  onClick={() => handleSharedFileUpload([file])}
+                  disabled={!file || (file && file.type === "application/json") || sharedLoading}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-3 rounded-lg shadow-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {sharedLoading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <UploadIcon className="w-4 h-4" /> Share to Office
+                    </>
+                  )}
+                </button>
+              </>
+            )}
 
             <button
               onClick={handleClearClick}
-              className="bg-red-500 text-white hover:bg-red-600 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              className={`${isReadOnly ? 'bg-amber-500 hover:bg-amber-600 h-16 shadow-md' : 'bg-red-500 hover:bg-red-600'} text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2`}
             >
-              <Trash2Icon className="w-4 h-4" /> Clear
+              {isReadOnly ? (
+                <>
+                  <XIcon className="w-5 h-5" /> Exit Read-Only Mode & Clear
+                </>
+              ) : (
+                <>
+                  <Trash2Icon className="w-4 h-4" /> Clear
+                </>
+              )}
             </button>
 
             {Object.keys(employees).length > 0 && (
                 <div className="mt-2 space-y-3">
                     <div>
-                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Log Source</label>
+                        <label className={`block text-xs font-semibold uppercase tracking-wider mb-1 ${labelClass(isReadOnly)}`}>Select Log Source</label>
                         <div className="relative">
-                            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <UserIcon className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isReadOnly ? 'text-gray-300' : 'text-gray-400'}`} />
                             <input
                                 type="text"
+                                disabled={isReadOnly}
                                 value={showEmpDropdown ? empSearch : (selectedEmployee || "")}
                                 onChange={(e) => {
                                     setEmpSearch(e.target.value);
@@ -1299,11 +1347,11 @@ export default function UploadAttendance({ user }) {
                                     setTimeout(() => setShowEmpDropdown(false), 200);
                                 }}
                                 placeholder="Search or select employee..."
-                                className="w-full pl-9 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer text-gray-700"
+                                className={`w-full pl-9 pr-10 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isReadOnly ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 cursor-pointer text-gray-700'}`}
                             />
-                            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                            <ChevronDownIcon className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isReadOnly ? 'text-gray-300' : 'text-gray-400'}`} />
                             
-                            {showEmpDropdown && (
+                            {showEmpDropdown && !isReadOnly && (
                                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                                     {Object.keys(employees)
                                         .filter(name => name.toLowerCase().includes(empSearch.toLowerCase()))
@@ -1332,13 +1380,14 @@ export default function UploadAttendance({ user }) {
 
                     {selectedEmployee && employees[selectedEmployee] && Object.keys(employees[selectedEmployee]).length > 0 && (
                         <div>
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Month</label>
+                            <label className={`block text-xs font-semibold uppercase tracking-wider mb-1 ${labelClass(isReadOnly)}`}>Select Month</label>
                             <div className="relative">
-                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <CalendarIcon className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isReadOnly ? 'text-gray-300' : 'text-gray-400'}`} />
                                 <select
+                                disabled={isReadOnly}
                                 value={selectedMonth}
                                 onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                className={`w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isReadOnly ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200'}`}
                                 >
                                 {Object.keys(employees[selectedEmployee]).map((monthKey) => (
                                     <option key={monthKey} value={monthKey}>{monthKey}</option>
@@ -1393,59 +1442,59 @@ export default function UploadAttendance({ user }) {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-800">
-                  {viewMode === "dtr" && "Edit Attendance Log"}
-                  {viewMode === "ar" && "Edit Accomplishment Report"}
+                  {viewMode === "dtr" && (isReadOnly ? "View Attendance Log" : "Edit Attendance Log")}
+                  {viewMode === "ar" && (isReadOnly ? "View Accomplishment Report" : "Edit Accomplishment Report")}
                   {viewMode === "dtr_adjustment" && "DTR Adjustment Slip Details"}
                 </h3>
                 <div className="text-sm text-gray-500 flex items-center gap-1">
-                    <Edit3Icon className="w-4 h-4" />
-                    Editable Preview
+                    {isReadOnly ? <EyeIcon className="w-4 h-4" /> : <Edit3Icon className="w-4 h-4" />}
+                    {isReadOnly ? "Read-Only View" : "Editable Preview"}
                 </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6 mb-6 border-b border-gray-100">
                 <div className="space-y-1">
-                    <label className={labelClass(false)}><UserIcon className="w-3 h-3"/> Employee Name</label>
+                    <label className={labelClass(isReadOnly)}><UserIcon className="w-3 h-3"/> Employee Name</label>
                     <input
-                        className={inputClass(false)}
+                        className={inputClass(isReadOnly)}
                         placeholder="e.g. Juan Dela Cruz"
                         value={arMeta.name}
                         onChange={(e) => { setArMeta({ ...arMeta, name: e.target.value }); setHasUnsavedChanges(true); }}
-                        disabled={false}
+                        disabled={isReadOnly}
                     />
                 </div>
 
                 {viewMode !== "dtr_adjustment" && (
                     <div className="space-y-1">
-                        <label className={labelClass(false)}><BriefcaseIcon className="w-3 h-3"/> Position (For AR)</label>
+                        <label className={labelClass(isReadOnly)}><BriefcaseIcon className="w-3 h-3"/> Position (For AR)</label>
                         <input
-                            className={inputClass(false)}
+                            className={inputClass(isReadOnly)}
                             placeholder="e.g. Project Officer I"
                             value={arMeta.position}
                             onChange={(e) => { setArMeta({ ...arMeta, position: e.target.value }); setHasUnsavedChanges(true); }}
-                            disabled={false}
+                            disabled={isReadOnly}
                         />
                     </div>
                 )}
 
                 {viewMode !== "dtr_adjustment" && (
                     <div className="space-y-1">
-                        <label className={labelClass(false)}><MapPinIcon className="w-3 h-3"/> Office (For AR)</label>
+                        <label className={labelClass(isReadOnly)}><MapPinIcon className="w-3 h-3"/> Office (For AR)</label>
                         <input
-                            className={inputClass(false)}
+                            className={inputClass(isReadOnly)}
                             placeholder="e.g. Cauayan Office"
                             value={arMeta.office}
                             onChange={(e) => { setArMeta({ ...arMeta, office: e.target.value }); setHasUnsavedChanges(true); }}
-                            disabled={false}
+                            disabled={isReadOnly}
                         />
                     </div>
                 )}
 
                 <div className="space-y-1 relative">
-                    <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approved By</label>
+                    <label className={labelClass(isReadOnly)}><BadgeCheckIcon className="w-3 h-3"/> Approved By</label>
                     <div className="relative">
                         <input
-                            className={inputClass(false)}
+                            className={inputClass(isReadOnly)}
                             placeholder="Provincial Officer Name"
                             value={arMeta.approver}
                             onChange={(e) => {
@@ -1459,11 +1508,11 @@ export default function UploadAttendance({ user }) {
                                 setHasUnsavedChanges(true);
                                 setShowApproverDropdown(true);
                             }}
-                            onFocus={() => setShowApproverDropdown(true)}
+                            onFocus={() => { if(!isReadOnly) setShowApproverDropdown(true); }}
                             onBlur={() => setTimeout(() => setShowApproverDropdown(false), 200)}
-                            disabled={false}
+                            disabled={isReadOnly}
                         />
-                        {showApproverDropdown && (
+                        {showApproverDropdown && !isReadOnly && (
                             <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                                 {reviewers
                                     .filter(rev => rev.full_name.toLowerCase().includes((arMeta.approver || "").toLowerCase()))
@@ -1497,24 +1546,25 @@ export default function UploadAttendance({ user }) {
 
                 {viewMode !== "dtr_adjustment" && (
                     <div className="space-y-1">
-                        <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
+                        <label className={labelClass(isReadOnly)}><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
                         <input
-                            className={inputClass(false)}
+                            className={inputClass(isReadOnly)}
                             placeholder="e.g. PROVINCIAL OFFICER..."
                             value={arMeta.approverTitle}
                             onChange={(e) => { setArMeta({ ...arMeta, approverTitle: e.target.value }); setHasUnsavedChanges(true); }}
-                            disabled={false}
+                            disabled={isReadOnly}
                         />
                     </div>
                 )}
 
                 {viewMode !== "dtr_adjustment" && (
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><CalendarIcon className="w-3 h-3"/> Period Coverage</label>
+                        <label className={`text-xs font-semibold flex items-center gap-1 ${labelClass(isReadOnly)}`}><CalendarIcon className="w-3 h-3"/> Period Coverage</label>
                         <select
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                            className={inputClass(isReadOnly)}
                             value={arMeta.periodFormat}
                             onChange={(e) => { setArMeta({ ...arMeta, periodFormat: e.target.value }); setHasUnsavedChanges(true); }}
+                            disabled={isReadOnly}
                         >
                             <option value="full">Full Month</option>
                             <option value="1-15">1st Quincena (1-15)</option>
@@ -1532,6 +1582,7 @@ export default function UploadAttendance({ user }) {
                     onBatchUpdate={handleBatchUpdate}
                     periodFormat={arMeta.periodFormat}
                     setAppAlert={setAppAlert}
+                    isReadOnly={isReadOnly}
                 />
                 ) : viewMode === "ar" ? (
                 <div className="overflow-x-auto border border-gray-100 bg-gray-50/50 rounded-lg">
@@ -1544,6 +1595,7 @@ export default function UploadAttendance({ user }) {
                         periodFormat={arMeta.periodFormat}
                         selectedMonth={selectedMonth}
                         setHasUnsavedChanges={setHasUnsavedChanges}
+                        isReadOnly={isReadOnly}
                     />
                 </div>
                 ) : (
@@ -1553,6 +1605,7 @@ export default function UploadAttendance({ user }) {
                         setArMeta={setArMeta}
                         setHasUnsavedChanges={setHasUnsavedChanges}
                         currentUser={currentUser}
+                        isReadOnly={isReadOnly}
                     />
                 </div>
                 )}
@@ -1733,13 +1786,15 @@ export default function UploadAttendance({ user }) {
   );
 }
 
-function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUser }) {
+function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUser, isReadOnly }) {
   const handleFieldChange = (field, value) => {
+    if (isReadOnly) return;
     setArMeta(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
   };
 
   const handleRowChange = (index, field, value) => {
+    if (isReadOnly) return;
     const newRows = [...arMeta.adjustmentRows];
     newRows[index] = { ...newRows[index], [field]: value };
     setArMeta(prev => ({ ...prev, adjustmentRows: newRows }));
@@ -1747,6 +1802,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
   };
 
   const addRow = () => {
+    if (isReadOnly) return;
     setArMeta(prev => ({
         ...prev,
         adjustmentRows: [...prev.adjustmentRows, { date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" }]
@@ -1755,6 +1811,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
   };
 
   const removeRow = (index) => {
+    if (isReadOnly) return;
     const newRows = arMeta.adjustmentRows.filter((_, i) => i !== index);
     setArMeta(prev => ({ ...prev, adjustmentRows: newRows }));
     setHasUnsavedChanges(true);
@@ -1774,7 +1831,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
   }, [currentUser, setArMeta]);
 
   return (
-    <div className="p-4 bg-gray-50">
+    <div className={`p-4 bg-gray-50 ${isReadOnly ? 'opacity-80 pointer-events-none' : ''}`}>
       <div className="bg-white border-2 border-black text-black max-w-6xl mx-auto shadow-lg">
         
         <div className="flex border-b border-black">
@@ -1784,6 +1841,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                     className="flex-1 min-w-0 border-b border-gray-300 focus:border-blue-500 outline-none px-1 text-sm bg-transparent"
                     value={arMeta.employeeNo}
                     onChange={(e) => handleFieldChange('employeeNo', e.target.value)}
+                    disabled={isReadOnly}
                 />
             </div>
             <div className="flex-1 p-2 flex items-center gap-2">
@@ -1792,6 +1850,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                     className="flex-1 min-w-0 border-b border-gray-300 focus:border-blue-500 outline-none px-1 text-sm bg-transparent"
                     value={arMeta.controlNo}
                     onChange={(e) => handleFieldChange('controlNo', e.target.value)}
+                    disabled={isReadOnly}
                 />
             </div>
         </div>
@@ -1804,6 +1863,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                     value={arMeta.adjustmentName}
                     onChange={(e) => handleFieldChange('adjustmentName', e.target.value)}
                     placeholder="LAST, FIRST M.I."
+                    disabled={isReadOnly}
                 />
             </div>
             <div className="flex-1 p-2">
@@ -1813,6 +1873,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                     className="w-full min-w-0 border-b border-gray-300 focus:border-blue-500 outline-none px-1 text-sm bg-transparent"
                     value={arMeta.filingDate}
                     onChange={(e) => handleFieldChange('filingDate', e.target.value)}
+                    disabled={isReadOnly}
                 />
             </div>
         </div>
@@ -1845,55 +1906,61 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
             <tbody>
               {arMeta.adjustmentRows.map((row, idx) => (
                 <tr key={idx} className="border-b border-black last:border-0">
-                  <td className="border-r border-black p-0"><input type="date" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.date} onChange={(e) => handleRowChange(idx, 'date', e.target.value)} /></td>
-                  <td className="border-r border-black p-0"><input type="text" placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.am_in} onChange={(e) => handleRowChange(idx, 'am_in', e.target.value)} /></td>
-                  <td className="border-r border-black p-0"><input type="text" placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.am_out} onChange={(e) => handleRowChange(idx, 'am_out', e.target.value)} /></td>
-                  <td className="border-r border-black p-0"><input type="text" placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.pm_in} onChange={(e) => handleRowChange(idx, 'pm_in', e.target.value)} /></td>
-                  <td className="border-r border-black p-0"><input type="text" placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.pm_out} onChange={(e) => handleRowChange(idx, 'pm_out', e.target.value)} /></td>
-                  <td className="border-r border-black p-0"><input type="text" placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.evening_in} onChange={(e) => handleRowChange(idx, 'evening_in', e.target.value)} /></td>
-                  <td className="p-0"><input type="text" placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.evening_out} onChange={(e) => handleRowChange(idx, 'evening_out', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="date" disabled={isReadOnly} className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent" value={row.date} onChange={(e) => handleRowChange(idx, 'date', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="text" disabled={isReadOnly} placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.am_in} onChange={(e) => handleRowChange(idx, 'am_in', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="text" disabled={isReadOnly} placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.am_out} onChange={(e) => handleRowChange(idx, 'am_out', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="text" disabled={isReadOnly} placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.pm_in} onChange={(e) => handleRowChange(idx, 'pm_in', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="text" disabled={isReadOnly} placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.pm_out} onChange={(e) => handleRowChange(idx, 'pm_out', e.target.value)} /></td>
+                  <td className="border-r border-black p-0"><input type="text" disabled={isReadOnly} placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.evening_in} onChange={(e) => handleRowChange(idx, 'evening_in', e.target.value)} /></td>
+                  <td className="p-0"><input type="text" disabled={isReadOnly} placeholder="--:--" className="w-full min-w-0 text-xs border-0 text-center focus:ring-0 h-8 p-0 bg-transparent font-mono" value={row.evening_out} onChange={(e) => handleRowChange(idx, 'evening_out', e.target.value)} /></td>
                   <td className="p-0 text-center bg-gray-50">
-                    <button 
-                        onClick={() => removeRow(idx)}
-                        disabled={arMeta.adjustmentRows.length <= 1}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-30"
-                    >
-                        <Trash2Icon className="w-3 h-3" />
-                    </button>
+                    {!isReadOnly && (
+                        <button 
+                            onClick={() => removeRow(idx)}
+                            disabled={arMeta.adjustmentRows.length <= 1}
+                            className="text-red-500 hover:text-red-700 disabled:opacity-30"
+                        >
+                            <Trash2Icon className="w-3 h-3" />
+                        </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="bg-gray-100 p-1 flex justify-center border-t border-black">
-              <button onClick={addRow} className="text-xs flex items-center gap-1 text-blue-600 font-bold hover:underline">
-                  <PlusIcon className="w-3 h-3" /> Add Row
-              </button>
-          </div>
+          {!isReadOnly && (
+              <div className="bg-gray-100 p-1 flex justify-center border-t border-black">
+                  <button onClick={addRow} className="text-xs flex items-center gap-1 text-blue-600 font-bold hover:underline">
+                      <PlusIcon className="w-3 h-3" /> Add Row
+                  </button>
+              </div>
+          )}
         </div>
 
         <div className="border-b border-black p-2">
             <div className="font-bold text-sm mb-2">REASON FOR ADJUSTMENT:</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 pr-2">
              <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className={`flex items-center gap-2 ${isReadOnly ? '' : 'cursor-pointer'}`}>
               <input 
                 type="radio" 
                 name="adjustmentReason" 
                 checked={arMeta.adjustmentReason === 'fingerprint'} 
                 onChange={() => handleFieldChange('adjustmentReason', 'fingerprint')}
                 className="w-4 h-4 text-black focus:ring-black"
+                disabled={isReadOnly}
               />
               <span className="text-sm">Fingerprint not recognized</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className={`flex items-center gap-2 ${isReadOnly ? '' : 'cursor-pointer'}`}>
                 <input 
                   type="radio" 
                   name="adjustmentReason" 
                   checked={arMeta.adjustmentReason === 'ob'} 
                   onChange={() => handleFieldChange('adjustmentReason', 'ob')}
                   className="w-4 h-4 text-black focus:ring-black"
+                  disabled={isReadOnly}
                 />
                 <span className="text-sm">On Official Business / Pass Slip</span>
               </label>
@@ -1904,20 +1971,22 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                       placeholder="With..." 
                       value={arMeta.obWith}
                       onChange={(e) => handleFieldChange('obWith', e.target.value)}
+                      disabled={isReadOnly}
                     />
                     <input 
                       className="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm bg-transparent" 
                       placeholder="At..." 
                       value={arMeta.obAt}
                       onChange={(e) => handleFieldChange('obAt', e.target.value)}
+                      disabled={isReadOnly}
                     />
                 </div>
               )}
              </div>
 
              <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="adjustmentReason" checked={arMeta.adjustmentReason === 'personal'} onChange={() => handleFieldChange('adjustmentReason', 'personal')} className="w-4 h-4 text-black focus:ring-black" />
+              <label className={`flex items-center gap-2 ${isReadOnly ? '' : 'cursor-pointer'}`}>
+                <input type="radio" disabled={isReadOnly} name="adjustmentReason" checked={arMeta.adjustmentReason === 'personal'} onChange={() => handleFieldChange('adjustmentReason', 'personal')} className="w-4 h-4 text-black focus:ring-black" />
                 <span className="text-sm">Personal Reason</span>
               </label>
               {arMeta.adjustmentReason === 'personal' && (
@@ -1928,12 +1997,13 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                         placeholder="Specify reason..." 
                         value={arMeta.adjustmentDetails} 
                         onChange={(e) => handleFieldChange('adjustmentDetails', e.target.value)} 
+                        disabled={isReadOnly}
                     />
                 </div>
               )}
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="adjustmentReason" checked={arMeta.adjustmentReason === 'other'} onChange={() => handleFieldChange('adjustmentReason', 'other')} className="w-4 h-4 text-black focus:ring-black" />
+              <label className={`flex items-center gap-2 ${isReadOnly ? '' : 'cursor-pointer'}`}>
+                <input type="radio" disabled={isReadOnly} name="adjustmentReason" checked={arMeta.adjustmentReason === 'other'} onChange={() => handleFieldChange('adjustmentReason', 'other')} className="w-4 h-4 text-black focus:ring-black" />
                 <span className="text-sm">Other reasons</span>
               </label>
               {arMeta.adjustmentReason === 'other' && (
@@ -1944,6 +2014,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                         placeholder="Specify reason..." 
                         value={arMeta.adjustmentDetails} 
                         onChange={(e) => handleFieldChange('adjustmentDetails', e.target.value)} 
+                        disabled={isReadOnly}
                     />
                 </div>
               )}
@@ -1964,6 +2035,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
                     value={arMeta.approver || ""}
                     onChange={(e) => handleFieldChange('approver', e.target.value)}
                     placeholder="APPROVER NAME"
+                    disabled={isReadOnly}
                 />
                 <div className="text-center text-xs">SIGNATURE OVER PRINTED NAME OF IMMEDIATE SUPERVISOR</div>
             </div>
@@ -1973,12 +2045,13 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
   );
 }
 
-const InputCell = ({ day, field, value, onUpdate }) => (
+const InputCell = ({ day, field, value, onUpdate, isReadOnly }) => (
     <input 
         type="text" 
         value={value || ""}
         onChange={(e) => onUpdate(day, field, e.target.value)}
-        className="w-full bg-transparent border-0 p-1 text-center focus:ring-1 focus:ring-blue-500 focus:bg-white rounded text-gray-700 font-mono text-sm"
+        disabled={isReadOnly}
+        className={`w-full bg-transparent border-0 p-1 text-center focus:ring-1 focus:ring-blue-500 focus:bg-white rounded text-gray-700 font-mono text-sm ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}`}
         placeholder={field === "remarks" ? "..." : "--:--"}
     />
 );
@@ -2105,7 +2178,7 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
 
 ToolContent.displayName = "ToolContent";
 
-function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) {
+function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, isReadOnly }) {
   let start = 1;
   let end = 31;
   if (periodFormat === "1-15") end = 15;
@@ -2118,6 +2191,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
   const tableRef = useRef(null);
 
   const toggleDay = (day) => {
+    if (isReadOnly) return;
     const newSelected = new Set(selectedDays);
     if (newSelected.has(day)) {
         newSelected.delete(day);
@@ -2128,6 +2202,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
   };
 
   const toggleAll = () => {
+    if (isReadOnly) return;
     if (selectedDays.size === days.length) {
         setSelectedDays(new Set());
     } else {
@@ -2167,8 +2242,8 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
   };
 
   return (
-    <div className="relative w-full" ref={tableRef}>
-        {selectedDays.size > 0 && typeof document !== 'undefined' && createPortal(
+    <div className={`relative w-full ${isReadOnly ? 'opacity-90' : ''}`} ref={tableRef}>
+        {selectedDays.size > 0 && !isReadOnly && typeof document !== 'undefined' && createPortal(
             <ToolContent 
                 selectedDays={selectedDays} setSelectedDays={setSelectedDays}
                 batchReason={batchReason} setBatchReason={setBatchReason}
@@ -2185,6 +2260,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
                 <th className="px-3 py-3 border-b w-10">
                     <input 
                         type="checkbox" 
+                        disabled={isReadOnly}
                         checked={selectedDays.size === days.length && days.length > 0}
                         onChange={toggleAll}
                     />
@@ -2209,6 +2285,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
                         <td className="px-3 py-2 border-r text-center">
                             <input 
                                 type="checkbox" 
+                                disabled={isReadOnly}
                                 checked={selectedDays.has(day)}
                                 onChange={() => toggleDay(day)}
                             />
@@ -2222,29 +2299,29 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
                         ) : (
                             <>
                                 <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="am_in" value={rowData.am_in} onUpdate={onUpdate} />
+                                    <InputCell day={day} field="am_in" value={rowData.am_in} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                                 </td>
                                 <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="am_out" value={rowData.am_out} onUpdate={onUpdate} />
+                                    <InputCell day={day} field="am_out" value={rowData.am_out} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                                 </td>
                                 <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="pm_in" value={rowData.pm_in} onUpdate={onUpdate} />
+                                    <InputCell day={day} field="pm_in" value={rowData.pm_in} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                                 </td>
                                 <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="pm_out" value={rowData.pm_out} onUpdate={onUpdate} />
+                                    <InputCell day={day} field="pm_out" value={rowData.pm_out} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                                 </td>
                             </>
                         )}
 
                         <td className={`border-r min-w-[60px] bg-red-50/30 ${hasRemark ? 'opacity-40' : ''}`}>
-                            <InputCell day={day} field="undertime_hrs" value={rowData.undertime_hrs} onUpdate={onUpdate} />
+                            <InputCell day={day} field="undertime_hrs" value={rowData.undertime_hrs} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                         </td>
                         <td className={`min-w-[60px] bg-red-50/30 border-r ${hasRemark ? 'opacity-40' : ''}`}>
-                            <InputCell day={day} field="undertime_min" value={rowData.undertime_min} onUpdate={onUpdate} />
+                            <InputCell day={day} field="undertime_min" value={rowData.undertime_min} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                         </td>
                         
                         <td className="min-w-[150px] bg-yellow-50/30">
-                            <InputCell day={day} field="remarks" value={rowData.remarks} onUpdate={onUpdate} />
+                            <InputCell day={day} field="remarks" value={rowData.remarks} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                         </td>
                     </tr>
                     );
@@ -2256,7 +2333,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert }) 
   );
 }
 
-function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMeta, periodFormat, selectedMonth, setHasUnsavedChanges }) {
+function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMeta, periodFormat, selectedMonth, setHasUnsavedChanges, isReadOnly }) {
   let start = 1;
   let end = 31;
   if (periodFormat === "1-15") end = 15;
@@ -2264,6 +2341,7 @@ function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMet
   const days = Array.from({ length: end - start + 1 }, (_, i) => String(start + i));
 
   const handleKeyDown = (e, day, currentValue) => {
+    if (isReadOnly) return;
     if (e.key === "Enter") {
       e.preventDefault();
       
@@ -2300,6 +2378,7 @@ function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMet
   };
 
   const handleChange = (e, day) => {
+      if (isReadOnly) return;
       let value = e.target.value;
       
       const lines = value.split('\n');
@@ -2321,6 +2400,7 @@ function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMet
   };
 
   const toggleManualHighlight = (day) => {
+      if (isReadOnly) return;
       setArMeta(prev => ({
           ...prev,
           manualHighlights: {
@@ -2335,14 +2415,15 @@ function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMet
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className={`p-4 space-y-6 ${isReadOnly ? 'opacity-90' : ''}`}>
         <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><LayersIcon className="w-3 h-3"/> Project</label>
+            <label className={`text-xs font-semibold flex items-center gap-1 ${isReadOnly ? 'text-gray-400' : 'text-gray-500'}`}><LayersIcon className="w-3 h-3"/> Project</label>
             <input
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none ${isReadOnly ? 'bg-gray-100 opacity-60 cursor-not-allowed' : 'bg-white'}`}
             placeholder="e.g. Free Wifi Project"
             value={arMeta.project}
             onChange={(e) => setArMeta({ ...arMeta, project: e.target.value })}
+            disabled={isReadOnly}
             />
         </div>
 
@@ -2372,18 +2453,19 @@ function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMet
                 const isHighlighted = hasAttendance || isManual;
 
                 return (
-                    <div key={day} className={`flex gap-4 p-3 border rounded-lg hover:shadow-sm transition-shadow items-start ${isHighlighted ? "bg-green-50 border-green-200" : "bg-white border-gray-200"}`}>
+                    <div key={day} className={`flex gap-4 p-3 border rounded-lg transition-shadow items-start ${isHighlighted ? "bg-green-50 border-green-200" : "bg-white border-gray-200"} ${isReadOnly ? '' : 'hover:shadow-sm'}`}>
                         <div 
-                            onClick={() => !hasAttendance && toggleManualHighlight(day)}
-                            className={`w-12 h-10 flex flex-col items-center justify-center font-bold rounded-md shrink-0 transition-colors ${!hasAttendance ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300' : ''} ${isHighlighted ? "bg-green-100 text-green-700" : "bg-indigo-50 text-indigo-700"}`}
-                            title={!hasAttendance ? "Click to manually include this date" : "Included via attendance log"}
+                            onClick={() => !hasAttendance && !isReadOnly && toggleManualHighlight(day)}
+                            className={`w-12 h-10 flex flex-col items-center justify-center font-bold rounded-md shrink-0 transition-colors ${!hasAttendance && !isReadOnly ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300' : ''} ${isHighlighted ? "bg-green-100 text-green-700" : "bg-indigo-50 text-indigo-700"}`}
+                            title={!hasAttendance ? (isReadOnly ? "Not included" : "Click to manually include this date") : "Included via attendance log"}
                         >
                             {day}
                             {isHighlighted && <CheckIcon className="w-3 h-3 mt-0.5" />}
                         </div>
                         <div className="flex-1 relative">
                             <textarea
-                                className="w-full min-h-[80px] bg-transparent border border-gray-200 rounded p-2 text-sm text-gray-700 placeholder-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y"
+                                readOnly={isReadOnly}
+                                className={`w-full min-h-[80px] bg-transparent border border-gray-200 rounded p-2 text-sm text-gray-700 placeholder-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
                                 placeholder={isHighlighted ? "Type accomplished task here...\nTip: Type '-' or '*' then space to start a bulleted list." : "No attendance log for this day..."}
                                 value={tasks[day] || ""}
                                 onChange={(e) => handleChange(e, day)}

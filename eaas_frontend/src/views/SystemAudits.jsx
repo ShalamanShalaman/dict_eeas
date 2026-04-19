@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Activity, Search, Shield, Download, RefreshCw, Filter, ChevronLeft, ChevronRight, Calendar, Eye, FileText } from 'lucide-react';
 
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
@@ -28,7 +29,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
+              src={`/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -48,6 +49,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
 };
 
 const SystemAudits = () => {
+  const navigate = useNavigate();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,7 +69,7 @@ const SystemAudits = () => {
   const fetchLogs = useCallback(async (isInitial = false) => {
     if (!isInitial) setIsRefreshing(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/logs?_t=${Date.now()}`);
+      const response = await fetch(`/api/admin/logs?_t=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
         setLogs(data);
@@ -95,7 +97,7 @@ const SystemAudits = () => {
       if (loading || isRefreshing || referenceLength === 0) return;
       
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/logs?_t=${Date.now()}`);
+        const response = await fetch(`/api/admin/logs?_t=${Date.now()}`);
         if (response.ok) {
           const data = await response.json();
           if (isMounted && data.length > referenceLength) {
@@ -119,7 +121,6 @@ const SystemAudits = () => {
     if (['CREATE', 'APPROVE'].includes(act)) return 'bg-green-100 text-green-800 border-green-200';
     if (['DELETE', 'DECLINE'].includes(act)) return 'bg-red-100 text-red-800 border-red-200';
     if (['UPDATE', 'SUBMIT', 'UPLOAD', 'UPLOAD_REVIEW'].includes(act)) return 'bg-blue-100 text-blue-800 border-blue-200';
-    // Included LOGOUT here
     if (['LOGIN', 'AUTH', 'LOGOUT'].includes(act)) return 'bg-purple-100 text-purple-800 border-purple-200';
     if (['GENERATE', 'EXPORT'].includes(act)) return 'bg-amber-100 text-amber-800 border-amber-200';
     if (['RENAME'].includes(act)) return 'bg-indigo-100 text-indigo-800 border-indigo-200';
@@ -413,6 +414,7 @@ const SystemAudits = () => {
                 paginatedLogs.map((log) => {
                   const isDocumentAction = log.entity_type === 'Document' && log.entity_id;
                   const isDeleted = log.action === 'DELETE' || log.details.includes('deleted');
+                  const isJsonDraft = log.details.toLowerCase().includes('.json');
 
                   return (
                     <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
@@ -440,11 +442,17 @@ const SystemAudits = () => {
                             
                             {isDocumentAction && !isDeleted && (
                                 <button 
-                                    onClick={() => handleViewDocument(log.entity_id)}
+                                    onClick={() => {
+                                      if (isJsonDraft) {
+                                        navigate(`/upload?view_only_doc_id=${log.entity_id}`);
+                                      } else {
+                                        handleViewDocument(log.entity_id);
+                                      }
+                                    }}
                                     className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 hover:bg-indigo-100 self-start px-2.5 py-1.5 rounded-lg border border-indigo-100 mt-1"
                                 >
                                     <FileText className="w-3.5 h-3.5" />
-                                    View Referenced Document
+                                    {isJsonDraft ? "View Draft Data" : "View Referenced Document"}
                                 </button>
                             )}
                         </div>

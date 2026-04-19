@@ -259,6 +259,15 @@ class DocumentController extends Controller
     public function getDocumentContent(Request $request, $doc_id)
     {
         $doc = Document::findOrFail($doc_id);
+        
+        $userId = $request->input('user_id');
+        $user = User::where('user_id', $userId)->first();
+        
+        // Security check: Must be owner, reviewer, or admin
+        if (!$user || ($doc->employee_id !== $user->id && $doc->reviewer_id !== $user->id && $user->role !== 'admin')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         if (!Storage::disk('public')->exists($doc->file_path)) return response()->json(['error' => 'File not found'], 404);
 
         if (str_ends_with($doc->file_path, '.json')) {
