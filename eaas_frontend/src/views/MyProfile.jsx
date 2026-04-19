@@ -57,7 +57,6 @@ export default function MyProfile() {
   const [saving, setSaving] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Cache buster for profile images
   const [imageHash, setImageHash] = useState(() => Date.now());
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -79,9 +78,8 @@ export default function MyProfile() {
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   
-  // Replaced phoneVerified with emailVerified for the new email OTP flow
   const [emailVerified, setEmailVerified] = useState(true); 
-  const [verifiedProfileOtp, setVerifiedProfileOtp] = useState(""); // Holds the OTP to pass on final save
+  const [verifiedProfileOtp, setVerifiedProfileOtp] = useState("");
 
   const [usingOtpForPassword, setUsingOtpForPassword] = useState(false);
   const [passwordResetOtp, setPasswordResetOtp] = useState("");
@@ -111,12 +109,10 @@ export default function MyProfile() {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
     
-    // Trigger verification requirement if they change their email
     if (field === "email" && profile && value !== profile.email) {
         setEmailVerified(false);
-        setVerifiedProfileOtp(""); // Reset any previously verified OTP
+        setVerifiedProfileOtp("");
     } else if (field === "email" && profile && value === profile.email) {
-        // If they revert back to original email, it is automatically verified
         setEmailVerified(true);
         setVerifiedProfileOtp("");
     }
@@ -243,7 +239,7 @@ export default function MyProfile() {
         
         if (response.ok) {
             setEmailVerified(true);
-            setVerifiedProfileOtp(otpCode); // Store to pass to handleSave
+            setVerifiedProfileOtp(otpCode);
             setOtpModalOpen(false);
             setOtpCode("");
             setUiModal({ show: true, type: 'success', title: 'Verified', message: 'Email verified successfully! Don\'t forget to click Save Changes.' });
@@ -403,7 +399,6 @@ export default function MyProfile() {
             contact_no: formData.contact_no,
         };
 
-        // Attach OTP if they verified an email change OR if they are resetting password
         if (verifiedProfileOtp) {
             payload.otp = verifiedProfileOtp;
         }
@@ -638,7 +633,7 @@ export default function MyProfile() {
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
                 <img
                   key={imageHash}
-                  src={`${API_BASE_URL}/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`}
+                  src={`${API_BASE_URL}/api/profile/${profile.public_id}/picture?t=${imageHash}`}
                   alt="Profile"
                   className="w-full h-full object-cover"
                   onError={(e) => { e.target.style.display = 'none'; }}
@@ -816,7 +811,7 @@ export default function MyProfile() {
                       <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
                         <img 
                           key={imageHash}
-                          src={`${API_BASE_URL}/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`} 
+                          src={`${API_BASE_URL}/api/profile/${profile.public_id}/picture?t=${imageHash}`} 
                           alt="Profile" 
                           className="w-full h-full object-cover"
                           onError={(e) => {

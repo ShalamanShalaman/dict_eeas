@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { User, Settings, Key, Bell, HelpCircle, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import NotificationDropdown from "./NotificationDropdown";
-import MessageDropdown from "./MessageDropdown";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const NotificationDropdown = () => null;
+const MessageDropdown = () => null;
+
+const API_BASE_URL = "";
 
 export default function Header({ role, setRole, user, onLogout }) {
   const canToggleRoles = user && (user.role === 'admin' || user.role === 'hr');
@@ -184,7 +185,7 @@ export default function Header({ role, setRole, user, onLogout }) {
             {user?.profile_picture ? (
               <img 
                 key={imageHash}
-                src={`${API_BASE_URL}/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
+                src={`${API_BASE_URL}/api/profile/${user.public_id}/picture?t=${imageHash}`}
                 alt="Profile"
                 className="w-8 h-8 rounded-full object-cover border-2 border-yellow-400 shadow-md"
                 onError={(e) => {
