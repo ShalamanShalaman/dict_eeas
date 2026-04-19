@@ -1393,9 +1393,9 @@ export default function UploadAttendance({ user }) {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-800">
-                    {viewMode === "dtr" && "Edit Attendance Log"}
-                    {viewMode === "ar" && "Edit Accomplishment Report"}
-                    {viewMode === "dtr_adjustment" && "DTR Adjustment Slip Details"}
+                  {viewMode === "dtr" && "Edit Attendance Log"}
+                  {viewMode === "ar" && "Edit Accomplishment Report"}
+                  {viewMode === "dtr_adjustment" && "DTR Adjustment Slip Details"}
                 </h3>
                 <div className="text-sm text-gray-500 flex items-center gap-1">
                     <Edit3Icon className="w-4 h-4" />
@@ -1414,26 +1414,33 @@ export default function UploadAttendance({ user }) {
                         disabled={false}
                     />
                 </div>
-                <div className="space-y-1">
-                    <label className={labelClass(false)}><BriefcaseIcon className="w-3 h-3"/> Position (For AR)</label>
-                    <input
-                        className={inputClass(false)}
-                        placeholder="e.g. Project Officer I"
-                        value={arMeta.position}
-                        onChange={(e) => { setArMeta({ ...arMeta, position: e.target.value }); setHasUnsavedChanges(true); }}
-                        disabled={false}
-                    />
-                </div>
-                <div className="space-y-1">
-                    <label className={labelClass(false)}><MapPinIcon className="w-3 h-3"/> Office (For AR)</label>
-                    <input
-                        className={inputClass(false)}
-                        placeholder="e.g. Cauayan Office"
-                        value={arMeta.office}
-                        onChange={(e) => { setArMeta({ ...arMeta, office: e.target.value }); setHasUnsavedChanges(true); }}
-                        disabled={false}
-                    />
-                </div>
+
+                {viewMode !== "dtr_adjustment" && (
+                    <div className="space-y-1">
+                        <label className={labelClass(false)}><BriefcaseIcon className="w-3 h-3"/> Position (For AR)</label>
+                        <input
+                            className={inputClass(false)}
+                            placeholder="e.g. Project Officer I"
+                            value={arMeta.position}
+                            onChange={(e) => { setArMeta({ ...arMeta, position: e.target.value }); setHasUnsavedChanges(true); }}
+                            disabled={false}
+                        />
+                    </div>
+                )}
+
+                {viewMode !== "dtr_adjustment" && (
+                    <div className="space-y-1">
+                        <label className={labelClass(false)}><MapPinIcon className="w-3 h-3"/> Office (For AR)</label>
+                        <input
+                            className={inputClass(false)}
+                            placeholder="e.g. Cauayan Office"
+                            value={arMeta.office}
+                            onChange={(e) => { setArMeta({ ...arMeta, office: e.target.value }); setHasUnsavedChanges(true); }}
+                            disabled={false}
+                        />
+                    </div>
+                )}
+
                 <div className="space-y-1 relative">
                     <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approved By</label>
                     <div className="relative">
@@ -1487,28 +1494,34 @@ export default function UploadAttendance({ user }) {
                         )}
                     </div>
                 </div>
-                <div className="space-y-1">
-                    <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
-                    <input
-                        className={inputClass(false)}
-                        placeholder="e.g. PROVINCIAL OFFICER..."
-                        value={arMeta.approverTitle}
-                        onChange={(e) => { setArMeta({ ...arMeta, approverTitle: e.target.value }); setHasUnsavedChanges(true); }}
-                        disabled={false}
-                    />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><CalendarIcon className="w-3 h-3"/> Period Coverage</label>
-                    <select
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                        value={arMeta.periodFormat}
-                        onChange={(e) => { setArMeta({ ...arMeta, periodFormat: e.target.value }); setHasUnsavedChanges(true); }}
-                    >
-                        <option value="full">Full Month</option>
-                        <option value="1-15">1st Quincena (1-15)</option>
-                        <option value="16-end">2nd Quincena (16-End)</option>
-                    </select>
-                </div>
+
+                {viewMode !== "dtr_adjustment" && (
+                    <div className="space-y-1">
+                        <label className={labelClass(false)}><BadgeCheckIcon className="w-3 h-3"/> Approver Title</label>
+                        <input
+                            className={inputClass(false)}
+                            placeholder="e.g. PROVINCIAL OFFICER..."
+                            value={arMeta.approverTitle}
+                            onChange={(e) => { setArMeta({ ...arMeta, approverTitle: e.target.value }); setHasUnsavedChanges(true); }}
+                            disabled={false}
+                        />
+                    </div>
+                )}
+
+                {viewMode !== "dtr_adjustment" && (
+                    <div className="space-y-1">
+                        <label className="text-xs font-semibold text-gray-500 flex items-center gap-1"><CalendarIcon className="w-3 h-3"/> Period Coverage</label>
+                        <select
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                            value={arMeta.periodFormat}
+                            onChange={(e) => { setArMeta({ ...arMeta, periodFormat: e.target.value }); setHasUnsavedChanges(true); }}
+                        >
+                            <option value="full">Full Month</option>
+                            <option value="1-15">1st Quincena (1-15)</option>
+                            <option value="16-end">2nd Quincena (16-End)</option>
+                        </select>
+                    </div>
+                )}
             </div>
 
             <div className="rounded-lg w-full">
