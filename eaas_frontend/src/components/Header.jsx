@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { User, Settings, Key, Bell, HelpCircle, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const NotificationDropdown = () => null;
-const MessageDropdown = () => null;
+import NotificationDropdown from "./NotificationDropdown";
+import MessageDropdown from "./MessageDropdown";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -51,7 +50,7 @@ export default function Header({ role, setRole, user, onLogout }) {
         setUnreadNotificationCount(data.unread_count || 0);
       }
     } catch (err) {
-      console.error("Failed to fetch unread notification count:", err);
+      console.error(err);
     }
   };
 
@@ -66,7 +65,7 @@ export default function Header({ role, setRole, user, onLogout }) {
         setUnreadMessageCount(data.unread_count || 0);
       }
     } catch (err) {
-      console.error("Failed to fetch unread message count:", err);
+      console.error(err);
     }
   };
 
@@ -96,9 +95,7 @@ export default function Header({ role, setRole, user, onLogout }) {
   };
 
   return (
-    <header
-      className="h-20 border-b border-blue-900/40 flex items-center justify-between px-4 md:px-6 bg-gradient-to-r from-[#1c1a88] via-[#1b3baf] to-[#1554c9] shadow-sm"
-    >
+    <header className="h-20 border-b border-blue-900/40 flex items-center justify-between px-4 md:px-6 bg-gradient-to-r from-[#1c1a88] via-[#1b3baf] to-[#1554c9] shadow-sm">
       <div className="min-w-0">
         <h1 className="text-base md:text-lg font-semibold text-white truncate">
           Employee Attendance and Accomplishment System
@@ -130,7 +127,6 @@ export default function Header({ role, setRole, user, onLogout }) {
             <button
               onClick={handleNotificationClick}
               className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
-              title="Notifications"
             >
               <Bell size={20} />
             </button>
@@ -154,7 +150,6 @@ export default function Header({ role, setRole, user, onLogout }) {
             <button
               onClick={handleMessagesClick}
               className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
-              title="Messages"
             >
               <MessageSquare size={20} />
             </button>
