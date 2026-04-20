@@ -130,7 +130,8 @@ def convert_file_to_pdf(file_path, output_dir):
     
     ext = filename.lower().split('.')[-1]
     
-    if ext == 'docx':
+    # FIX: Route both doc and docx to the same handler
+    if ext in ['docx', 'doc']:
         return _convert_docx_to_pdf(file_path, output_path)
     elif ext in ['xlsx', 'xls']:
         return _convert_xlsx_to_pdf(file_path, output_path)
@@ -169,6 +170,12 @@ def _convert_docx_to_pdf(docx_path, pdf_path):
 
     if _convert_with_libreoffice(docx_path, pdf_path):
         return pdf_path
+    
+    # FIX: Safety check. If LibreOffice fails, python-docx crashes on old .doc files.
+    # We fallback to generic to prevent the crash locally.
+    ext = docx_path.lower().split('.')[-1]
+    if ext == 'doc':
+        return _convert_generic_to_pdf(docx_path, pdf_path)
     
     if not DOCX_AVAILABLE:
         raise Exception("python-docx not available for DOCX conversion")
