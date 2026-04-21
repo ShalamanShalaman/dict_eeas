@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
 
+const API_BASE_URL = "";
+
+// Smart filter to safely remove the 13-character PHP uniqid() hash from display names
+const cleanFileName = (filename) => {
+  if (!filename) return '';
+  const match = filename.match(/^(?:shared_)?[a-zA-Z0-9]{13,14}_(.+)$/i);
+  if (match) {
+    return match[1];
+  }
+  return filename;
+};
+
 const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText, cancelText, confirmVariant }) => {
   if (!isOpen) return null;
 
@@ -32,8 +44,6 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText
     </div>
   );
 };
-
-const API_BASE_URL = "";
 
 const CheckIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
@@ -124,7 +134,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
           <h3 className="font-semibold text-slate-800 truncate pr-4 flex items-center gap-2">
             <FileIcon />
-            {title || 'Document Viewer'}
+            {cleanFileName(title) || 'Document Viewer'}
           </h3>
           <button
             onClick={onClose}
@@ -174,7 +184,7 @@ const ApproveModal = ({ isOpen, doc, onClose, onApprove, processing }) => {
           </p>
           {doc && (
             <div className="mt-3 pt-3 border-t border-slate-200">
-              <p className="text-sm"><strong>Document:</strong> {getDocumentName(doc).replace('.json', '')}</p>
+              <p className="text-sm"><strong>Document:</strong> {cleanFileName(getDocumentName(doc).replace('.json', ''))}</p>
             </div>
           )}
         </div>
@@ -338,7 +348,7 @@ const UploadModal = ({ isOpen, doc, onClose, onUpload, uploading }) => {
         {doc && (
           <div className="bg-slate-50 rounded-lg p-3 mb-4">
             <p className="text-sm text-slate-600">
-              <strong>Original:</strong> {getDocumentName(doc).replace('.json', '')}
+              <strong>Original:</strong> {cleanFileName(getDocumentName(doc).replace('.json', ''))}
             </p>
           </div>
         )}
@@ -363,7 +373,7 @@ const UploadModal = ({ isOpen, doc, onClose, onUpload, uploading }) => {
   );
 };
 
-const ReviewerDashboard = ({ user, isArchiveView = false }) => {
+const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false }) => {
   const [pendingDocs, setPendingDocs] = useState([]);
   const [archivedDocs, setArchivedDocs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -372,49 +382,59 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [showDeclineSuccessModal, setShowDeclineSuccessModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
   const [processing, setProcessing] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
 
-  const fetchDocuments = async (showLoading = true) => {
-    if (!user?.id) return;
-    if (showLoading) setLoading(true);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}?_t=${Date.now()}`, {
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setPendingDocs(data);
-      }
-      
-      const archiveResponse = await fetch(`${API_BASE_URL}/api/document/reviewer-archive/${user.id}?_t=${Date.now()}`, {
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      if (archiveResponse.ok) {
-        const archiveData = await archiveResponse.json();
-        setArchivedDocs(archiveData);
-      }
-    } catch (err) {
-      console.error("Failed to fetch documents:", err);
-    } finally {
-      if (showLoading) setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (user?.id) {
-      fetchDocuments(true);
-      
-      const intervalId = setInterval(() => {
-        fetchDocuments(false);
-      }, 10000);
+    let isMounted = true;
 
-      return () => clearInterval(intervalId);
-    }
+    const fetchDocuments = async (showLoading = true) => {
+      if (!user?.id) return;
+      if (showLoading) setLoading(true);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}?_t=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (isMounted) setPendingDocs(data);
+        }
+        
+        const archiveResponse = await fetch(`${API_BASE_URL}/api/document/reviewer-archive/${user.id}?_t=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        if (archiveResponse.ok) {
+          const archiveData = await archiveResponse.json();
+          if (isMounted) setArchivedDocs(archiveData);
+        }
+      } catch (err) {
+        console.error("Failed to fetch documents:", err);
+      } finally {
+        if (showLoading && isMounted) setLoading(false);
+      }
+    };
+
+    fetchDocuments(true);
+    
+    const intervalId = setInterval(() => {
+      fetchDocuments(false);
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, [user?.id]);
 
   const handleDownload = (doc) => {
@@ -443,7 +463,9 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       
       if (response.ok) {
         setShowUploadModal(false);
-        fetchDocuments(false);
+        // Force an immediate UI refresh
+        const newResponse = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}?_t=${Date.now()}`);
+        if (newResponse.ok) setPendingDocs(await newResponse.json());
       } else {
         const error = await response.json();
         alert('Failed to upload: ' + (error.error || 'Unknown error'));
@@ -470,7 +492,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       if (response.ok) {
         setShowApproveModal(false);
         setSelectedDoc(null);
-        fetchDocuments(false);
+        setPendingDocs(pendingDocs.filter(doc => doc.id !== docId));
       } else {
         const error = await response.json();
         alert('Failed to approve: ' + (error.error || 'Unknown error'));
@@ -496,9 +518,9 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       });
       
       if (response.ok) {
+        setPendingDocs(pendingDocs.filter(doc => doc.id !== docId));
         closeDeclineModal();
         setShowDeclineSuccessModal(true);
-        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to decline: ' + (error.error || 'Unknown error'));
@@ -547,7 +569,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       });
       
       if (response.ok) {
-        fetchDocuments(false);
+        setArchivedDocs(archivedDocs.filter(doc => doc.id !== docId));
       } else {
         const error = await response.json();
         alert('Failed to delete: ' + (error.error || 'Unknown error'));
@@ -596,7 +618,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
           <div className="p-1.5 bg-red-50 rounded text-red-500">
             <FileIcon />
           </div>
-          <span className="font-medium">{getDocumentName(doc).replace('.json', '')}</span>
+          <span className="font-medium">{cleanFileName(getDocumentName(doc).replace('.json', ''))}</span>
         </div>
       </td>
       <td className="px-6 py-4">
@@ -638,6 +660,13 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
           {!isArchive && (
             <>
               <button 
+                onClick={() => openApproveModal(doc)}
+                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Approve"
+              >
+                <CheckCircleIcon />
+              </button>
+              <button 
                 onClick={() => openUploadModal(doc)}
                 className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                 title="Upload Signed Document"
@@ -653,115 +682,34 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
               </button>
             </>
           )}
+          {isArchive && (
+            <button
+              onClick={() => {
+                setDocToDelete(doc);
+                setShowDeleteConfirm(true);
+              }}
+              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="Delete"
+            >
+              <TrashIcon />
+            </button>
+          )}
         </div>
       </td>
     </tr>
   );
 
-  if (isArchiveView) {
-    return (
-      <div>
-        <PDFViewerModal
-          isOpen={viewPdfModal.isOpen}
-          onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
-          documentId={viewPdfModal.docId}
-          title={viewPdfModal.title}
-        />
-        <ConfirmDialog
-          isOpen={showDeleteConfirm}
-          onClose={() => {
-            setShowDeleteConfirm(false);
-            setDocToDelete(null);
-          }}
-          onConfirm={() => {
-            if (docToDelete) {
-              handleDelete(docToDelete.id);
-            }
-            setShowDeleteConfirm(false);
-            setDocToDelete(null);
-          }}
-          title="Delete Document"
-          message="Are you sure you want to delete this document?"
-          confirmText="Delete"
-          cancelText="Cancel"
-          confirmVariant="danger"
-        />
-        
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Archive</h2>
-          <p className="text-slate-500">
-            View approved and declined document submissions
-          </p>
-        </div>
+  const title = isArchiveView 
+    ? "Archive" 
+    : isPendingView 
+      ? "Pending Reviews" 
+      : "Reviewer Dashboard";
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-6 rounded-xl shadow-lg shadow-green-200 flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium opacity-90 mb-1">Approved</p>
-              <h3 className="text-3xl font-bold">{approvedCount}</h3>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <CheckCircleIcon />
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-red-500 to-rose-600 text-white p-6 rounded-xl shadow-lg shadow-red-200 flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium opacity-90 mb-1">Declined</p>
-              <h3 className="text-3xl font-bold">{declinedCount}</h3>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <XIcon />
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Total Processed</p>
-              <h3 className="text-3xl font-bold text-slate-800">{archiveCount}</h3>
-            </div>
-            <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
-              <ArchiveIcon />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-              <p>Loading documents...</p>
-            </div>
-          ) : archivedDocs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 mb-4 opacity-50">
-                <polyline points="21 8 21 21 3 21 3 8" />
-                <rect x="1" y="3" width="22" height="5" />
-                <line x1="10" y1="12" x2="14" y2="12" />
-              </svg>
-              <p className="text-lg font-medium text-slate-600">No archived documents</p>
-              <p className="text-sm">Approved or declined documents will appear here</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
-                  <tr>
-                    <th className="px-6 py-3">Employee</th>
-                    <th className="px-6 py-3">Document</th>
-                    <th className="px-6 py-3">Date Processed</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {archivedDocs.map(doc => renderDocumentRow(doc, true))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const description = isArchiveView 
+    ? "View approved and declined document submissions" 
+    : isPendingView 
+      ? "Documents waiting for your approval" 
+      : "Manage and review employee document submissions";
 
   return (
     <div>
@@ -770,6 +718,13 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
         onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
         documentId={viewPdfModal.docId}
         title={viewPdfModal.title}
+      />
+      <ApproveModal
+        isOpen={showApproveModal}
+        doc={selectedDoc}
+        onClose={closeApproveModal}
+        onApprove={handleApprove}
+        processing={processing}
       />
       <DeclineModal 
         isOpen={showDeclineModal} 
@@ -810,107 +765,113 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       />
       
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-900">Reviewer Dashboard</h2>
-        <p className="text-slate-500">
-          Manage and review employee document submissions
-        </p>
+        <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+        <p className="text-slate-500">{description}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-xl shadow-lg shadow-orange-200 flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium opacity-90 mb-1">Pending</p>
-            <h3 className="text-3xl font-bold">{pendingCount}</h3>
+      {isArchiveView && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-6 rounded-xl shadow-lg shadow-green-200 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium opacity-90 mb-1">Approved</p>
+              <h3 className="text-3xl font-bold">{approvedCount}</h3>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <CheckCircleIcon />
+            </div>
           </div>
-          <div className="p-3 bg-white/20 rounded-lg">
-            <ClockIcon />
+          <div className="bg-gradient-to-br from-red-500 to-rose-600 text-white p-6 rounded-xl shadow-lg shadow-red-200 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium opacity-90 mb-1">Declined</p>
+              <h3 className="text-3xl font-bold">{declinedCount}</h3>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <XIcon />
+            </div>
           </div>
-        </div>
-        <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-6 rounded-xl shadow-lg shadow-green-200 flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium opacity-90 mb-1">Approved</p>
-            <h3 className="text-3xl font-bold">{approvedCount}</h3>
-          </div>
-          <div className="p-3 bg-white/20 rounded-lg">
-            <CheckCircleIcon />
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-red-500 to-rose-600 text-white p-6 rounded-xl shadow-lg shadow-red-200 flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium opacity-90 mb-1">Declined</p>
-            <h3 className="text-3xl font-bold">{declinedCount}</h3>
-          </div>
-          <div className="p-3 bg-white/20 rounded-lg">
-            <XIcon />
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-500 mb-1">Total Processed</p>
-            <h3 className="text-3xl font-bold text-slate-800">{archiveCount}</h3>
-          </div>
-          <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
-            <ArchiveIcon />
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500 mb-1">Total Processed</p>
+              <h3 className="text-3xl font-bold text-slate-800">{archiveCount}</h3>
+            </div>
+            <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
+              <ArchiveIcon />
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {!isArchiveView && !isPendingView && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-xl shadow-lg shadow-orange-200 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium opacity-90 mb-1">Pending</p>
+              <h3 className="text-3xl font-bold">{pendingCount}</h3>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <ClockIcon />
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white p-6 rounded-xl shadow-lg shadow-green-200 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium opacity-90 mb-1">Approved</p>
+              <h3 className="text-3xl font-bold">{approvedCount}</h3>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <CheckCircleIcon />
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-red-500 to-rose-600 text-white p-6 rounded-xl shadow-lg shadow-red-200 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium opacity-90 mb-1">Declined</p>
+              <h3 className="text-3xl font-bold">{declinedCount}</h3>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <XIcon />
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500 mb-1">Total Processed</p>
+              <h3 className="text-3xl font-bold text-slate-800">{archiveCount}</h3>
+            </div>
+            <div className="p-3 bg-slate-50 text-slate-600 rounded-lg">
+              <ArchiveIcon />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200">
-          <nav className="flex -mb-px" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('pending')}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'pending'
-                  ? 'border-amber-500 text-amber-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-              }`}
-            >
-              <ClockIcon />
-              Pending Review
-              {pendingCount > 0 && (
-                <span className="ml-2 bg-amber-100 text-amber-800 py-0.5 px-2 rounded-full text-xs">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
-          </nav>
-        </div>
+        {!isArchiveView && !isPendingView && (
+          <div className="border-b border-slate-200">
+            <nav className="flex -mb-px" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'pending'
+                    ? 'border-amber-500 text-amber-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                <ClockIcon />
+                Pending Review
+                {pendingCount > 0 && (
+                  <span className="ml-2 bg-amber-100 text-amber-800 py-0.5 px-2 rounded-full text-xs">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            </nav>
+          </div>
+        )}
         
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
             <p>Loading documents...</p>
           </div>
-        ) : activeTab === 'pending' ? (
-          pendingDocs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 mb-4 opacity-50">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              <p className="text-lg font-medium text-slate-600">No pending documents</p>
-              <p className="text-sm">All caught up!</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
-                  <tr>
-                    <th className="px-6 py-3">Employee</th>
-                    <th className="px-6 py-3">Document</th>
-                    <th className="px-6 py-3">Date Submitted</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pendingDocs.map(doc => renderDocumentRow(doc, false))}
-                </tbody>
-              </table>
-            </div>
-          )
-        ) : (
+        ) : isArchiveView ? (
           archivedDocs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 mb-4 opacity-50">
@@ -935,6 +896,34 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {archivedDocs.map(doc => renderDocumentRow(doc, true))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          pendingDocs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 mb-4 opacity-50">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <p className="text-lg font-medium text-slate-600">No pending documents</p>
+              <p className="text-sm">All caught up!</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
+                  <tr>
+                    <th className="px-6 py-3">Employee</th>
+                    <th className="px-6 py-3">Document</th>
+                    <th className="px-6 py-3">Date Submitted</th>
+                    <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingDocs.map(doc => renderDocumentRow(doc, false))}
                 </tbody>
               </table>
             </div>

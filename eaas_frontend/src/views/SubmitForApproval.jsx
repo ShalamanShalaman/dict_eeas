@@ -3,10 +3,14 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 
 const API_BASE_URL = "";
 
+// Smart filter to safely remove the 13-character PHP uniqid() hash from display names
 const cleanFileName = (filename) => {
   if (!filename) return '';
-  const parts = filename.split('_');
-  return parts.length > 1 ? parts.slice(1).join('_') : filename;
+  const match = filename.match(/^(?:shared_)?[a-zA-Z0-9]{13,14}_(.+)$/i);
+  if (match) {
+    return match[1];
+  }
+  return filename;
 };
 
 const Icon = ({ children, className }) => (
@@ -98,7 +102,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            {title || 'Document Viewer'}
+            {cleanFileName(title) || 'Document Viewer'}
           </h3>
           <button
             onClick={onClose}
