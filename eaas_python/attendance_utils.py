@@ -9,6 +9,7 @@ from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 from datetime import datetime
 from docx import Document
 from docx.shared import Pt
+from docx.oxml.ns import qn
 
 from ar_utils import generate_ar_docx
 
@@ -522,23 +523,30 @@ def generate_dtr_adjustment_slip(employee_data, output_path, template_path, over
             
             inner_table = target_cell.add_table(rows=2, cols=2)
             
+            # Helper function to prevent LibreOffice from mangling the box character
+            def add_checkbox(paragraph, is_checked, text):
+                box_char = "■" if is_checked else "□"
+                run_box = paragraph.add_run(box_char)
+                run_box.font.name = 'Arial'
+                # Explicitly set the font for complex scripts to avoid the 'ử' symbol fallback
+                run_box._element.rPr.rFonts.set(qn('w:eastAsia'), 'Arial')
+                run_box._element.rPr.rFonts.set(qn('w:cs'), 'Arial')
+                paragraph.add_run(f" {text}")
+
             c00 = inner_table.cell(0, 0)
             p00 = c00.paragraphs[0] if c00.paragraphs else c00.add_paragraph()
-            box_f = "■" if reason_key == 'fingerprint' else "□"
-            p00.add_run(f"{box_f} Fingerprint not recognized")
+            add_checkbox(p00, reason_key == 'fingerprint', "Fingerprint not recognized")
             
             c01 = inner_table.cell(0, 1)
             p01 = c01.paragraphs[0] if c01.paragraphs else c01.add_paragraph()
-            box_p = "■" if reason_key == 'personal' else "□"
-            p01.add_run(f"{box_p} Personal Reason: ")
+            add_checkbox(p01, reason_key == 'personal', "Personal Reason:")
             if reason_key == 'personal':
-                r_p = p01.add_run(personal_details if personal_details else "                          ")
+                r_p = p01.add_run(f" {personal_details}" if personal_details else "                          ")
                 r_p.underline = True
             
             c10 = inner_table.cell(1, 0)
             p10 = c10.paragraphs[0] if c10.paragraphs else c10.add_paragraph()
-            box_o = "■" if reason_key == 'ob' else "□"
-            p10.add_run(f"{box_o} On Official Business/Pass Slip")
+            add_checkbox(p10, reason_key == 'ob', "On Official Business/Pass Slip")
             
             p10_where = c10.add_paragraph()
             p10_where.add_run("    With: ")
@@ -554,10 +562,9 @@ def generate_dtr_adjustment_slip(employee_data, output_path, template_path, over
             
             c11 = inner_table.cell(1, 1)
             p11 = c11.paragraphs[0] if c11.paragraphs else c11.add_paragraph()
-            box_ot = "■" if reason_key == 'other' else "□"
-            p11.add_run(f"{box_ot} Other reasons: ")
+            add_checkbox(p11, reason_key == 'other', "Other reasons:")
             if reason_key == 'other':
-                r_ot = p11.add_run(other_details if other_details else "                          ")
+                r_ot = p11.add_run(f" {other_details}" if other_details else "                          ")
                 r_ot.underline = True
 
         cert_row_idx = -1
