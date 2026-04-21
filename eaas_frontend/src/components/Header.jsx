@@ -7,7 +7,6 @@ import MessageDropdown from "./MessageDropdown";
 const API_BASE_URL = "";
 
 export default function Header({ role, setRole, user, onLogout }) {
-  const canToggleRoles = user && (user.role === 'admin' || user.role === 'hr');
   
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
