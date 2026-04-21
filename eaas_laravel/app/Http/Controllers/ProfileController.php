@@ -209,12 +209,23 @@ class ProfileController extends Controller
             return response()->json(['error' => 'Invalid file type. Only PNG, JPG, JPEG, GIF, and WEBP are allowed'], 400);
         }
 
+        // Check and delete existing physical file
         if ($user->profile_picture) {
-            Storage::disk('public')->delete("profile_pictures/{$user->profile_picture}");
+            $oldPath = public_path("storage/profile_pictures/{$user->profile_picture}");
+            if (file_exists($oldPath)) {
+                unlink($oldPath);
+            }
         }
 
         $filename = "{$public_id}." . $file->getClientOriginalExtension();
-        $file->storeAs('profile_pictures', $filename, 'public');
+        
+        // Bypass symlinks entirely by placing the file directly into the physical public folder
+        $destinationPath = public_path('storage/profile_pictures');
+        if (!file_exists($destinationPath)) {
+            mkdir($destinationPath, 0775, true);
+        }
+        
+        $file->move($destinationPath, $filename);
 
         $user->profile_picture = $filename;
         $user->profile_picture_updated = now();
@@ -233,11 +244,14 @@ class ProfileController extends Controller
     {
         $user = User::where('public_id', $public_id)->firstOrFail();
 
-        if (!$user->profile_picture || !Storage::disk('public')->exists("profile_pictures/{$user->profile_picture}")) {
+        // Adjust to read from the physical public directory instead of the storage symlink
+        $filePath = public_path("storage/profile_pictures/{$user->profile_picture}");
+
+        if (!$user->profile_picture || !file_exists($filePath)) {
             return response()->json(['error' => 'No profile picture found'], 404);
         }
 
-        return response()->file(Storage::disk('public')->path("profile_pictures/{$user->profile_picture}"));
+        return response()->file($filePath);
     }
 
     public function deleteProfilePicture(Request $request, $public_id)
@@ -245,7 +259,12 @@ class ProfileController extends Controller
         $user = User::where('public_id', $public_id)->firstOrFail();
 
         if ($user->profile_picture) {
-            Storage::disk('public')->delete("profile_pictures/{$user->profile_picture}");
+            // Delete directly from the physical public directory
+            $filePath = public_path("storage/profile_pictures/{$user->profile_picture}");
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+            
             $user->profile_picture = null;
             $user->save();
 
