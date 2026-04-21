@@ -378,7 +378,6 @@ export default function UserManagement() {
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Position</th>
                 <th className="px-6 py-4">Office / Unit</th>
-                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
             </thead>
