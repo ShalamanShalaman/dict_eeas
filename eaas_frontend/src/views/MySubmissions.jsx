@@ -34,8 +34,16 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText
   );
 };
 
-// Use this for local deployment: const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const API_BASE_URL = ""; 
+
+const cleanFileName = (filename) => {
+  if (!filename) return '';
+  const match = filename.match(/^(?:shared_)?[a-zA-Z0-9]{13,14}_(.+)$/i);
+  if (match) {
+    return match[1];
+  }
+  return filename;
+};
 
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
   if (!isOpen) return null;
@@ -49,7 +57,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            {title || 'Document Viewer'}
+            {cleanFileName(title) || 'Document Viewer'}
           </h3>
           <button
             onClick={onClose}
@@ -252,7 +260,7 @@ export default function MySubmissions({ user }) {
     if (doc.is_draft === true) return false;
     
     const matchesFilter = filter === 'all' || doc.status === filter;
-    const matchesSearch = getFilename(doc).toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = cleanFileName(getFilename(doc)).toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -424,7 +432,7 @@ export default function MySubmissions({ user }) {
                         <FileTextIcon className="w-5 h-5 text-indigo-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-slate-800">{getFilename(doc).replace('.json', '')}</p>
+                        <p className="font-medium text-slate-800">{cleanFileName(getFilename(doc).replace('.json', ''))}</p>
                         <p className="text-xs text-slate-500">ID: {doc.id}</p>
                       </div>
                     </div>
@@ -445,7 +453,7 @@ export default function MySubmissions({ user }) {
                         className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-sm"
                       >
                         <DownloadIcon className="w-4 h-4" />
-                        {getSignedFilename(doc)}
+                        {cleanFileName(getSignedFilename(doc))}
                       </button>
                     ) : (
                       <span className="text-slate-400 text-sm">-</span>
