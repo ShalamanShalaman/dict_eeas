@@ -67,7 +67,7 @@ export default function App() {
         <Route path="/saved-progress" element={<Protected><SavedProgress user={user} /></Protected>} />
         <Route path="/submit-for-approval" element={<Protected><SubmitForApproval user={user} /></Protected>} />
         <Route path="/submissions" element={<Protected><MySubmissions user={user} /></Protected>} />
-        <Route path="/pending-reviews" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
+        <Route path="/pending-reviews" element={<Protected><ReviewerDashboard user={user} isPendingView={true} /></Protected>} />
         <Route path="/upload-reviewer" element={<Protected><UploadAttendance user={user} /></Protected>} />
         <Route path="/archive" element={<Protected><ReviewerDashboard user={user} isArchiveView={true} /></Protected>} />
         <Route path="/signature" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
