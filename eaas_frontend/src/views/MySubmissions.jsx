@@ -1,6 +1,38 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import ConfirmDialog from "../components/ConfirmDialog";
+
+const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText, cancelText, confirmVariant }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
+          <p className="text-slate-500 text-sm">{message}</p>
+        </div>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+          >
+            {cancelText || 'Cancel'}
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-sm ${
+              confirmVariant === 'danger' 
+                ? 'bg-red-600 hover:bg-red-700' 
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            {confirmText || 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
   if (!isOpen) return null;
@@ -297,14 +329,43 @@ export default function MySubmissions({ user }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {filterOptions.slice(1).map(opt => {
           const count = submissions.filter(d => d.status === opt.value).length;
+          const isActive = filter === opt.value;
+          
+          const cardStyles = {
+            submitted: {
+              active: "border-blue-400 bg-blue-50 shadow-sm",
+              inactive: "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/50",
+              text: "text-blue-700",
+              countText: "text-blue-800"
+            },
+            pending: {
+              active: "border-amber-400 bg-amber-50 shadow-sm",
+              inactive: "border-slate-200 bg-white hover:border-amber-300 hover:bg-amber-50/50",
+              text: "text-amber-700",
+              countText: "text-amber-800"
+            },
+            approved: {
+              active: "border-green-400 bg-green-50 shadow-sm",
+              inactive: "border-slate-200 bg-white hover:border-green-300 hover:bg-green-50/50",
+              text: "text-green-700",
+              countText: "text-green-800"
+            },
+            declined: {
+              active: "border-red-400 bg-red-50 shadow-sm",
+              inactive: "border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/50",
+              text: "text-red-700",
+              countText: "text-red-800"
+            }
+          }[opt.value];
+
           return (
             <button
               key={opt.value}
               onClick={() => setFilter(opt.value)}
-              className={`p-4 rounded-xl border text-left transition-all ${filter === opt.value ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+              className={`p-4 rounded-xl border text-left transition-all duration-200 ${isActive ? cardStyles.active : cardStyles.inactive}`}
             >
-              <p className="text-2xl font-bold text-slate-800">{count}</p>
-              <p className="text-sm text-slate-500">{opt.label}s</p>
+              <p className={`text-2xl font-bold ${cardStyles.countText}`}>{count}</p>
+              <p className={`text-sm font-medium mt-1 ${cardStyles.text}`}>{opt.label}</p>
             </button>
           );
         })}
