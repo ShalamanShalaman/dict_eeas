@@ -105,21 +105,6 @@ export default function Header({ role, setRole, user, onLogout }) {
       </div>
 
       <div className="flex items-center gap-2 md:gap-2.5">
-        {canToggleRoles && (
-          <div className="hidden md:flex bg-white/15 backdrop-blur-sm p-1 rounded-lg border border-white/20">
-            {["employee", "reviewer", "admin"].map(r => (
-              <button
-                key={r}
-                onClick={() => setRole(r)}
-                className={`px-3 py-1 text-sm rounded-md capitalize transition-all ${
-                  role === r ? "bg-white text-blue-900 shadow-sm font-semibold" : "text-blue-100 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        )}
 
         {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
           <div className="relative">
