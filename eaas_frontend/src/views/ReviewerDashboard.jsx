@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE_URL = "";
+const API_BASE_URL = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE_URL : "";
 
-// Smart filter to safely remove the 13-character PHP uniqid() hash from display names
 const cleanFileName = (filename) => {
   if (!filename) return '';
   const match = filename.match(/^(?:shared_)?[a-zA-Z0-9]{13,14}_(.+)$/i);
@@ -389,52 +388,49 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchDocuments = async (showLoading = true) => {
+    if (!user?.id) return;
+    if (showLoading) setLoading(true);
 
-    const fetchDocuments = async (showLoading = true) => {
-      if (!user?.id) return;
-      if (showLoading) setLoading(true);
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}?_t=${Date.now()}`, {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (isMounted) setPendingDocs(data);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}?_t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
-        
-        const archiveResponse = await fetch(`${API_BASE_URL}/api/document/reviewer-archive/${user.id}?_t=${Date.now()}`, {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        if (archiveResponse.ok) {
-          const archiveData = await archiveResponse.json();
-          if (isMounted) setArchivedDocs(archiveData);
-        }
-      } catch (err) {
-        console.error("Failed to fetch documents:", err);
-      } finally {
-        if (showLoading && isMounted) setLoading(false);
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPendingDocs(data);
       }
-    };
+      
+      const archiveResponse = await fetch(`${API_BASE_URL}/api/document/reviewer-archive/${user.id}?_t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      if (archiveResponse.ok) {
+        const archiveData = await archiveResponse.json();
+        setArchivedDocs(archiveData);
+      }
+    } catch (err) {
+      console.error("Failed to fetch documents:", err);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
 
-    fetchDocuments(true);
-    
-    const intervalId = setInterval(() => {
-      fetchDocuments(false);
-    }, 5000);
+  useEffect(() => {
+    if (user?.id) {
+      fetchDocuments(true);
+      
+      const intervalId = setInterval(() => {
+        fetchDocuments(false);
+      }, 5000);
 
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
+      return () => clearInterval(intervalId);
+    }
   }, [user?.id]);
 
   const handleDownload = (doc) => {
@@ -463,9 +459,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
       
       if (response.ok) {
         setShowUploadModal(false);
-        // Force an immediate UI refresh
-        const newResponse = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}?_t=${Date.now()}`);
-        if (newResponse.ok) setPendingDocs(await newResponse.json());
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to upload: ' + (error.error || 'Unknown error'));
@@ -492,7 +486,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
       if (response.ok) {
         setShowApproveModal(false);
         setSelectedDoc(null);
-        setPendingDocs(pendingDocs.filter(doc => doc.id !== docId));
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to approve: ' + (error.error || 'Unknown error'));
@@ -518,9 +512,9 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
       });
       
       if (response.ok) {
-        setPendingDocs(pendingDocs.filter(doc => doc.id !== docId));
         closeDeclineModal();
         setShowDeclineSuccessModal(true);
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to decline: ' + (error.error || 'Unknown error'));
@@ -569,7 +563,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
       });
       
       if (response.ok) {
-        setArchivedDocs(archivedDocs.filter(doc => doc.id !== docId));
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to delete: ' + (error.error || 'Unknown error'));
