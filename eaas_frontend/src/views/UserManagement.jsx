@@ -378,7 +378,6 @@ export default function UserManagement() {
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Position</th>
                 <th className="px-6 py-4">Office / Unit</th>
-                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
             </thead>
@@ -408,10 +407,6 @@ export default function UserManagement() {
                         </td>
                         <td className="px-6 py-3 text-gray-600">{user.position_id || <span className="text-gray-300 italic">None</span>}</td>
                         <td className="px-6 py-3 text-gray-600">{loc ? loc.location : <span className="text-gray-300 italic">None</span>}</td>
-                        <td className="px-6 py-3">
-                            <span className={`inline-block w-2 h-2 rounded-full mr-2 ${user.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                            {user.is_active ? "Active" : "Inactive"}
-                        </td>
                         <td className="px-6 py-3 text-right space-x-2">
                             <button onClick={() => handleEditUser(user)} className="text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
                                 <Edit2 className="w-4 h-4 inline" />
