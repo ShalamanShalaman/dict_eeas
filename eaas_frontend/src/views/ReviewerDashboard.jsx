@@ -1,7 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import ConfirmDialog from '../components/ConfirmDialog';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText, cancelText, confirmVariant }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
+          <p className="text-slate-500 text-sm">{message}</p>
+        </div>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+          >
+            {cancelText || 'Cancel'}
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-sm ${
+              confirmVariant === 'danger' 
+                ? 'bg-red-600 hover:bg-red-700' 
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            {confirmText || 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const API_BASE_URL = "";
 
 const CheckIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
@@ -83,7 +115,6 @@ const getDocumentName = (document) => {
   return `Document #${document?.id}`;
 };
 
-// Inline PDF Viewer Modal
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
   if (!isOpen) return null;
 
@@ -347,22 +378,22 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchDocuments();
-    }
-  }, [user?.id]);
+  const fetchDocuments = async (showLoading = true) => {
+    if (!user?.id) return;
+    if (showLoading) setLoading(true);
 
-  const fetchDocuments = async () => {
-    setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}`);
+      const response = await fetch(`${API_BASE_URL}/api/document/reviewer/${user.id}?_t=${Date.now()}`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       if (response.ok) {
         const data = await response.json();
         setPendingDocs(data);
       }
       
-      const archiveResponse = await fetch(`${API_BASE_URL}/api/document/reviewer-archive/${user.id}`);
+      const archiveResponse = await fetch(`${API_BASE_URL}/api/document/reviewer-archive/${user.id}?_t=${Date.now()}`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       if (archiveResponse.ok) {
         const archiveData = await archiveResponse.json();
         setArchivedDocs(archiveData);
@@ -370,9 +401,21 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
     } catch (err) {
       console.error("Failed to fetch documents:", err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchDocuments(true);
+      
+      const intervalId = setInterval(() => {
+        fetchDocuments(false);
+      }, 10000);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [user?.id]);
 
   const handleDownload = (doc) => {
     const url = doc.review_file_path 
@@ -400,7 +443,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       
       if (response.ok) {
         setShowUploadModal(false);
-        fetchDocuments();
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to upload: ' + (error.error || 'Unknown error'));
@@ -425,10 +468,9 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       });
       
       if (response.ok) {
-        setPendingDocs(pendingDocs.filter(doc => doc.id !== docId));
         setShowApproveModal(false);
         setSelectedDoc(null);
-        fetchDocuments();
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to approve: ' + (error.error || 'Unknown error'));
@@ -454,10 +496,9 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       });
       
       if (response.ok) {
-        setPendingDocs(pendingDocs.filter(doc => doc.id !== docId));
         closeDeclineModal();
         setShowDeclineSuccessModal(true);
-        fetchDocuments();
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to decline: ' + (error.error || 'Unknown error'));
@@ -506,7 +547,7 @@ const ReviewerDashboard = ({ user, isArchiveView = false }) => {
       });
       
       if (response.ok) {
-        fetchDocuments();
+        fetchDocuments(false);
       } else {
         const error = await response.json();
         alert('Failed to delete: ' + (error.error || 'Unknown error'));

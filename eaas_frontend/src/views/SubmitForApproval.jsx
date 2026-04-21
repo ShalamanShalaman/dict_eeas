@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import SuccessModal from "../components/SuccessModal";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = "";
+
+const cleanFileName = (filename) => {
+  if (!filename) return '';
+  const parts = filename.split('_');
+  return parts.length > 1 ? parts.slice(1).join('_') : filename;
+};
 
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
@@ -49,6 +54,37 @@ const UserIcon = ({ className }) => (
     <circle cx="12" cy="7" r="4" />
   </Icon>
 );
+
+const SuccessModal = ({ isOpen, message, subMessage, onClose, autoClose }) => {
+  useEffect(() => {
+    if (isOpen && autoClose !== false) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoClose, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-8 flex flex-col items-center text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
+          <CheckCircleIcon className="w-8 h-8 text-green-600" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 mb-2">{message}</h3>
+        {subMessage && <p className="text-slate-500 text-sm mb-6">{subMessage}</p>}
+        <button
+          onClick={onClose}
+          className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
   if (!isOpen) return null;
@@ -414,7 +450,7 @@ export default function SubmitForApproval({ user }) {
       setViewPdfModal({
         isOpen: true,
         docId: convertedDocumentId,
-        title: convertedFileName ? convertedFileName.replace('.json', '') : 'Document Viewer'
+        title: convertedFileName ? cleanFileName(convertedFileName).replace('.json', '') : 'Document Viewer'
       });
     }
   };
@@ -650,7 +686,7 @@ export default function SubmitForApproval({ user }) {
                       <FileTextIcon className="w-6 h-6 text-red-500" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-slate-700">{convertedFileName}</p>
+                      <p className="text-sm font-medium text-slate-700">{cleanFileName(convertedFileName)}</p>
                       <p className="text-xs text-slate-400">PDF Document</p>
                     </div>
                   </div>
