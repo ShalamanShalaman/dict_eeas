@@ -164,7 +164,7 @@ export default function Header({ role, setRole, user, onLogout }) {
             {user?.profile_picture ? (
               <img 
                 key={imageHash}
-                src={`${API_BASE_URL}/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
+                src={`${API_BASE_URL}/api/profile/${user.public_id}/picture?t=${imageHash}`}
                 alt="Profile"
                 className="w-8 h-8 rounded-full object-cover border-2 border-yellow-400 shadow-md"
                 onError={(e) => {

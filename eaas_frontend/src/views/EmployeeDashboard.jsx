@@ -355,7 +355,7 @@ export default function EmployeeDashboard({ user }) {
               {user?.profile_picture ? (
                 <img 
                   key={imageHash}
-                  src={`${API_BASE_URL}/storage/profile_pictures/${user.profile_picture}?t=${imageHash}`}
+                  src={`${API_BASE_URL}/api/profile/${user.public_id}/picture?t=${imageHash}`}
                   alt="Profile"
                   className="w-16 h-16 rounded-full object-cover border-2 border-indigo-600 shadow-md"
                   onError={(e) => {

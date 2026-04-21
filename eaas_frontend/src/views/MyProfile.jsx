@@ -638,7 +638,7 @@ export default function MyProfile() {
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
                 <img
                   key={imageHash}
-                  src={`${API_BASE_URL}/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`}
+                  src={`${API_BASE_URL}/api/profile/${profile.public_id}/picture?t=${imageHash}`}
                   alt="Profile"
                   className="w-full h-full object-cover"
                   onError={(e) => { e.target.style.display = 'none'; }}
@@ -816,7 +816,7 @@ export default function MyProfile() {
                       <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg bg-slate-100">
                         <img 
                           key={imageHash}
-                          src={`${API_BASE_URL}/storage/profile_pictures/${profile.profile_picture}?t=${imageHash}`} 
+                          src={`${API_BASE_URL}/api/profile/${profile.public_id}/picture?t=${imageHash}`} 
                           alt="Profile" 
                           className="w-full h-full object-cover"
                           onError={(e) => {
