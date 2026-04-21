@@ -34,6 +34,9 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText
   );
 };
 
+// Use this for local deployment: const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = ""; 
+
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
   if (!isOpen) return null;
 
@@ -61,7 +64,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
         <div className="flex-1 bg-slate-100 relative">
           {documentId ? (
             <iframe
-              src={`${import.meta.env.VITE_API_BASE_URL}/api/document/view/${documentId}`}
+              src={`${API_BASE_URL}/api/document/view/${documentId}`}
               className="w-full h-full border-0"
               title="PDF Viewer"
             />
@@ -191,26 +194,42 @@ export default function MySubmissions({ user }) {
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, docId: null });
 
   useEffect(() => {
-    const fetchSubmissions = async () => {
+    let isMounted = true;
+
+    const fetchSubmissions = async (showLoading = true) => {
       if (!user?.user_id) return;
       
+      if (showLoading) setLoading(true);
+
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/user/${user.user_id}`);
+        const response = await fetch(`${API_BASE_URL}/api/document/user/${user.user_id}?_t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
         if (response.ok) {
           const data = await response.json();
           const sorted = data.sort((a, b) => 
             new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
           );
-          setSubmissions(sorted);
+          if (isMounted) setSubmissions(sorted);
         }
       } catch (err) {
         console.error("Failed to fetch submissions:", err);
       } finally {
-        setLoading(false);
+        if (isMounted && showLoading) setLoading(false);
       }
     };
 
     fetchSubmissions();
+
+    const intervalId = setInterval(() => {
+      fetchSubmissions(false);
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, [user?.user_id]);
 
   const getFilename = (doc) => {
@@ -246,7 +265,7 @@ export default function MySubmissions({ user }) {
     setDeleteDialog({ isOpen: false, docId: null });
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/document/${docId}?user_id=${user.user_id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/document/${docId}?user_id=${user.user_id}`, {
         method: 'DELETE'
       });
       
@@ -270,7 +289,7 @@ export default function MySubmissions({ user }) {
   };
 
   const handleDownloadSigned = (doc) => {
-    window.open(`${import.meta.env.VITE_API_BASE_URL}/api/document/download/${doc.id}`, '_blank');
+    window.open(`${API_BASE_URL}/api/document/download/${doc.id}`, '_blank');
   };
 
   const filterOptions = [
@@ -280,6 +299,21 @@ export default function MySubmissions({ user }) {
     { value: 'approved', label: 'Approved' },
     { value: 'declined', label: 'Declined' },
   ];
+
+  const getCardStyles = (status) => {
+    switch (status) {
+      case 'submitted':
+        return { bg: 'from-blue-500 to-indigo-600 shadow-blue-200', icon: <AlertCircleIcon className="w-5 h-5" /> };
+      case 'pending':
+        return { bg: 'from-amber-500 to-orange-500 shadow-orange-200', icon: <ClockIcon className="w-5 h-5" /> };
+      case 'approved':
+        return { bg: 'from-green-500 to-emerald-600 shadow-green-200', icon: <CheckCircleIcon className="w-5 h-5" /> };
+      case 'declined':
+        return { bg: 'from-red-500 to-rose-600 shadow-red-200', icon: <XCircleIcon className="w-5 h-5" /> };
+      default:
+        return { bg: 'from-slate-500 to-slate-600 shadow-slate-200', icon: <FileTextIcon className="w-5 h-5" /> };
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -330,42 +364,21 @@ export default function MySubmissions({ user }) {
         {filterOptions.slice(1).map(opt => {
           const count = submissions.filter(d => d.status === opt.value).length;
           const isActive = filter === opt.value;
-          
-          const cardStyles = {
-            submitted: {
-              active: "border-blue-400 bg-blue-50 shadow-sm",
-              inactive: "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/50",
-              text: "text-blue-700",
-              countText: "text-blue-800"
-            },
-            pending: {
-              active: "border-amber-400 bg-amber-50 shadow-sm",
-              inactive: "border-slate-200 bg-white hover:border-amber-300 hover:bg-amber-50/50",
-              text: "text-amber-700",
-              countText: "text-amber-800"
-            },
-            approved: {
-              active: "border-green-400 bg-green-50 shadow-sm",
-              inactive: "border-slate-200 bg-white hover:border-green-300 hover:bg-green-50/50",
-              text: "text-green-700",
-              countText: "text-green-800"
-            },
-            declined: {
-              active: "border-red-400 bg-red-50 shadow-sm",
-              inactive: "border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/50",
-              text: "text-red-700",
-              countText: "text-red-800"
-            }
-          }[opt.value];
+          const cardStyle = getCardStyles(opt.value);
 
           return (
             <button
               key={opt.value}
               onClick={() => setFilter(opt.value)}
-              className={`p-4 rounded-xl border text-left transition-all duration-200 ${isActive ? cardStyles.active : cardStyles.inactive}`}
+              className={`bg-gradient-to-br text-white p-6 rounded-xl shadow-lg flex items-start justify-between text-left transition-all duration-200 ${cardStyle.bg} ${isActive ? 'ring-4 ring-offset-2 ring-indigo-500 scale-[1.02]' : 'hover:scale-[1.02] opacity-90 hover:opacity-100'}`}
             >
-              <p className={`text-2xl font-bold ${cardStyles.countText}`}>{count}</p>
-              <p className={`text-sm font-medium mt-1 ${cardStyles.text}`}>{opt.label}</p>
+              <div>
+                <p className="text-sm font-medium opacity-90 mb-1">{opt.label}</p>
+                <h3 className="text-3xl font-bold">{count}</h3>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg">
+                {cardStyle.icon}
+              </div>
             </button>
           );
         })}
