@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE_URL = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE_URL : "";
+const API_BASE_URL = "";
 
 const cleanFileName = (filename) => {
   if (!filename) return '';
@@ -155,53 +155,6 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
               <p className="mt-2 text-sm">No document selected</p>
             </div>
           )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ApproveModal = ({ isOpen, doc, onClose, onApprove, processing }) => {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-green-100 rounded-full">
-            <CheckIcon />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">Approve Document</h3>
-            <p className="text-sm text-slate-500">This action cannot be undone</p>
-          </div>
-        </div>
-        
-        <div className="bg-slate-50 rounded-lg p-4 mb-4">
-          <p className="text-sm text-slate-600">
-            Are you sure you want to approve this document? The employee will be notified.
-          </p>
-          {doc && (
-            <div className="mt-3 pt-3 border-t border-slate-200">
-              <p className="text-sm"><strong>Document:</strong> {cleanFileName(getDocumentName(doc).replace('.json', ''))}</p>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onApprove(doc.id)}
-            disabled={processing}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
-          >
-            {processing ? 'Approving...' : 'Approve'}
-          </button>
         </div>
       </div>
     </div>
@@ -381,7 +334,6 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [showDeclineSuccessModal, setShowDeclineSuccessModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false);
   const [processing, setProcessing] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
@@ -471,33 +423,6 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
     }
   };
 
-  const handleApprove = async (docId) => {
-    setProcessing(docId);
-    try {
-      const formData = new FormData();
-      formData.append('user_id', user.user_id);
-      formData.append('action', 'approve');
-      
-      const response = await fetch(`${API_BASE_URL}/api/document/review/${docId}`, {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (response.ok) {
-        setShowApproveModal(false);
-        setSelectedDoc(null);
-        fetchDocuments(false);
-      } else {
-        const error = await response.json();
-        alert('Failed to approve: ' + (error.error || 'Unknown error'));
-      }
-    } catch (err) {
-      alert('Error: ' + err.message);
-    } finally {
-      setProcessing(null);
-    }
-  };
-
   const handleDecline = async (docId, reason) => {
     setProcessing(docId);
     try {
@@ -524,16 +449,6 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
     } finally {
       setProcessing(null);
     }
-  };
-
-  const openApproveModal = (doc) => {
-    setSelectedDoc(doc);
-    setShowApproveModal(true);
-  };
-
-  const closeApproveModal = () => {
-    setShowApproveModal(false);
-    setSelectedDoc(null);
   };
 
   const openDeclineModal = (doc) => {
@@ -654,13 +569,6 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
           {!isArchive && (
             <>
               <button 
-                onClick={() => openApproveModal(doc)}
-                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Approve"
-              >
-                <CheckCircleIcon />
-              </button>
-              <button 
                 onClick={() => openUploadModal(doc)}
                 className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                 title="Upload Signed Document"
@@ -712,13 +620,6 @@ const ReviewerDashboard = ({ user, isArchiveView = false, isPendingView = false 
         onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
         documentId={viewPdfModal.docId}
         title={viewPdfModal.title}
-      />
-      <ApproveModal
-        isOpen={showApproveModal}
-        doc={selectedDoc}
-        onClose={closeApproveModal}
-        onApprove={handleApprove}
-        processing={processing}
       />
       <DeclineModal 
         isOpen={showDeclineModal} 
