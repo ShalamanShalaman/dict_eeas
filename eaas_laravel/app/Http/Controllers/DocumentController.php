@@ -290,9 +290,28 @@ class DocumentController extends Controller
         $doc = Document::findOrFail($doc_id);
         $path = $doc->review_file_path ?: $doc->file_path;
         if (!Storage::disk('public')->exists($path)) return response()->json(['error' => 'File not found'], 404);
+        
         $fileExt = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        if ($fileExt === 'pdf') return response()->file(Storage::disk('public')->path($path), ['Content-Type' => 'application/pdf']);
-        return response()->json(['message' => 'View not supported'], 400);
+        
+        // Map supported file extensions to their proper MIME types so the browser can render them in the iframe
+        $supportedTypes = [
+            'pdf' => 'application/pdf',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'txt' => 'text/plain'
+        ];
+
+        if (array_key_exists($fileExt, $supportedTypes)) {
+            return response()->file(Storage::disk('public')->path($path), [
+                'Content-Type' => $supportedTypes[$fileExt],
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"'
+            ]);
+        }
+        
+        // Only error if the file format is completely unsupported by browsers (like .docx or .xlsx)
+        return response()->json(['message' => "View not supported for .$fileExt files"], 400);
     }
 
     public function deleteDocument(Request $request, $doc_id)

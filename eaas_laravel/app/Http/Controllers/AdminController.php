@@ -36,8 +36,18 @@ class AdminController extends Controller
 
     public function getActivityLogs()
     {
-        $logs = ActivityLog::orderBy('created_at', 'desc')->get();
-        return response()->json($logs->map->toArray());
+        // Fetch logs and eager load the user relationship to avoid N+1 query issues
+        $logs = ActivityLog::with('user')->orderBy('created_at', 'desc')->get();
+        
+        // Map the collection to inject the user_name and user_role required by the React frontend
+        $mappedLogs = $logs->map(function ($log) {
+            $array = $log->toArray();
+            $array['user_name'] = $log->user ? $log->user->full_name : 'System';
+            $array['user_role'] = $log->user ? $log->user->role : 'system';
+            return $array;
+        });
+
+        return response()->json($mappedLogs);
     }
 
     public function getPositions()
