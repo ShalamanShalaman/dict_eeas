@@ -65,7 +65,6 @@ class DocumentController extends Controller
             $env['PATH'] = isset($_SERVER['PATH']) ? $_SERVER['PATH'] : '';
         }
 
-        // Fetch the Python executable path from the .env file, fallback to the venv path if not found
         $pythonExec = env('PYTHON_EXECUTABLE', '/var/www/eaas/eaas_python/venv/bin/python');
 
         $process = new Process([$pythonExec, $cliPath, $action, $tempPayload], $workingDir, $env);
@@ -263,7 +262,6 @@ class DocumentController extends Controller
         $userId = $request->input('user_id');
         $user = User::where('user_id', $userId)->first();
         
-        // Security check: Must be owner, reviewer, or admin
         if (!$user || ($doc->employee_id !== $user->id && $doc->reviewer_id !== $user->id && $user->role !== 'admin')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
@@ -289,29 +287,75 @@ class DocumentController extends Controller
     {
         $doc = Document::findOrFail($doc_id);
         $path = $doc->review_file_path ?: $doc->file_path;
-        if (!Storage::disk('public')->exists($path)) return response()->json(['error' => 'File not found'], 404);
         
+        if (!Storage::disk('public')->exists($path)) {
+            return response()->json(['error' => 'File not found'], 404);
+        }
+        
+        // Use Laravel's Storage to read the actual file's magic bytes/headers
+        // This will find out if the file is a PDF even if it's named .xlsx
+        $mimeType = Storage::disk('public')->mimeType($path);
         $fileExt = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         
-        // Map supported file extensions to their proper MIME types so the browser can render them in the iframe
-        $supportedTypes = [
-            'pdf' => 'application/pdf',
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'txt' => 'text/plain'
-        ];
-
-        if (array_key_exists($fileExt, $supportedTypes)) {
+        // Check if the true MIME type is a PDF, or if it's an image
+        if ($mimeType === 'application/pdf' || str_starts_with($mimeType, 'image/')) {
             return response()->file(Storage::disk('public')->path($path), [
-                'Content-Type' => $supportedTypes[$fileExt],
+                'Content-Type' => $mimeType,
                 'Content-Disposition' => 'inline; filename="' . basename($path) . '"'
             ]);
         }
         
-        // Only error if the file format is completely unsupported by browsers (like .docx or .xlsx)
-        return response()->json(['message' => "View not supported for .$fileExt files"], 400);
+        // Support viewing raw text files natively
+        if ($mimeType === 'text/plain') {
+            return response()->file(Storage::disk('public')->path($path), [
+                'Content-Type' => 'text/plain',
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"'
+            ]);
+        }
+        
+        // If it really is an unviewable file format (like a pure Excel spreadsheet), render the download fallback UI
+        $filename = basename($path);
+        $downloadUrl = url("/api/document/download/{$doc_id}");
+        
+        $html = <<<HTML
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Preview Not Available</title>
+            <style>
+                body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f1f5f9; color: #334155; }
+                .card { background: white; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); text-align: center; max-width: 450px; border: 1px solid #e2e8f0; width: 90%; }
+                svg { width: 56px; height: 56px; color: #94a3b8; margin-bottom: 1.25rem; }
+                h2 { margin: 0 0 0.75rem 0; font-size: 1.5rem; color: #0f172a; font-weight: 600; }
+                p { margin: 0 0 2rem 0; font-size: 0.95rem; color: #64748b; line-height: 1.6; }
+                .btn { display: inline-flex; align-items: center; justify-content: center; background-color: #4f46e5; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+                .btn:hover { background-color: #4338ca; transform: translateY(-1px); }
+                .btn:active { transform: translateY(0); }
+                .filename { display: inline-block; background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: 1px solid #e2e8f0; color: #334155; font-family: monospace; word-break: break-all; margin: 0.5rem 0; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <h2>Preview Not Supported</h2>
+                <p>Web browsers cannot display this file format directly.<br>
+                <span class="filename">{$filename}</span></p>
+                <a href="{$downloadUrl}" class="btn" target="_blank">
+                    <svg xmlns="http://www.w3.org/2000/svg" style="width: 1.25rem; height: 1.25rem; margin-right: 0.5rem; margin-bottom: 0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download File Instead
+                </a>
+            </div>
+        </body>
+        </html>
+HTML;
+        
+        return response($html)->header('Content-Type', 'text/html');
     }
 
     public function deleteDocument(Request $request, $doc_id)
