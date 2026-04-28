@@ -233,30 +233,10 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
     wb = load_workbook(template_path)
     ws = wb.active
 
-    # CRITICAL FIX: Activate the master switch for "Fit to Page" in the Excel sheet properties
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
-    
-    # Set the fit dimensions
-    ws.page_setup.fitToPage = True
-    ws.page_setup.fitToHeight = 1
-    ws.page_setup.fitToWidth = 1
-    
-    # Force orientation and paper size to prevent rendering breakage in LibreOffice
-    ws.page_setup.orientation = "portrait"
-    ws.page_setup.paperSize = 9 # A4 paper size
-    
-    # Minimize margins to give the wide organic table maximum breathing room
-    ws.page_margins.left = 0.1
-    ws.page_margins.right = 0.1
-    ws.page_margins.top = 0.25
-    ws.page_margins.bottom = 0.25
-    ws.page_margins.header = 0.0
-    ws.page_margins.footer = 0.0
+    # REMOVED: All aggressive openpyxl page_setup and margin forced commands.
+    # Python will now blindly rely on the native print settings you saved in the Excel template.
 
     if dtr_format == 'organic':
-        # Hardcode the exact print area so LibreOffice calculates the scale properly
-        ws.print_area = 'A1:T72'
-        
         name_top = ('C6', 'M6')
         name_bot = ('C55', 'M55')
         approver_cell = ('C61', 'M61')
@@ -279,9 +259,6 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
         
         right_day_col = 'L' 
     else:
-        # Standard format bounding box
-        ws.print_area = 'A1:P65'
-        
         name_top = ('C6', 'K6')
         name_bot = ('C55', 'K55')
         approver_cell = ('C61', 'K61')
