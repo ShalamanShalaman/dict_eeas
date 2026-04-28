@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 
 const API_BASE_URL = "";
 
-// Smart filter to safely remove the 13-character PHP uniqid() hash from display names
 const cleanFileName = (filename) => {
   if (!filename) return '';
   const match = filename.match(/^(?:shared_)?[a-zA-Z0-9]{13,14}_(.+)$/i);
@@ -56,6 +55,13 @@ const UserIcon = ({ className }) => (
   <Icon className={className}>
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
+  </Icon>
+);
+
+const Edit3Icon = ({ className }) => (
+  <Icon className={className}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
   </Icon>
 );
 
@@ -218,6 +224,8 @@ export default function SubmitForApproval({ user }) {
               setSelectedReviewerId(filteredData[0].id.toString());
             }
           }
+        } else if (!response.ok) {
+            console.error(`Backend error fetching reviewers: ${response.status}. Proceeding with empty reviewers list.`);
         }
       } catch (err) {
         console.error("Failed to fetch reviewers:", err);
@@ -274,7 +282,7 @@ export default function SubmitForApproval({ user }) {
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
       console.error('Non-JSON response from server:', text);
-      throw new Error('Server returned an unexpected response format. Check the browser console.');
+      throw new Error('Server returned an unexpected HTML response format. Check the browser console or network tab to see the exact Laravel error.');
     }
     return await response.json();
   };
@@ -479,13 +487,6 @@ export default function SubmitForApproval({ user }) {
       <polyline points="14 2 14 8 20 8" />
       <polyline points="9 15 12 18 15 15" />
       <line x1="12" y1="12" x2="12" y2="18" />
-    </Icon>
-  );
-
-  const EyeIcon = ({ className }) => (
-    <Icon className={className}>
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
     </Icon>
   );
 

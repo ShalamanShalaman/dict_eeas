@@ -34,7 +34,12 @@ export default function UserManagement() {
 
   const [locationForm, setLocationForm] = useState({
     location: "",
-    reviewer_id: "" 
+    reviewer_id: "",
+    am_in: "",
+    am_out: "",
+    pm_in: "",
+    pm_out: "",
+    apply_to_all: false
   });
 
   const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api`;
@@ -84,6 +89,11 @@ export default function UserManagement() {
 
   const handleInputChange = (setter, data, field, value) => {
     setter({ ...data, [field]: value });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleCheckboxChange = (setter, data, field, e) => {
+    setter({ ...data, [field]: e.target.checked });
     setHasUnsavedChanges(true);
   };
 
@@ -248,7 +258,7 @@ export default function UserManagement() {
             closeLocationModal(true);
             setUiModal({ show: true, type: 'success', title: 'Success', message: 'Location updated successfully', onConfirm: () => closeUiModal() });
         } else {
-            setLocationForm({ location: "", reviewer_id: "" });
+            setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "", apply_to_all: false });
             setHasUnsavedChanges(false);
             setUiModal({ show: true, type: 'success', title: 'Success', message: 'Location added successfully', onConfirm: () => closeUiModal() });
         }
@@ -263,7 +273,15 @@ export default function UserManagement() {
 
   const handleEditLocation = (loc) => {
     setEditingLocation(loc);
-    setLocationForm({ location: loc.location, reviewer_id: loc.reviewer_id || "" });
+    setLocationForm({ 
+      location: loc.location, 
+      reviewer_id: loc.reviewer_id || "",
+      am_in: loc.am_in || "",
+      am_out: loc.am_out || "",
+      pm_in: loc.pm_in || "",
+      pm_out: loc.pm_out || "",
+      apply_to_all: false
+    });
     setHasUnsavedChanges(false);
     setIsLocationModalOpen(true);
   };
@@ -317,7 +335,7 @@ export default function UserManagement() {
     setIsLocationModalOpen(false);
     setEditingLocation(null);
     setHasUnsavedChanges(false);
-    setLocationForm({ location: "", reviewer_id: "" });
+    setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "", apply_to_all: false });
   };
 
   const itemsPerPage = 10;
@@ -338,7 +356,7 @@ export default function UserManagement() {
         <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                 <Users className="w-6 h-6 text-blue-600" />
-                User Management
+                Admin Settings
             </h2>
             <p className="text-gray-500 text-sm">Manage system access, roles, and assignments.</p>
         </div>
@@ -561,7 +579,7 @@ export default function UserManagement() {
               <button onClick={attemptCloseLocationModal} className="text-white/70 hover:text-white"><X className="w-5 h-5"/></button>
             </div>
 
-            <div className="p-5 max-h-[70vh] flex flex-col">
+            <div className="p-5 max-h-[85vh] flex flex-col">
                 <form onSubmit={handleLocationSubmit} className="space-y-3 mb-6 border-b border-gray-100 pb-6">
                     <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase">Office Name</label>
@@ -587,6 +605,34 @@ export default function UserManagement() {
                         </select>
                         <p className="text-[10px] text-gray-400 mt-1">Only users with 'Reviewer' role appear here.</p>
                     </div>
+
+                    <div className="pt-2 border-t border-gray-100">
+                        <label className="text-xs font-semibold text-gray-500 uppercase mb-2 block">Standard Office Hours</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-semibold uppercase">AM IN</label>
+                                <input type="time" value={locationForm.am_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_in", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-semibold uppercase">AM OUT</label>
+                                <input type="time" value={locationForm.am_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_out", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-semibold uppercase">PM IN</label>
+                                <input type="time" value={locationForm.pm_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_in", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-semibold uppercase">PM OUT</label>
+                                <input type="time" value={locationForm.pm_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_out", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
+                            </div>
+                        </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                        <input type="checkbox" checked={locationForm.apply_to_all} onChange={(e) => handleCheckboxChange(setLocationForm, locationForm, "apply_to_all", e)} className="w-4 h-4 text-blue-600 focus:ring-blue-500 rounded border-gray-300" />
+                        <span className="text-xs font-semibold text-gray-700">Apply this schedule to all existing locations</span>
+                    </label>
+
                     <button className={`w-full py-2 rounded-md text-sm font-semibold text-white shadow-sm transition-colors mt-2 ${editingLocation ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700"}`}>
                         {editingLocation ? "Update Location" : "Add Location"}
                     </button>
@@ -596,11 +642,23 @@ export default function UserManagement() {
                     {locations.length === 0 && <p className="text-center text-xs text-gray-400 py-4">No locations added yet.</p>}
                     {locations.map((loc) => {
                         const revName = users.find(u => u.id === loc.reviewer_id)?.full_name || "Unassigned";
+                        
+                        const formatTime = (t) => {
+                            if(!t) return '';
+                            let [h, m] = t.split(':');
+                            let ampm = h >= 12 ? 'PM' : 'AM';
+                            h = h % 12 || 12;
+                            return `${h}:${m} ${ampm}`;
+                        };
+
                         return (
                             <div key={loc.id} className="group flex justify-between items-start p-3 bg-gray-50 border border-gray-100 rounded-lg hover:border-blue-200 transition-colors">
                                 <div>
                                     <div className="font-medium text-sm text-gray-800">{loc.location}</div>
-                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                    <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+                                        {loc.am_in ? `${formatTime(loc.am_in)} - ${formatTime(loc.pm_out)}` : "No schedule set"}
+                                    </div>
+                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                                         <Briefcase className="w-3 h-3"/> {revName}
                                     </div>
                                 </div>

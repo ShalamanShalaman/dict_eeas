@@ -80,6 +80,53 @@ const GripIcon = ({ className }) => (
     <circle cx="15" cy="19" r="1.5" />
   </svg>
 );
+const MergeIcon = ({ className }) => (<Icon className={className}><path d="M8 12h8M8 12l3-3M8 12l3 3M16 12l-3-3M16 12l-3 3M4 4v16M20 4v16"/></Icon>);
+const SplitIcon = ({ className }) => (<Icon className={className}><path d="M12 4v16M8 12H4M8 12l-3-3M8 12l-3 3M16 12h4M16 12l3-3M16 12l3 3"/></Icon>);
+
+const parseStandardMinutes = (timeStr) => {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const parseDtrMinutes = (timeStr, col) => {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  let [h, m] = timeStr.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
+
+  if (col === 'am_in') {
+    if (h === 12) h = 0;
+  } else if (col === 'am_out') {
+  } else if (col === 'pm_in' || col === 'pm_out') {
+    if (h !== 12) h += 12;
+  }
+  return h * 60 + m;
+};
+
+const computeUndertime = (dayData, schedule) => {
+  if (!schedule || !schedule.am_in) return { hrs: dayData.undertime_hrs || "", min: dayData.undertime_min || "" };
+
+  const stdAmIn = parseStandardMinutes(schedule.am_in);
+  const stdAmOut = parseStandardMinutes(schedule.am_out);
+  const stdPmIn = parseStandardMinutes(schedule.pm_in);
+  const stdPmOut = parseStandardMinutes(schedule.pm_out);
+
+  const actAmIn = parseDtrMinutes(dayData.am_in, 'am_in');
+  const actAmOut = parseDtrMinutes(dayData.am_out, 'am_out');
+  const actPmIn = parseDtrMinutes(dayData.pm_in, 'pm_in');
+  const actPmOut = parseDtrMinutes(dayData.pm_out, 'pm_out');
+
+  let penalty = 0;
+  if (actAmIn !== null && stdAmIn !== null && actAmIn > stdAmIn) penalty += actAmIn - stdAmIn;
+  if (actAmOut !== null && stdAmOut !== null && actAmOut < stdAmOut) penalty += stdAmOut - actAmOut;
+  if (actPmIn !== null && stdPmIn !== null && actPmIn > stdPmIn) penalty += actPmIn - stdPmIn;
+  if (actPmOut !== null && stdPmOut !== null && actPmOut < stdPmOut) penalty += stdPmOut - actPmOut;
+
+  if (penalty > 0) {
+    return { hrs: Math.floor(penalty / 60), min: penalty % 60 };
+  }
+  return { hrs: "", min: "" };
+};
 
 export default function UploadAttendance({ user }) {
   const [file, setFile] = useState(null);
@@ -96,6 +143,7 @@ export default function UploadAttendance({ user }) {
   const [isReadOnly, setIsReadOnly] = useState(false);
   
   const [savedDocId, setSavedDocId] = useState(null);
+  const [officeSchedule, setOfficeSchedule] = useState(null);
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -131,12 +179,26 @@ export default function UploadAttendance({ user }) {
 
   const [arMeta, setArMeta] = useState({
     name: "", adjustmentName: "", position: "", office: "", project: "", approver: "", approverTitle: "", periodFormat: "full", tasks: {},  manualHighlights: {}, employeeNo: "", controlNo: "", filingDate: "", adjustmentReason: "", adjustmentDetails: "", obWith: "", obAt: "",
-    adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" })
+    adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" }),
+    dtrFormat: "standard"
   });
 
   const fileInputRef = useRef(null);
 
-  const autoFillWeekends = (employeesData) => {
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      if (!currentUser?.office_location_id) return;
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/locations`);
+        const data = await res.json();
+        const myLoc = data.find(l => l.id === currentUser.office_location_id);
+        if (myLoc) setOfficeSchedule(myLoc);
+      } catch (e) {}
+    };
+    fetchSchedule();
+  }, [currentUser]);
+
+  const autoFillWeekends = (employeesData, scheduleToUse = null) => {
     if (!employeesData) return {};
     const newData = JSON.parse(JSON.stringify(employeesData));
     Object.keys(newData).forEach(emp => {
@@ -157,14 +219,37 @@ export default function UploadAttendance({ user }) {
                     
                     if (!newData[emp][monthKey][dayStr]) {
                       newData[emp][monthKey][dayStr] = {
-                        am_in: '', am_out: '', pm_in: '', pm_out: '', undertime_hrs: '', undertime_min: '', remarks: ''
+                        am_in: '', am_out: '', pm_in: '', pm_out: '', 
+                        am_in_options: [], am_out_options: [], pm_in_options: [], pm_out_options: [],
+                        undertime_hrs: '', undertime_min: '', remarks: '', claim_remark: '',
+                        merges: []
                       };
                     }
                     
                     const dayData = newData[emp][monthKey][dayStr];
-                    const hasAttendance = dayData.am_in || dayData.am_out || dayData.pm_in || dayData.pm_out;
+
+                    if (!dayData.merges) dayData.merges = [];
+                    if (dayData.claim_remark === undefined) dayData.claim_remark = '';
+
+                    ['am_in', 'am_out', 'pm_in', 'pm_out'].forEach(f => {
+                        if (Array.isArray(dayData[f])) {
+                            dayData[`${f}_options`] = [...dayData[f]];
+                            dayData[f] = dayData[f].length === 1 ? dayData[f][0] : ""; 
+                        }
+                    });
+
+                    if (scheduleToUse && !dayData.remarks) {
+                        const { hrs, min } = computeUndertime(dayData, scheduleToUse);
+                        dayData.undertime_hrs = hrs;
+                        dayData.undertime_min = min;
+                    }
+
+                    const hasAttendance = dayData.am_in || dayData.am_out || dayData.pm_in || dayData.pm_out ||
+                                          dayData.am_in_options?.length || dayData.am_out_options?.length ||
+                                          dayData.pm_in_options?.length || dayData.pm_out_options?.length;
+                    const hasMerge = dayData.merges && dayData.merges.length > 0;
                     
-                    if (!dayData.remarks && !hasAttendance) {
+                    if (!dayData.remarks && !hasAttendance && !hasMerge) {
                       if (dayOfWeek === 0) dayData.remarks = "Sunday";
                       if (dayOfWeek === 6) dayData.remarks = "Saturday";
                     }
@@ -244,7 +329,8 @@ export default function UploadAttendance({ user }) {
         tasks: {},
         manualHighlights: {},
         employeeNo: "", controlNo: "", filingDate: "", adjustmentReason: "", adjustmentDetails: "", obWith: "", obAt: "",
-        adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" })
+        adjustmentRows: Array(5).fill({ date: "", am_in: "", am_out: "", pm_in: "", pm_out: "", evening_in: "", evening_out: "" }),
+        dtrFormat: "standard"
     };
   };
 
@@ -375,7 +461,7 @@ export default function UploadAttendance({ user }) {
         });
 
         if (Object.keys(loadedEmployees).length > 0) {
-            setEmployees(autoFillWeekends(loadedEmployees));
+            setEmployees(autoFillWeekends(loadedEmployees, officeSchedule));
         }
         
         if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
@@ -386,6 +472,7 @@ export default function UploadAttendance({ user }) {
             if (loadedArMeta.tasks && Object.keys(loadedArMeta.tasks).some(k => !isNaN(parseInt(k)))) {
                 loadedArMeta.tasks = { [loadedSelectedMonth]: loadedArMeta.tasks };
             }
+            if (!loadedArMeta.dtrFormat) loadedArMeta.dtrFormat = "standard";
             setArMeta(loadedArMeta);
         }
 
@@ -571,7 +658,7 @@ export default function UploadAttendance({ user }) {
                 });
 
                 if (Object.keys(loadedEmployees).length > 0) {
-                    setEmployees(autoFillWeekends(loadedEmployees));
+                    setEmployees(autoFillWeekends(loadedEmployees, officeSchedule));
                 }
                 
                 if (stateData.selectedEmployee) setSelectedEmployee(stateData.selectedEmployee);
@@ -582,6 +669,7 @@ export default function UploadAttendance({ user }) {
                     if (loadedArMeta.tasks && Object.keys(loadedArMeta.tasks).some(k => !isNaN(parseInt(k)))) {
                         loadedArMeta.tasks = { [loadedSelectedMonth]: loadedArMeta.tasks };
                     }
+                    if (!loadedArMeta.dtrFormat) loadedArMeta.dtrFormat = "standard";
                     setArMeta(loadedArMeta);
                 }
 
@@ -706,7 +794,7 @@ export default function UploadAttendance({ user }) {
       const result = await response.json();
 
       if (response.ok) {
-        const data = autoFillWeekends(result.data || {});
+        const data = autoFillWeekends(result.data || {}, officeSchedule);
         setEmployees(data);
         const firstEmp = Object.keys(data)[0] || "";
         setSelectedEmployee(firstEmp);
@@ -815,19 +903,29 @@ export default function UploadAttendance({ user }) {
 
   const handleDtrUpdate = (day, field, value) => {
     if (isReadOnly) return;
-    setEmployees((prev) => ({
-      ...prev,
-      [selectedEmployee]: {
-        ...prev[selectedEmployee],
-        [selectedMonth]: {
-            ...prev[selectedEmployee][selectedMonth],
-            [day]: {
-                ...prev[selectedEmployee][selectedMonth][day],
-                [field]: value,
-            }
+    setEmployees((prev) => {
+      const dayData = {
+        ...prev[selectedEmployee][selectedMonth][day],
+        [field]: value,
+      };
+
+      if (['am_in', 'am_out', 'pm_in', 'pm_out'].includes(field)) {
+        const { hrs, min } = computeUndertime(dayData, officeSchedule);
+        dayData.undertime_hrs = hrs;
+        dayData.undertime_min = min;
+      }
+
+      return {
+        ...prev,
+        [selectedEmployee]: {
+          ...prev[selectedEmployee],
+          [selectedMonth]: {
+              ...prev[selectedEmployee][selectedMonth],
+              [day]: dayData,
+          }
         }
-      },
-    }));
+      };
+    });
     setHasUnsavedChanges(true);
   };
 
@@ -836,10 +934,18 @@ export default function UploadAttendance({ user }) {
     setEmployees((prev) => {
       const updatedMonthData = { ...prev[selectedEmployee][selectedMonth] };
       daysToUpdate.forEach(day => {
-        updatedMonthData[day] = {
+        const dayData = {
             ...updatedMonthData[day],
             [field]: value
         };
+        
+        if (['am_in', 'am_out', 'pm_in', 'pm_out'].includes(field)) {
+          const { hrs, min } = computeUndertime(dayData, officeSchedule);
+          dayData.undertime_hrs = hrs;
+          dayData.undertime_min = min;
+        }
+
+        updatedMonthData[day] = dayData;
       });
 
       return {
@@ -878,7 +984,12 @@ export default function UploadAttendance({ user }) {
         const finalTasks = {};
         
         Object.keys(fullTasks).forEach(key => {
-            const hasAttendance = fullData[key] && (fullData[key].am_in || fullData[key].am_out || fullData[key].pm_in || fullData[key].pm_out);
+            const dayData = fullData[key] || {};
+            const hasAttendance = dayData.am_in || dayData.am_out || dayData.pm_in || dayData.pm_out || 
+                                  (dayData.merges && dayData.merges.length > 0) ||
+                                  dayData.am_in_options?.length || dayData.am_out_options?.length || 
+                                  dayData.pm_in_options?.length || dayData.pm_out_options?.length;
+                                  
             const isManual = manualHighlights[key];
             if (hasAttendance || isManual) {
                 finalTasks[key] = fullTasks[key];
@@ -907,7 +1018,12 @@ export default function UploadAttendance({ user }) {
     Object.keys(fullTasks).forEach(key => {
         const day = parseInt(key);
         if (!isNaN(day) && (day >= start && day <= end)) {
-            const hasAttendance = fullData[key] && (fullData[key].am_in || fullData[key].am_out || fullData[key].pm_in || fullData[key].pm_out);
+            const dayData = fullData[key] || {};
+            const hasAttendance = dayData.am_in || dayData.am_out || dayData.pm_in || dayData.pm_out || 
+                                  (dayData.merges && dayData.merges.length > 0) ||
+                                  dayData.am_in_options?.length || dayData.am_out_options?.length || 
+                                  dayData.pm_in_options?.length || dayData.pm_out_options?.length;
+                                  
             const isManual = manualHighlights[key];
             if (hasAttendance || isManual) {
                 filteredTasks[key] = fullTasks[key];
@@ -940,7 +1056,8 @@ export default function UploadAttendance({ user }) {
           approver_title: arMeta.approverTitle,
           period_text: finalPeriod,
           period_format: arMeta.periodFormat,
-          action_by: currentUser?.user_id
+          action_by: currentUser?.user_id,
+          dtr_format: arMeta.dtrFormat || 'standard'
         }),
       });
 
@@ -1573,6 +1690,21 @@ export default function UploadAttendance({ user }) {
                         </select>
                     </div>
                 )}
+
+                {viewMode === "dtr" && (
+                    <div className="space-y-1">
+                        <label className={`text-xs font-semibold flex items-center gap-1 ${labelClass(isReadOnly)}`}><FileTextIcon className="w-3 h-3"/> DTR Format</label>
+                        <select
+                            className={inputClass(isReadOnly)}
+                            value={arMeta.dtrFormat || 'standard'}
+                            onChange={(e) => { setArMeta({ ...arMeta, dtrFormat: e.target.value }); setHasUnsavedChanges(true); }}
+                            disabled={isReadOnly}
+                        >
+                            <option value="standard">Standard (Default)</option>
+                            <option value="organic">Organic (With Claims)</option>
+                        </select>
+                    </div>
+                )}
             </div>
 
             <div className="rounded-lg w-full">
@@ -1584,6 +1716,8 @@ export default function UploadAttendance({ user }) {
                     periodFormat={arMeta.periodFormat}
                     setAppAlert={setAppAlert}
                     isReadOnly={isReadOnly}
+                    officeSchedule={officeSchedule}
+                    dtrFormat={arMeta.dtrFormat || 'standard'}
                 />
                 ) : viewMode === "ar" ? (
                 <div className="overflow-x-auto border border-gray-100 bg-gray-50/50 rounded-lg">
@@ -1832,7 +1966,7 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
   }, [currentUser, setArMeta]);
 
   return (
-    <div className={`p-4 bg-gray-50 ${isReadOnly ? 'opacity-80 pointer-events-none' : ''}`}>
+    <div className={`p-4 bg-gray-50 select-none ${isReadOnly ? 'opacity-80 pointer-events-none' : ''}`}>
       <div className="bg-white border-2 border-black text-black max-w-6xl mx-auto shadow-lg">
         
         <div className="flex border-b border-black">
@@ -2046,18 +2180,111 @@ function DTRAdjustmentSlip({ arMeta, setArMeta, setHasUnsavedChanges, currentUse
   );
 }
 
-const InputCell = ({ day, field, value, onUpdate, isReadOnly }) => (
-    <input 
-        type="text" 
-        value={value || ""}
-        onChange={(e) => onUpdate(day, field, e.target.value)}
-        disabled={isReadOnly}
-        className={`w-full bg-transparent border-0 p-1 text-center focus:ring-1 focus:ring-blue-500 focus:bg-white rounded text-gray-700 font-mono text-sm ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}`}
-        placeholder={field === "remarks" ? "..." : "--:--"}
-    />
-);
+const InputCell = ({ day, field, value, options, onUpdate, isReadOnly }) => {
+  const hasOptions = Array.isArray(options) && options.length > 0;
+  
+  const [localValue, setLocalValue] = useState(value !== undefined && value !== null && value !== "" ? String(value) : "");
+  const [isEditingOverride, setIsEditingOverride] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const inputRef = useRef(null);
 
-const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReason, setBatchReason, customReason, setCustomReason, isWeekendValid, applyBatch, clearBatchRemarks }, ref) => {
+  useEffect(() => {
+    setLocalValue(value !== undefined && value !== null && value !== "" ? String(value) : "");
+  }, [value]);
+
+  const needsResolution = hasOptions && localValue === "" && !isEditingOverride;
+  const isResolvedWithOptions = hasOptions && localValue !== "" && !isEditingOverride;
+
+  const handleSingleClick = (e) => {
+    if (isReadOnly || isEditingOverride) return;
+    if (hasOptions) {
+      setShowDropdown(true);
+    }
+  };
+
+  const handleDoubleClick = (e) => {
+    if (isReadOnly) return;
+    if (hasOptions) {
+      setShowDropdown(false);
+      setIsEditingOverride(true);
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 0);
+    }
+  };
+
+  const handleChange = (e) => {
+    setLocalValue(e.target.value);
+    onUpdate(day, field, e.target.value);
+  };
+
+  const handleSelect = (opt) => {
+    setLocalValue(opt);
+    onUpdate(day, field, opt);
+    setShowDropdown(false);
+  };
+
+  const handleBlur = (e) => {
+    setTimeout(() => {
+      setShowDropdown(false);
+      setIsEditingOverride(false);
+    }, 200);
+  };
+
+  let baseClass = "w-full h-full border-0 py-1.5 px-1 text-center outline-none rounded-none font-mono text-sm transition-all focus:ring-inset focus:ring-2 focus:ring-blue-400 focus:bg-white focus:text-gray-900 ";
+  
+  if (isReadOnly) {
+      baseClass += "cursor-not-allowed opacity-70 bg-transparent text-gray-700 ";
+  } else if (needsResolution) {
+      baseClass += "bg-rose-100 text-rose-700 placeholder-rose-600 font-bold cursor-pointer hover:bg-rose-200 shadow-inner ";
+  } else if (isResolvedWithOptions) {
+      baseClass += "bg-amber-50 text-amber-900 cursor-pointer hover:bg-amber-100 ";
+  } else {
+      baseClass += "bg-transparent text-gray-700 hover:bg-slate-50 cursor-text ";
+  }
+
+  return (
+    <div className={`relative w-full h-full flex items-center justify-center ${showDropdown ? 'z-[100]' : 'z-10'}`}>
+      <input 
+        ref={inputRef}
+        type="text" 
+        value={localValue}
+        onChange={handleChange}
+        onClick={handleSingleClick}
+        onDoubleClick={handleDoubleClick}
+        onBlur={handleBlur}
+        readOnly={!isEditingOverride && hasOptions}
+        disabled={isReadOnly}
+        className={baseClass}
+        placeholder={needsResolution ? "Select" : (field === "remarks" || field === "claim_remark" || field.includes("merged") ? "..." : "--:--")}
+      />
+      {showDropdown && !isReadOnly && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-rose-300 shadow-2xl rounded-md z-[99999] min-w-[100px] overflow-hidden">
+          <div className="bg-rose-50 px-2 py-1.5 border-b border-rose-200 text-[10px] font-bold text-rose-800 uppercase tracking-wider text-center">
+            Select Option
+          </div>
+          <div className="max-h-40 overflow-y-auto">
+              {options.map((opt, i) => (
+                <div 
+                  key={i} 
+                  onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelect(opt);
+                  }} 
+                  className="px-3 py-2 text-sm hover:bg-rose-100 hover:text-rose-900 cursor-pointer font-mono text-center border-b last:border-0 border-rose-50 transition-colors whitespace-nowrap"
+                >
+                  {opt}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReason, setBatchReason, customReason, setCustomReason, batchClaim, setBatchClaim, isWeekendValid, applyBatch, clearBatchRemarks, dtrFormat }, ref) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const startPos = useRef({ x: 0, y: 0 });
@@ -2091,14 +2318,14 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
       window.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
       window.addEventListener('touchmove', handlePointerMove, { passive: false });
-      window.addEventListener('touchend', handlePointerUp);
+      window.addEventListener('touchmove', handlePointerUp);
     }
 
     return () => {
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('mouseup', handlePointerUp);
       window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerUp);
     };
   }, [isDragging]);
 
@@ -2133,21 +2360,24 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
       </div>
 
       <div className="flex flex-col gap-3">
-          <label className="text-xs text-slate-500 font-semibold uppercase">Merge/Set Reason:</label>
-          <select 
-              value={batchReason}
-              onChange={(e) => setBatchReason(e.target.value)}
-              className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white w-full"
-          >
-              <option value="Saturday">Saturday</option>
-              <option value="Sunday">Sunday</option>
-              <option value="Weekend" disabled={!isWeekendValid}>Weekend (Requires 2 consecutive days)</option>
-              <option value="Work Suspension">Work Suspension</option>
-              <option value="Holiday">Holiday</option>
-              <option value="Sick Leave">Sick Leave</option>
-              <option value="Vacation Leave">Vacation Leave</option>
-              <option value="Others">Others</option>
-          </select>
+          <div>
+              <label className="text-xs text-slate-500 font-semibold uppercase">Merge/Set Reason:</label>
+              <select 
+                  value={batchReason}
+                  onChange={(e) => setBatchReason(e.target.value)}
+                  className="mt-1 text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white w-full"
+              >
+                  <option value="-- No Change --">-- No Change --</option>
+                  <option value="Saturday">Saturday</option>
+                  <option value="Sunday">Sunday</option>
+                  <option value="Weekend" disabled={!isWeekendValid}>Weekend (Requires 2 consecutive days)</option>
+                  <option value="Work Suspension">Work Suspension</option>
+                  <option value="Holiday">Holiday</option>
+                  <option value="Sick Leave">Sick Leave</option>
+                  <option value="Vacation Leave">Vacation Leave</option>
+                  <option value="Others">Others</option>
+              </select>
+          </div>
           
           {batchReason === "Others" && (
               <input 
@@ -2156,6 +2386,21 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
                   onChange={(e) => setCustomReason(e.target.value)}
                   className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-full"
               />
+          )}
+
+          {dtrFormat === 'organic' && (
+              <div>
+                  <label className="text-xs text-slate-500 font-semibold uppercase">Set Claim Remark:</label>
+                  <select 
+                      value={batchClaim}
+                      onChange={(e) => setBatchClaim(e.target.value)}
+                      className="mt-1 text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white w-full"
+                  >
+                      <option value="">-- No Change --</option>
+                      <option value="With Claim">With Claim</option>
+                      <option value="No Claim">No Claim</option>
+                  </select>
+              </div>
           )}
 
           <button 
@@ -2170,7 +2415,7 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
               className="bg-white border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-50 shadow-sm transition-colors w-full"
               title="Remove remarks and restore time columns"
           >
-              Clear Remarks
+              Clear
           </button>
       </div>
     </div>
@@ -2179,7 +2424,7 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
 
 ToolContent.displayName = "ToolContent";
 
-function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, isReadOnly }) {
+function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, isReadOnly, officeSchedule, dtrFormat }) {
   let start = 1;
   let end = 31;
   if (periodFormat === "1-15") end = 15;
@@ -2189,18 +2434,53 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, is
   const [selectedDays, setSelectedDays] = useState(new Set());
   const [batchReason, setBatchReason] = useState("Work Suspension");
   const [customReason, setCustomReason] = useState("");
+  const [batchClaim, setBatchClaim] = useState("");
   const tableRef = useRef(null);
 
-  const toggleDay = (day) => {
-    if (isReadOnly) return;
-    const newSelected = new Set(selectedDays);
-    if (newSelected.has(day)) {
-        newSelected.delete(day);
-    } else {
-        newSelected.add(day);
-    }
-    setSelectedDays(newSelected);
+  const [activeMergeDay, setActiveMergeDay] = useState(null);
+  const [dragStart, setDragStart] = useState(null);
+  const [dragEnd, setDragEnd] = useState(null);
+
+  const [rowDragStart, setRowDragStart] = useState(null);
+  const [rowDragCurrent, setRowDragCurrent] = useState(null);
+  const [rowDragMode, setRowDragMode] = useState(null);
+
+  const fieldNames = ['am_in', 'am_out', 'pm_in', 'pm_out'];
+  const timeColClass = "w-20 min-w-[80px] max-w-[80px]";
+
+  const getSpanClass = (span) => {
+    if (span === 2) return "w-40 min-w-[160px] max-w-[160px]";
+    if (span === 3) return "w-60 min-w-[240px] max-w-[240px]";
+    if (span === 4) return "w-80 min-w-[320px] max-w-[320px]";
+    return timeColClass;
   };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+        if (dragStart !== null) {
+            setActiveMergeDay(null);
+            setDragStart(null);
+            setDragEnd(null);
+        }
+        if (rowDragStart !== null) {
+            const min = Math.min(rowDragStart, rowDragCurrent);
+            const max = Math.max(rowDragStart, rowDragCurrent);
+            setSelectedDays(prev => {
+                const next = new Set(prev);
+                for (let i = min; i <= max; i++) {
+                    if (rowDragMode === 'add') next.add(String(i));
+                    else next.delete(String(i));
+                }
+                return next;
+            });
+            setRowDragStart(null);
+            setRowDragCurrent(null);
+            setRowDragMode(null);
+        }
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [dragStart, rowDragStart, rowDragCurrent, rowDragMode]);
 
   const toggleAll = () => {
     if (isReadOnly) return;
@@ -2209,6 +2489,18 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, is
     } else {
         setSelectedDays(new Set(days));
     }
+  };
+
+  const isDayEffectivelySelected = (dayStr) => {
+      const dayNum = parseInt(dayStr);
+      if (rowDragStart !== null && rowDragCurrent !== null) {
+          const min = Math.min(rowDragStart, rowDragCurrent);
+          const max = Math.max(rowDragStart, rowDragCurrent);
+          if (dayNum >= min && dayNum <= max) {
+              return rowDragMode === 'add';
+          }
+      }
+      return selectedDays.has(dayStr);
   };
 
   const sortedDays = Array.from(selectedDays).map(Number).sort((a, b) => a - b);
@@ -2230,100 +2522,218 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, is
               else alert("Please select exactly 2 consecutive days to apply the 'Weekend' reason.");
               return;
           }
-      } else {
+      } else if (batchReason !== "-- No Change --") {
           const reasonToApply = batchReason === "Others" ? customReason : batchReason;
           onBatchUpdate(Array.from(selectedDays), "remarks", reasonToApply);
       }
+
+      if (dtrFormat === 'organic' && batchClaim !== "") {
+          onBatchUpdate(Array.from(selectedDays), "claim_remark", batchClaim);
+      }
+
       setSelectedDays(new Set());
   };
 
   const clearBatchRemarks = () => {
       onBatchUpdate(Array.from(selectedDays), "remarks", "");
+      if (dtrFormat === 'organic') {
+          onBatchUpdate(Array.from(selectedDays), "claim_remark", "");
+      }
       setSelectedDays(new Set());
+  };
+
+  const handleRowMouseDown = (dayNum, e) => {
+      if (isReadOnly) return;
+      e.preventDefault(); 
+      setRowDragStart(dayNum);
+      setRowDragCurrent(dayNum);
+      setRowDragMode(selectedDays.has(String(dayNum)) ? 'remove' : 'add');
   };
 
   return (
     <div className={`relative w-full ${isReadOnly ? 'opacity-90' : ''}`} ref={tableRef}>
-        {selectedDays.size > 0 && !isReadOnly && typeof document !== 'undefined' && createPortal(
+        {selectedDays.size > 0 && rowDragStart === null && !isReadOnly && typeof document !== 'undefined' && createPortal(
             <ToolContent 
                 selectedDays={selectedDays} setSelectedDays={setSelectedDays}
                 batchReason={batchReason} setBatchReason={setBatchReason}
                 customReason={customReason} setCustomReason={setCustomReason}
+                batchClaim={batchClaim} setBatchClaim={setBatchClaim}
                 isWeekendValid={isWeekendValid} applyBatch={applyBatch} clearBatchRemarks={clearBatchRemarks}
+                dtrFormat={dtrFormat}
             />,
             document.body
         )}
 
-        <div className="overflow-x-auto w-full bg-white rounded-lg border border-gray-200 shadow-sm relative z-10">
-            <table className="w-full text-sm text-left">
-            <thead className="bg-gray-100 text-gray-600 font-semibold uppercase text-xs">
+        <div className="overflow-x-auto w-full bg-white rounded-lg border border-gray-200 shadow-sm relative z-10 pb-32">
+            <table className="w-full text-sm text-left select-none bg-white">
+            <thead className="bg-gray-100 text-gray-600 font-semibold uppercase text-xs border-b border-gray-200">
                 <tr>
-                <th className="px-3 py-3 border-b w-10">
+                <th rowSpan={2} className="px-3 py-3 border-b border-r align-middle w-10 text-center">
                     <input 
                         type="checkbox" 
                         disabled={isReadOnly}
                         checked={selectedDays.size === days.length && days.length > 0}
                         onChange={toggleAll}
+                        className="cursor-pointer"
                     />
                 </th>
-                <th className="px-4 py-3 border-b">Day</th>
-                <th className="px-2 py-3 border-b text-center">AM IN</th>
-                <th className="px-2 py-3 border-b text-center">AM OUT</th>
-                <th className="px-2 py-3 border-b text-center">PM IN</th>
-                <th className="px-2 py-3 border-b text-center">PM OUT</th>
-                <th className="px-2 py-3 border-b text-center text-red-500">UT (HRS)</th>
-                <th className="px-2 py-3 border-b text-center text-red-500">UT (MIN)</th>
-                <th className="px-2 py-3 border-b text-center w-40">Remarks / Reason</th>
+                <th rowSpan={2} className="px-4 py-3 border-b border-r align-middle text-center">Day</th>
+                <th colSpan={4} className="px-2 py-2 border-b border-r text-center">TIME LOGS</th>
+                <th rowSpan={2} className={`px-2 py-3 border-b border-r align-middle text-center text-red-500 ${timeColClass}`}>UT (HRS)</th>
+                <th rowSpan={2} className={`px-2 py-3 border-b border-r align-middle text-center text-red-500 ${timeColClass}`}>UT (MIN)</th>
+                <th rowSpan={2} className="px-2 py-3 border-b border-r align-middle text-center w-40">Reason</th>
+                {dtrFormat === 'organic' && (
+                    <th rowSpan={2} className="px-2 py-3 border-b align-middle text-center w-28">Remarks</th>
+                )}
+                </tr>
+                <tr className="bg-gray-50/50">
+                <th className={`px-2 py-2 border-b border-r text-center text-[10px] font-bold ${timeColClass}`}>AM IN</th>
+                <th className={`px-2 py-2 border-b border-r text-center text-[10px] font-bold ${timeColClass}`}>AM OUT</th>
+                <th className={`px-2 py-2 border-b border-r text-center text-[10px] font-bold ${timeColClass}`}>PM IN</th>
+                <th className={`px-2 py-2 border-b border-r text-center text-[10px] font-bold ${timeColClass}`}>PM OUT</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
                 {days.map((day) => {
                     const rowData = data?.[day] || {};
                     const hasRemark = !!rowData.remarks;
+                    const merges = rowData.merges || [];
+
+                    const timeCells = [];
+
+                    if (activeMergeDay === day) {
+                        for (let col = 0; col < 4; col++) {
+                            const isSelected = dragStart !== null && dragEnd !== null &&
+                                               col >= Math.min(dragStart, dragEnd) &&
+                                               col <= Math.max(dragStart, dragEnd);
+                            timeCells.push(
+                                <td key={`sel-${col}`}
+                                    className={`border-r p-0 relative select-none cursor-crosshair ${timeColClass} transition-colors ${isSelected ? 'bg-blue-300 shadow-inner' : 'bg-blue-50/50 hover:bg-blue-100'}`}
+                                    onMouseDown={(e) => { e.stopPropagation(); setDragStart(col); setDragEnd(col); }}
+                                    onMouseEnter={() => { if (dragStart !== null) setDragEnd(col); }}
+                                    onMouseUp={(e) => {
+                                        e.stopPropagation();
+                                        const startMerge = Math.min(dragStart, dragEnd);
+                                        const endMerge = Math.max(dragStart, dragEnd);
+                                        if (startMerge < endMerge) {
+                                            const newMerges = merges.filter(m => m.end < startMerge || m.start > endMerge);
+                                            newMerges.push({ start: startMerge, end: endMerge });
+                                            onUpdate(day, 'merges', newMerges);
+                                        }
+                                        setActiveMergeDay(null);
+                                        setDragStart(null);
+                                        setDragEnd(null);
+                                    }}
+                                >
+                                   <div className="h-8 w-full min-h-[32px]"></div>
+                                </td>
+                            );
+                        }
+                    } else {
+                        for (let col = 0; col < 4; col++) {
+                            const merge = merges.find(m => m.start === col);
+                            if (merge) {
+                                const span = merge.end - merge.start + 1;
+                                const currentStart = merge.start;
+                                timeCells.push(
+                                    <td key={`merged-${col}`} colSpan={span} className={`border-r p-0 relative bg-blue-50/30 group/merge ${getSpanClass(span)}`}>
+                                        <InputCell day={day} field={`merged_${merge.start}_${merge.end}`} value={rowData[`merged_${merge.start}_${merge.end}`]} onUpdate={onUpdate} isReadOnly={isReadOnly} />
+                                        {!isReadOnly && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const newMerges = merges.filter(m => m.start !== currentStart);
+                                                    onUpdate(day, 'merges', newMerges);
+                                                }}
+                                                className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/merge:opacity-100 bg-white text-red-500 border border-red-200 p-0.5 rounded shadow-sm hover:bg-red-50 z-20 transition-opacity"
+                                                title="Split cells"
+                                            >
+                                                <SplitIcon className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </td>
+                                );
+                                col = merge.end;
+                            } else {
+                                timeCells.push(
+                                    <td key={`cell-${col}`} className={`border-r p-0 relative bg-white group/merge ${timeColClass}`}>
+                                        <InputCell day={day} field={fieldNames[col]} value={rowData[fieldNames[col]]} options={rowData[`${fieldNames[col]}_options`]} onUpdate={onUpdate} isReadOnly={isReadOnly} />
+                                        {!isReadOnly && col !== 3 && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setActiveMergeDay(day); }}
+                                                className="absolute top-1/2 opacity-0 group-hover/merge:opacity-100 bg-white text-slate-500 border border-slate-200 p-0.5 rounded shadow-sm hover:bg-slate-100 z-20 transition-opacity"
+                                                title="Merge cells"
+                                                style={{ right: '-12px', transform: 'translate(0, -50%)' }}
+                                            >
+                                                <MergeIcon className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                    </td>
+                                );
+                            }
+                        }
+                    }
+
+                    const effectivelySelected = isDayEffectivelySelected(day);
 
                     return (
-                    <tr key={day} className={`hover:bg-blue-50/50 transition-colors group ${selectedDays.has(day) ? "bg-blue-50" : ""}`}>
-                        <td className="px-3 py-2 border-r text-center">
+                    <tr 
+                        key={day} 
+                        onMouseEnter={() => {
+                            if (rowDragStart !== null && !isReadOnly) {
+                                setRowDragCurrent(parseInt(day));
+                            }
+                        }}
+                        className={`hover:bg-blue-50/50 hover:z-40 focus-within:z-50 transition-colors group relative ${effectivelySelected ? "bg-blue-50" : "bg-white"} ${activeMergeDay === day ? "ring-2 ring-blue-400 z-[60] shadow-md bg-blue-50" : "z-10"}`}
+                    >
+                        <td 
+                            className="px-3 py-2 border-r text-center cursor-pointer"
+                            onMouseDown={(e) => handleRowMouseDown(parseInt(day), e)}
+                        >
                             <input 
                                 type="checkbox" 
                                 disabled={isReadOnly}
-                                checked={selectedDays.has(day)}
-                                onChange={() => toggleDay(day)}
+                                checked={effectivelySelected}
+                                readOnly
+                                className="pointer-events-none"
                             />
                         </td>
-                        <td className="px-4 py-2 font-medium text-gray-500 bg-gray-50 border-r w-16 text-center">{day}</td>
+                        <td 
+                            className="px-4 py-2 font-medium text-gray-500 bg-gray-50 border-r w-16 text-center cursor-pointer"
+                            onMouseDown={(e) => handleRowMouseDown(parseInt(day), e)}
+                        >
+                            {day}
+                        </td>
                         
                         {hasRemark ? (
-                            <td colSpan={4} className="border-r px-2 py-1 text-center font-medium text-gray-600 italic bg-gray-50/50">
+                            <td colSpan={4} className="border-r px-2 py-1 text-center font-medium text-gray-600 italic bg-gray-50/50 min-w-[320px]">
                                 {rowData.remarks}
                             </td>
-                        ) : (
-                            <>
-                                <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="am_in" value={rowData.am_in} onUpdate={onUpdate} isReadOnly={isReadOnly} />
-                                </td>
-                                <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="am_out" value={rowData.am_out} onUpdate={onUpdate} isReadOnly={isReadOnly} />
-                                </td>
-                                <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="pm_in" value={rowData.pm_in} onUpdate={onUpdate} isReadOnly={isReadOnly} />
-                                </td>
-                                <td className="border-r min-w-[80px]">
-                                    <InputCell day={day} field="pm_out" value={rowData.pm_out} onUpdate={onUpdate} isReadOnly={isReadOnly} />
-                                </td>
-                            </>
-                        )}
+                        ) : timeCells}
 
-                        <td className={`border-r min-w-[60px] bg-red-50/30 ${hasRemark ? 'opacity-40' : ''}`}>
+                        <td className={`border-r p-0 bg-red-50/30 ${timeColClass} ${hasRemark ? 'opacity-40' : ''}`}>
                             <InputCell day={day} field="undertime_hrs" value={rowData.undertime_hrs} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                         </td>
-                        <td className={`min-w-[60px] bg-red-50/30 border-r ${hasRemark ? 'opacity-40' : ''}`}>
+                        <td className={`border-r p-0 bg-red-50/30 ${timeColClass} ${hasRemark ? 'opacity-40' : ''}`}>
                             <InputCell day={day} field="undertime_min" value={rowData.undertime_min} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                         </td>
                         
-                        <td className="min-w-[150px] bg-yellow-50/30">
+                        <td className={`border-r min-w-[150px] p-0 ${dtrFormat === 'organic' ? 'bg-yellow-50/30' : 'bg-yellow-50/30'}`}>
                             <InputCell day={day} field="remarks" value={rowData.remarks} onUpdate={onUpdate} isReadOnly={isReadOnly} />
                         </td>
+
+                        {dtrFormat === 'organic' && (
+                            <td className="min-w-[100px] p-0 bg-green-50/30">
+                                <InputCell 
+                                    day={day} 
+                                    field="claim_remark" 
+                                    value={rowData.claim_remark} 
+                                    options={["With Claim", "No Claim"]} 
+                                    onUpdate={onUpdate} 
+                                    isReadOnly={isReadOnly} 
+                                />
+                            </td>
+                        )}
                     </tr>
                     );
                 })}
@@ -2443,12 +2853,11 @@ function AccomplishmentTable({ attendance, tasks, onTaskChange, arMeta, setArMet
         </div>
         <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
             {days.map((day) => {
-                const hasAttendance = attendance && attendance[day] && (
-                    attendance[day].am_in ||
-                    attendance[day].am_out ||
-                    attendance[day].pm_in ||
-                    attendance[day].pm_out
-                );
+                const dayData = attendance?.[day] || {};
+                const hasAttendance = dayData.am_in || dayData.am_out || dayData.pm_in || dayData.pm_out || 
+                                      (dayData.merges && dayData.merges.length > 0) ||
+                                      dayData.am_in_options?.length || dayData.am_out_options?.length || 
+                                      dayData.pm_in_options?.length || dayData.pm_out_options?.length;
                 
                 const isManual = arMeta.manualHighlights?.[selectedMonth]?.[day];
                 const isHighlighted = hasAttendance || isManual;

@@ -9,6 +9,10 @@ class OfficeLocation extends Model
     protected $fillable = [
         'location',
         'reviewer_id',
+        'am_in',
+        'am_out',
+        'pm_in',
+        'pm_out'
     ];
 
     public function employees()
@@ -27,6 +31,10 @@ class OfficeLocation extends Model
             'id' => $this->id,
             'location' => $this->location,
             'reviewer_id' => $this->reviewer_id,
+            'am_in' => $this->am_in,
+            'am_out' => $this->am_out,
+            'pm_in' => $this->pm_in,
+            'pm_out' => $this->pm_out,
         ];
     }
 }

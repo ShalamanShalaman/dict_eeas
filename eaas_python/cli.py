@@ -37,7 +37,9 @@ def main():
             print(json.dumps({"data": employees_data}))
 
         elif action == 'generate_dtr':
-            template_path = os.path.join(template_dir, 'DTR_template.xlsx')
+            dtr_format = data.get('dtr_format', 'standard')
+            template_name = 'DTR_template_organic.xlsx' if dtr_format == 'organic' else 'DTR_template.xlsx'
+            template_path = os.path.join(template_dir, template_name)
             output_path = data.get('output_path')
             wb_io = generate_dtr(
                 data.get('employee_name'),
@@ -46,7 +48,8 @@ def main():
                 approver_name=data.get('approver', ''),
                 approver_title=data.get('approver_title', ''),
                 period_text=data.get('period_text', ''),
-                period_format=data.get('period_format', 'full')
+                period_format=data.get('period_format', 'full'),
+                dtr_format=dtr_format
             )
             with open(output_path, 'wb') as f:
                 f.write(wb_io.getvalue())

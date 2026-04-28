@@ -199,7 +199,6 @@ export default function Sidebar({ role, onLogout }) {
         items: [
           { label: "Upload Attendance", icon: Upload, path: "/upload" },
           { label: "Saved Progress", icon: Save, path: "/saved-progress" },
-          // Appending ?new=true to ensure proper state resetting when navigating directly
           { label: "Submit for Approval", icon: Clock, path: "/submit-for-approval?new=true", matchPath: "/submit-for-approval" },
           { label: "My Submissions", icon: FileText, path: "/submissions" },
         ]
@@ -222,7 +221,7 @@ export default function Sidebar({ role, onLogout }) {
         id: 'admin',
         title: 'ADMINISTRATION',
         items: [
-          { label: "User Management", icon: Users, path: "/users" },
+          { label: "Admin Settings", icon: Users, path: "/users" },
           { label: "System Audits", icon: Shield, path: "/audits" },
         ]
       });

@@ -100,20 +100,41 @@ def parse_employees_data(text, date_format='DMY'):
                         
                     if action == 'C/IN':
                         if hour < 12:
-                            if not emp_data[m_key][day]['am_in']:
-                                emp_data[m_key][day]['am_in'] = display_time
+                            emp_data[m_key][day]['am_in'].append(display_time)
                         else:
-                            if not emp_data[m_key][day]['pm_in']:
-                                emp_data[m_key][day]['pm_in'] = display_time
-                                
+                            emp_data[m_key][day]['pm_in'].append(display_time)
+                            
                     elif action == 'C/OUT':
                         if hour < 13:
-                            emp_data[m_key][day]['am_out'] = display_time
+                            emp_data[m_key][day]['am_out'].append(display_time)
                         else:
                             if not emp_data[m_key][day]['am_out'] and hour < 14:
-                                emp_data[m_key][day]['am_out'] = display_time
+                                emp_data[m_key][day]['am_out'].append(display_time)
                             else:
-                                emp_data[m_key][day]['pm_out'] = display_time
+                                emp_data[m_key][day]['pm_out'].append(display_time)
+
+        for m_key in emp_data:
+            if 'month_name' in m_key or 'year' in m_key:
+                continue
+            for day in emp_data[m_key]:
+                if not day.isdigit():
+                    continue
+                    
+                day_dict = emp_data[m_key][day]
+                for field in ['am_in', 'am_out', 'pm_in', 'pm_out']:
+                    vals = day_dict[field]
+                    
+                    unique_vals = []
+                    for v in vals:
+                        if v not in unique_vals:
+                            unique_vals.append(v)
+                            
+                    if len(unique_vals) == 0:
+                        day_dict[field] = ""
+                    elif len(unique_vals) == 1:
+                        day_dict[field] = unique_vals[0]
+                    else:
+                        day_dict[field] = unique_vals
 
     for line in lines:
         line = line.strip()
@@ -181,8 +202,9 @@ def parse_employees_data(text, date_format='DMY'):
 
                 if day_key not in employee_data[m_key]:
                     employee_data[m_key][day_key] = {
-                        'am_in': '', 'am_out': '', 'pm_in': '', 'pm_out': '',
-                        'undertime_hrs': '', 'undertime_min': '', 'remarks': ''
+                        'am_in': [], 'am_out': [], 'pm_in': [], 'pm_out': [],
+                        'undertime_hrs': '', 'undertime_min': '', 'remarks': '', 'claim_remark': '',
+                        'merges': []
                     }
                     day_checkins[m_key][day_key] = []
 
@@ -199,7 +221,7 @@ def parse_employees_data(text, date_format='DMY'):
 
     return employees
 
-def generate_dtr(employee_name, employee_data, template_path, approver_name="", approver_title="", period_text="", period_format="full"):
+def generate_dtr(employee_name, employee_data, template_path, approver_name="", approver_title="", period_text="", period_format="full", dtr_format="standard"):
     raw_data = dict(employee_data)
     month_name = raw_data.pop('month_name', '')
     year = raw_data.pop('year', '')
@@ -210,6 +232,51 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
 
     wb = load_workbook(template_path)
     ws = wb.active
+
+    if dtr_format == 'organic':
+        name_top = ('C6', 'M6')
+        name_bot = ('C55', 'M55')
+        approver_cell = ('C61', 'M61')
+        approver_title_cell = ('C62', 'M62')
+        header_cell = ('E8', 'O8')
+        
+        left_cols = ['C', 'D', 'E', 'F']
+        right_cols = ['M', 'N', 'O', 'P']
+        
+        left_ut_h, left_ut_m = 'G', 'H'
+        right_ut_h, right_ut_m = 'Q', 'R'
+        
+        left_claim = 'I'
+        right_claim = 'S'
+        
+        left_merge_start = 3 
+        left_merge_end = 6 
+        right_merge_start = 13 
+        right_merge_end = 16 
+        
+        right_day_col = 'L' 
+    else:
+        name_top = ('C6', 'K6')
+        name_bot = ('C55', 'K55')
+        approver_cell = ('C61', 'K61')
+        approver_title_cell = ('C62', 'K62')
+        header_cell = ('E8', 'M8')
+        
+        left_cols = ['C', 'D', 'E', 'F']
+        right_cols = ['K', 'L', 'M', 'N']
+        
+        left_ut_h, left_ut_m = 'G', 'H'
+        right_ut_h, right_ut_m = 'O', 'P'
+        
+        left_claim = None
+        right_claim = None
+        
+        left_merge_start = 3 
+        left_merge_end = 6 
+        right_merge_start = 11 
+        right_merge_end = 14 
+        
+        right_day_col = 'J'
 
     def safe_write(coord, val, align=None):
         try:
@@ -226,30 +293,38 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
                         break
             
             if type(target).__name__ != 'MergedCell':
-                target.value = val
+                if isinstance(val, (int, float)):
+                    target.value = val
+                    target.number_format = '0'
+                elif isinstance(val, str) and val.isdigit():
+                    target.value = int(val)
+                    target.number_format = '0'
+                else:
+                    target.value = val
+                    
                 if align:
                     target.alignment = align
         except Exception:
             pass
 
-    safe_write('C6', employee_name)
-    safe_write('K6', employee_name)
-    safe_write('C55', employee_name)
-    safe_write('K55', employee_name)
+    safe_write(name_top[0], employee_name)
+    safe_write(name_top[1], employee_name)
+    safe_write(name_bot[0], employee_name)
+    safe_write(name_bot[1], employee_name)
 
     header_val = period_text if period_text else (f"{month_name} {year}" if month_name else "")
     
     if header_val:
-        safe_write('E8', header_val, Alignment(horizontal='center', vertical='center'))
-        safe_write('M8', header_val, Alignment(horizontal='center', vertical='center'))
+        safe_write(header_cell[0], header_val, Alignment(horizontal='center', vertical='center'))
+        safe_write(header_cell[1], header_val, Alignment(horizontal='center', vertical='center'))
 
     if approver_name:
-        safe_write('C61', approver_name, Alignment(horizontal='center', vertical='bottom'))
-        safe_write('K61', approver_name, Alignment(horizontal='center', vertical='bottom'))
+        safe_write(approver_cell[0], approver_name, Alignment(horizontal='center', vertical='bottom'))
+        safe_write(approver_cell[1], approver_name, Alignment(horizontal='center', vertical='bottom'))
 
     if approver_title:
-        safe_write('C62', approver_title, Alignment(horizontal='center', vertical='center'))
-        safe_write('K62', approver_title, Alignment(horizontal='center', vertical='center'))
+        safe_write(approver_title_cell[0], approver_title, Alignment(horizontal='center', vertical='center'))
+        safe_write(approver_title_cell[1], approver_title, Alignment(horizontal='center', vertical='center'))
 
     center = Alignment(horizontal='center', vertical='center')
     bold_font = Font(bold=True)
@@ -265,15 +340,26 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
     elif period_format == "16-end":
         active_start = 16
 
+    def resolve_val(v, is_in):
+        if isinstance(v, list):
+            if len(v) > 0:
+                return v[0] if is_in else v[-1]
+            return ""
+        return v
+
     for day in range(1, 32):
         row = 13 + day
         if row > 44: break
         
         safe_write(f'B{row}', day)
-        safe_write(f'J{row}', day)
+        safe_write(f'{right_day_col}{row}', day)
 
         if day < active_start or day > active_end:
-            for col in ['C', 'D', 'E', 'F', 'G', 'H', 'K', 'L', 'M', 'N', 'O', 'P']:
+            if dtr_format == 'organic':
+                cols_to_clear = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T']
+            else:
+                cols_to_clear = ['C', 'D', 'E', 'F', 'G', 'H', 'K', 'L', 'M', 'N', 'O', 'P']
+            for col in cols_to_clear:
                 safe_write(f'{col}{row}', "")
             continue
 
@@ -296,54 +382,88 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
             
             end_row = row + span - 1
             
-            ws.merge_cells(start_row=row, start_column=3, end_row=end_row, end_column=6)
-            
-            target_left = ws.cell(row=row, column=3)
-            if type(target_left).__name__ == 'MergedCell':
-                for mr in ws.merged_cells.ranges:
-                    if mr.min_col <= 3 <= mr.max_col and mr.min_row <= row <= mr.max_row:
-                        target_left = ws.cell(row=mr.min_row, column=mr.min_col)
-                        break
-            
+            ws.merge_cells(start_row=row, start_column=left_merge_start, end_row=end_row, end_column=left_merge_end)
+            target_left = ws.cell(row=row, column=left_merge_start)
             target_left.value = current_remark
             target_left.alignment = center
             target_left.font = bold_font 
 
-            ws.merge_cells(start_row=row, start_column=11, end_row=end_row, end_column=14)
-            
-            target_right = ws.cell(row=row, column=11)
-            if type(target_right).__name__ == 'MergedCell':
-                for mr in ws.merged_cells.ranges:
-                    if mr.min_col <= 11 <= mr.max_col and mr.min_row <= row <= mr.max_row:
-                        target_right = ws.cell(row=mr.min_row, column=mr.min_col)
-                        break
-
+            ws.merge_cells(start_row=row, start_column=right_merge_start, end_row=end_row, end_column=right_merge_end)
+            target_right = ws.cell(row=row, column=right_merge_start)
             target_right.value = current_remark
             target_right.alignment = center
             target_right.font = bold_font
 
             for r in range(row, end_row + 1):
-                safe_write(f'G{r}', "")
-                safe_write(f'H{r}', "")
-                safe_write(f'O{r}', "")
-                safe_write(f'P{r}', "")
+                safe_write(f'{left_ut_h}{r}', "")
+                safe_write(f'{left_ut_m}{r}', "")
+                safe_write(f'{right_ut_h}{r}', "")
+                safe_write(f'{right_ut_m}{r}', "")
+                if left_claim:
+                    safe_write(f'{left_claim}{r}', "")
+                    safe_write(f'{right_claim}{r}', "")
+
+        elif day_data.get('merges') and len(day_data.get('merges')) > 0:
+            merges = day_data.get('merges', [])
+            merged_cols = set()
+            
+            for m in merges:
+                s_col = m['start']
+                e_col = m['end']
+                m_val = day_data.get(f'merged_{s_col}_{e_col}', '')
+                
+                ws.merge_cells(start_row=row, start_column=left_merge_start+s_col, end_row=row, end_column=left_merge_start+e_col)
+                cell_left = ws.cell(row=row, column=left_merge_start+s_col)
+                cell_left.value = m_val
+                cell_left.alignment = center
+                cell_left.font = bold_font
+                
+                ws.merge_cells(start_row=row, start_column=right_merge_start+s_col, end_row=row, end_column=right_merge_start+e_col)
+                cell_right = ws.cell(row=row, column=right_merge_start+s_col)
+                cell_right.value = m_val
+                cell_right.alignment = center
+                cell_right.font = bold_font
+                
+                for c in range(s_col, e_col + 1):
+                    merged_cols.add(c)
+                    
+            fields = ['am_in', 'am_out', 'pm_in', 'pm_out']
+            
+            for i in range(4):
+                if i not in merged_cols:
+                    val = resolve_val(day_data.get(fields[i], ''), is_in=(i % 2 == 0))
+                    safe_write(f'{left_cols[i]}{row}', val, center)
+                    safe_write(f'{right_cols[i]}{row}', val, center)
+                    
+            safe_write(f'{left_ut_h}{row}', day_data.get('undertime_hrs', ''), center)
+            safe_write(f'{left_ut_m}{row}', day_data.get('undertime_min', ''), center)
+            safe_write(f'{right_ut_h}{row}', day_data.get('undertime_hrs', ''), center)
+            safe_write(f'{right_ut_m}{row}', day_data.get('undertime_min', ''), center)
+            
+            if left_claim:
+                safe_write(f'{left_claim}{row}', day_data.get('claim_remark', ''), center)
+                safe_write(f'{right_claim}{row}', day_data.get('claim_remark', ''), center)
 
         else:
             updates = {
-                'C': day_data.get('am_in', ''),
-                'D': day_data.get('am_out', ''),
-                'E': day_data.get('pm_in', ''),
-                'F': day_data.get('pm_out', ''),
-                'G': day_data.get('undertime_hrs', ''),
-                'H': day_data.get('undertime_min', ''),
+                left_cols[0]: resolve_val(day_data.get('am_in', ''), is_in=True),
+                left_cols[1]: resolve_val(day_data.get('am_out', ''), is_in=False),
+                left_cols[2]: resolve_val(day_data.get('pm_in', ''), is_in=True),
+                left_cols[3]: resolve_val(day_data.get('pm_out', ''), is_in=False),
+                left_ut_h: day_data.get('undertime_hrs', ''),
+                left_ut_m: day_data.get('undertime_min', ''),
                 
-                'K': day_data.get('am_in', ''),
-                'L': day_data.get('am_out', ''),
-                'M': day_data.get('pm_in', ''),
-                'N': day_data.get('pm_out', ''),
-                'O': day_data.get('undertime_hrs', ''),
-                'P': day_data.get('undertime_min', '')
+                right_cols[0]: resolve_val(day_data.get('am_in', ''), is_in=True),
+                right_cols[1]: resolve_val(day_data.get('am_out', ''), is_in=False),
+                right_cols[2]: resolve_val(day_data.get('pm_in', ''), is_in=True),
+                right_cols[3]: resolve_val(day_data.get('pm_out', ''), is_in=False),
+                right_ut_h: day_data.get('undertime_hrs', ''),
+                right_ut_m: day_data.get('undertime_min', '')
             }
+            
+            if left_claim:
+                updates[left_claim] = day_data.get('claim_remark', '')
+                updates[right_claim] = day_data.get('claim_remark', '')
 
             for col, value in updates.items():
                 safe_write(f'{col}{row}', value, center)
@@ -523,12 +643,10 @@ def generate_dtr_adjustment_slip(employee_data, output_path, template_path, over
             
             inner_table = target_cell.add_table(rows=2, cols=2)
             
-            # Helper function to prevent LibreOffice from mangling the box character
             def add_checkbox(paragraph, is_checked, text):
                 box_char = "■" if is_checked else "□"
                 run_box = paragraph.add_run(box_char)
                 run_box.font.name = 'Arial'
-                # Explicitly set the font for complex scripts to avoid the 'ử' symbol fallback
                 run_box._element.rPr.rFonts.set(qn('w:eastAsia'), 'Arial')
                 run_box._element.rPr.rFonts.set(qn('w:cs'), 'Arial')
                 paragraph.add_run(f" {text}")

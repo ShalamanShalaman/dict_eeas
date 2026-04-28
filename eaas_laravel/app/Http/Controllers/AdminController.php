@@ -111,10 +111,25 @@ class AdminController extends Controller
             return response()->json(['error' => 'Location is required'], 400);
         }
 
-        $loc = OfficeLocation::create([
+        $data = [
             'location' => $location,
-            'reviewer_id' => $request->input('reviewer_id')
-        ]);
+            'reviewer_id' => $request->input('reviewer_id'),
+            'am_in' => $request->input('am_in'),
+            'am_out' => $request->input('am_out'),
+            'pm_in' => $request->input('pm_in'),
+            'pm_out' => $request->input('pm_out'),
+        ];
+
+        $loc = OfficeLocation::create($data);
+
+        if ($request->input('apply_to_all')) {
+            OfficeLocation::query()->update([
+                'am_in' => $request->input('am_in'),
+                'am_out' => $request->input('am_out'),
+                'pm_in' => $request->input('pm_in'),
+                'pm_out' => $request->input('pm_out'),
+            ]);
+        }
 
         LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'CREATE', 'OfficeLocation', "Created office location: {$location}", $loc->id);
 
@@ -126,8 +141,21 @@ class AdminController extends Controller
         $loc = OfficeLocation::findOrFail($loc_id);
         $loc->update([
             'location' => $request->input('location', $loc->location),
-            'reviewer_id' => $request->input('reviewer_id', $loc->reviewer_id)
+            'reviewer_id' => $request->input('reviewer_id', $loc->reviewer_id),
+            'am_in' => $request->input('am_in', $loc->am_in),
+            'am_out' => $request->input('am_out', $loc->am_out),
+            'pm_in' => $request->input('pm_in', $loc->pm_in),
+            'pm_out' => $request->input('pm_out', $loc->pm_out),
         ]);
+
+        if ($request->input('apply_to_all')) {
+            OfficeLocation::query()->update([
+                'am_in' => $request->input('am_in', $loc->am_in),
+                'am_out' => $request->input('am_out', $loc->am_out),
+                'pm_in' => $request->input('pm_in', $loc->pm_in),
+                'pm_out' => $request->input('pm_out', $loc->pm_out),
+            ]);
+        }
 
         LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'UPDATE', 'OfficeLocation', "Updated office location: {$loc->location}", $loc->id);
 

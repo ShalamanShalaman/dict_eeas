@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Settings, Key, Bell, HelpCircle, MessageSquare } from "lucide-react";
+import { User, Settings, Key, Bell, HelpCircle, MessageSquare, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "./NotificationDropdown";
 import MessageDropdown from "./MessageDropdown";
@@ -13,6 +13,7 @@ export default function Header({ role, setRole, user, onLogout }) {
   const [showMessages, setShowMessages] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [officeSchedule, setOfficeSchedule] = useState("");
   const navigate = useNavigate();
 
   const userName = user?.full_name || user?.name || user?.username || "User";
@@ -28,15 +29,42 @@ export default function Header({ role, setRole, user, onLogout }) {
     if (user?.user_id) {
       fetchUnreadCount();
       fetchUnreadMessageCount();
+      fetchOfficeSchedule();
 
       const intervalId = setInterval(() => {
         fetchUnreadCount();
         fetchUnreadMessageCount();
+        fetchOfficeSchedule();
       }, 5000);
 
       return () => clearInterval(intervalId);
     }
   }, [user?.user_id]);
+
+  const fetchOfficeSchedule = async () => {
+    if (!user?.office_location_id) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/locations`);
+      if (response.ok) {
+        const locations = await response.json();
+        const myLoc = locations.find(l => l.id === user.office_location_id);
+        if (myLoc && myLoc.am_in && myLoc.pm_out) {
+          const formatTime = (t) => {
+            if (!t) return '';
+            let [h, m] = t.split(':');
+            let ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return `${h}:${m} ${ampm}`;
+          };
+          setOfficeSchedule(`${formatTime(myLoc.am_in)} - ${formatTime(myLoc.pm_out)}`);
+        } else {
+          setOfficeSchedule("");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch schedule", err);
+    }
+  };
 
   const fetchUnreadCount = async () => {
     try {
@@ -95,13 +123,24 @@ export default function Header({ role, setRole, user, onLogout }) {
 
   return (
     <header className="h-20 border-b border-blue-900/40 flex items-center justify-between px-4 md:px-6 bg-gradient-to-r from-[#1c1a88] via-[#1b3baf] to-[#1554c9] shadow-sm">
-      <div className="min-w-0">
-        <h1 className="text-base md:text-lg font-semibold text-white truncate">
-          Employee Attendance and Accomplishment System
-        </h1>
-        <p className="hidden md:block text-xs text-blue-100/90 mt-0.5">
-          Attendance and document workflow
-        </p>
+      <div className="min-w-0 flex items-center gap-6">
+        <div>
+          <h1 className="text-base md:text-lg font-semibold text-white truncate">
+            Employee Attendance and Accomplishment System
+          </h1>
+          <p className="hidden md:block text-xs text-blue-100/90 mt-0.5">
+            Attendance and document workflow
+          </p>
+        </div>
+        
+        {officeSchedule && (
+          <div className="hidden lg:flex items-center gap-2 bg-black/10 px-3 py-1.5 rounded-full border border-white/10">
+            <Clock size={14} className="text-yellow-400" />
+            <span className="text-xs font-medium text-white tracking-wide">
+              Office Hours: {officeSchedule}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2 md:gap-2.5">
