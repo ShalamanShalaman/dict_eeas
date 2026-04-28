@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
+// Using empty string for relative pathing to avoid import.meta es2015 build errors
 const API_BASE_URL = "";
 
+// Smart filter to safely remove the 13-character PHP uniqid() hash from display names
 const cleanFileName = (filename) => {
   if (!filename) return '';
   const match = filename.match(/^(?:shared_)?[a-zA-Z0-9]{13,14}_(.+)$/i);
@@ -12,6 +14,7 @@ const cleanFileName = (filename) => {
   return filename;
 };
 
+// --- ICON COMPONENTS ---
 const Icon = ({ children, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -65,6 +68,44 @@ const Edit3Icon = ({ className }) => (
   </Icon>
 );
 
+const SendIcon = ({ className }) => (
+  <Icon className={className}>
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </Icon>
+);
+
+const XIcon = ({ className }) => (
+  <Icon className={className}>
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </Icon>
+);
+
+const FileCheckIcon = ({ className }) => (
+  <Icon className={className}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <polyline points="9 15 12 18 15 15" />
+    <line x1="12" y1="12" x2="12" y2="18" />
+  </Icon>
+);
+
+const ArrowLeftIcon = ({ className }) => (
+  <Icon className={className}>
+    <line x1="19" y1="12" x2="5" y2="12" />
+    <polyline points="12 19 5 12 12 5" />
+  </Icon>
+);
+
+const EyeIcon = ({ className }) => (
+  <Icon className={className}>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+// --- END ICON COMPONENTS ---
+
 const SuccessModal = ({ isOpen, message, subMessage, onClose, autoClose }) => {
   useEffect(() => {
     if (isOpen && autoClose !== false) {
@@ -114,10 +155,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
             onClick={onClose}
             className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <XIcon className="w-5 h-5" />
           </button>
         </div>
         <div className="flex-1 bg-slate-100 relative">
@@ -129,10 +167,7 @@ const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 mb-4">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
+              <FileTextIcon className="w-12 h-12 mb-4" />
               <p className="mt-2 text-sm">No document selected</p>
             </div>
           )}
@@ -466,36 +501,6 @@ export default function SubmitForApproval({ user }) {
       });
     }
   };
-
-  const SendIcon = ({ className }) => (
-    <Icon className={className}>
-      <line x1="22" y1="2" x2="11" y2="13" />
-      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-    </Icon>
-  );
-
-  const XIcon = ({ className }) => (
-    <Icon className={className}>
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </Icon>
-  );
-
-  const FileCheckIcon = ({ className }) => (
-    <Icon className={className}>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <polyline points="9 15 12 18 15 15" />
-      <line x1="12" y1="12" x2="12" y2="18" />
-    </Icon>
-  );
-
-  const ArrowLeftIcon = ({ className }) => (
-    <Icon className={className}>
-      <line x1="19" y1="12" x2="5" y2="12" />
-      <polyline points="12 19 5 12 12 5" />
-    </Icon>
-  );
 
   const StepIndicator = () => (
     <div className="flex items-center justify-center mb-6">
