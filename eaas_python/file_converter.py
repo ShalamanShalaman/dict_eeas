@@ -20,9 +20,9 @@ except ImportError:
 
 try:
     import openpyxl
-    XLSX_AVAILABLE = True
+    XSLX_AVAILABLE = True
 except ImportError:
-    XLSX_AVAILABLE = False
+    XSLX_AVAILABLE = False
 
 try:
     import win32com.client

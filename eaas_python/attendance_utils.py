@@ -233,12 +233,10 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
     wb = load_workbook(template_path)
     ws = wb.active
 
-    # Force LibreOffice/Excel to scale the document to 1 page wide and 1 page tall
     ws.page_setup.fitToPage = True
     ws.page_setup.fitToHeight = 1
     ws.page_setup.fitToWidth = 1
     
-    # Adjust margins to provide maximum space for the wider 'organic' table
     ws.page_margins.left = 0.25
     ws.page_margins.right = 0.25
     ws.page_margins.top = 0.5
