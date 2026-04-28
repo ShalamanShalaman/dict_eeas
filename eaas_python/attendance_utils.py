@@ -243,6 +243,7 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
     
     # Force orientation and paper size to prevent rendering breakage in LibreOffice
     ws.page_setup.orientation = "portrait"
+    ws.page_setup.paperSize = 9 # A4 paper size
     
     # Minimize margins to give the wide organic table maximum breathing room
     ws.page_margins.left = 0.1
@@ -253,6 +254,9 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
     ws.page_margins.footer = 0.0
 
     if dtr_format == 'organic':
+        # Hardcode the exact print area so LibreOffice calculates the scale properly
+        ws.print_area = 'A1:T72'
+        
         name_top = ('C6', 'M6')
         name_bot = ('C55', 'M55')
         approver_cell = ('C61', 'M61')
@@ -275,6 +279,9 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
         
         right_day_col = 'L' 
     else:
+        # Standard format bounding box
+        ws.print_area = 'A1:P65'
+        
         name_top = ('C6', 'K6')
         name_bot = ('C55', 'K55')
         approver_cell = ('C61', 'K61')
