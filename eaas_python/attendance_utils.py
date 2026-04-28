@@ -233,16 +233,24 @@ def generate_dtr(employee_name, employee_data, template_path, approver_name="", 
     wb = load_workbook(template_path)
     ws = wb.active
 
+    # CRITICAL FIX: Activate the master switch for "Fit to Page" in the Excel sheet properties
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    
+    # Set the fit dimensions
     ws.page_setup.fitToPage = True
     ws.page_setup.fitToHeight = 1
     ws.page_setup.fitToWidth = 1
     
-    ws.page_margins.left = 0.25
-    ws.page_margins.right = 0.25
-    ws.page_margins.top = 0.5
-    ws.page_margins.bottom = 0.5
-    ws.page_margins.header = 0.2
-    ws.page_margins.footer = 0.2
+    # Force orientation and paper size to prevent rendering breakage in LibreOffice
+    ws.page_setup.orientation = "portrait"
+    
+    # Minimize margins to give the wide organic table maximum breathing room
+    ws.page_margins.left = 0.1
+    ws.page_margins.right = 0.1
+    ws.page_margins.top = 0.25
+    ws.page_margins.bottom = 0.25
+    ws.page_margins.header = 0.0
+    ws.page_margins.footer = 0.0
 
     if dtr_format == 'organic':
         name_top = ('C6', 'M6')
