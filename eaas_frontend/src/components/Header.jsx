@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { User, Settings, Key, Bell, HelpCircle, MessageSquare, Clock, Home, BookOpen } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const API_BASE_URL = "";
 
-// Stub components for Canvas preview compilation
 const NotificationDropdown = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
   return (
@@ -38,6 +37,7 @@ export default function Header({ role, setRole, user, onLogout }) {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [officeSchedule, setOfficeSchedule] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const userName = user?.full_name || user?.name || user?.username || "User";
   const userRole = user?.role || "employee";
@@ -168,21 +168,23 @@ export default function Header({ role, setRole, user, onLogout }) {
 
       <div className="flex items-center gap-2 md:gap-2.5">
 
-        <button
-          onClick={() => navigate('/')}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
-          title="Home Dashboard"
-        >
-          <Home size={20} />
-        </button>
-
-        <button
-          onClick={() => navigate('/manual')}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
-          title="System Manual"
-        >
-          <BookOpen size={20} />
-        </button>
+        {location.pathname === '/manual' ? (
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
+            title="Home Dashboard"
+          >
+            <Home size={20} />
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/manual')}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
+            title="System Manual"
+          >
+            <BookOpen size={20} />
+          </button>
+        )}
 
         {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
           <div className="relative">

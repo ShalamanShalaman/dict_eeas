@@ -13,6 +13,7 @@ import SystemAudits from "./views/SystemAudits";
 import SavedProgress from "./views/SavedProgress";
 import SubmitForApproval from "./views/SubmitForApproval";
 import MySubmissions from "./views/MySubmissions";
+import SystemManual from "./views/SystemManual";
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="/audits" element={<Protected>{viewRole === "admin" ? <SystemAudits /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/logs" element={<Navigate to="/audits" replace />} />
         <Route path="/profile" element={<Protected><MyProfile /></Protected>} />
+        <Route path="/manual" element={<Protected><SystemManual user={user} /></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </>
     )
