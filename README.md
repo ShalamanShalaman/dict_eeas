@@ -2,11 +2,9 @@
 
 This repository contains the DICT Employee Attendance and Accomplishment System (EAAS) built with a Laravel backend, React frontend, and a Python processing module.
 
-**Branches**
-eaas_laravel
-Main development branch used for local testing.
-laravel_deploy
-Branch used for deployment / hosting.
+Branches
+eaas_laravel - main development branch used for local testing.
+laravel_deploy - branch used for deployment / hosting.
 
 Make sure you are on the correct branch before running or pushing changes.
 
@@ -59,17 +57,17 @@ git checkout eaas_laravel
 2. Setup Python Module (Required First)
 cd eaas_python
 
-# create virtual environment
+create virtual environment
 python -m venv venv
 
-# activate venv
-# Linux / Mac
+activate venv
+Linux / Mac
 source venv/bin/activate
 
-# Windows
+Windows
 venv\Scripts\activate
 
-# install dependencies
+install dependencies
 pip install -r requirements.txt
 
 3. Run Laravel Backend
