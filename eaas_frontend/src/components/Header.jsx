@@ -7,8 +7,8 @@ import {
   CheckCheck, Mail, MailOpen, MessageCircle, ChevronRight, 
   AlertCircle, CheckCircle 
 } from "lucide-react";
-import NotificationDropdown from "./notificationdropdown";
-import MessageDropdown from "./messagedropdown";
+import NotificationDropdown from "./Notificationdropdown";
+import MessageDropdown from "./Messagedropdown";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
