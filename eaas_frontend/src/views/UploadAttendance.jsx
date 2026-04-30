@@ -234,7 +234,7 @@ export default function UploadAttendance({ user }) {
                     ['am_in', 'am_out', 'pm_in', 'pm_out'].forEach(f => {
                         if (Array.isArray(dayData[f])) {
                             dayData[`${f}_options`] = [...dayData[f]];
-                            dayData[f] = dayData[f].length === 1 ? dayData[f][0] : ""; 
+                            dayData[f] = dayData[f].length > 0 ? dayData[f][0] : ""; 
                         }
                     });
 
