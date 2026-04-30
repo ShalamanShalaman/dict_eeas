@@ -169,6 +169,20 @@ export default function Sidebar({ role, onLogout }) {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
+  useEffect(() => {
+    const handleSidebarToggle = (e) => {
+      if (e.detail && typeof e.detail.collapse === 'boolean') {
+        setIsSpinning(true);
+        setSpinDirection(e.detail.collapse ? 'logo-spin-counter-clockwise' : 'logo-spin-clockwise');
+        setCollapsed(e.detail.collapse);
+        setTimeout(() => setIsSpinning(false), 200);
+      }
+    };
+
+    window.addEventListener('toggleSidebar', handleSidebarToggle);
+    return () => window.removeEventListener('toggleSidebar', handleSidebarToggle);
+  }, []);
+
   const toggleCategory = (category) => {
     if (collapsed) {
       handleToggle();

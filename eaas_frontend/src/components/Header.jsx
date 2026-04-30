@@ -170,7 +170,10 @@ export default function Header({ role, setRole, user, onLogout }) {
 
         {location.pathname === '/manual' ? (
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              navigate('/');
+              window.dispatchEvent(new CustomEvent('toggleSidebar', { detail: { collapse: false } }));
+            }}
             className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
             title="Home Dashboard"
           >
@@ -178,7 +181,10 @@ export default function Header({ role, setRole, user, onLogout }) {
           </button>
         ) : (
           <button
-            onClick={() => navigate('/manual')}
+            onClick={() => {
+              navigate('/manual');
+              window.dispatchEvent(new CustomEvent('toggleSidebar', { detail: { collapse: true } }));
+            }}
             className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
             title="System Manual"
           >
