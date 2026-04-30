@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Briefcase, Plus, X, Edit2, Trash2, AlertCircle, CheckCircle } from "lucide-react";
+import { MapPin, Briefcase, Plus, X, Edit2, Trash2, AlertCircle, CheckCircle, Clock } from "lucide-react";
 
 export default function LocationManagement() {
   const [locations, setLocations] = useState([]);
@@ -8,6 +8,7 @@ export default function LocationManagement() {
   const [currentUser, setCurrentUser] = useState(null);
 
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isGlobalHoursModalOpen, setIsGlobalHoursModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
 
   const [uiModal, setUiModal] = useState({ show: false, type: '', title: '', message: '', onConfirm: null });
@@ -19,8 +20,14 @@ export default function LocationManagement() {
     am_in: "",
     am_out: "",
     pm_in: "",
-    pm_out: "",
-    apply_to_all: false
+    pm_out: ""
+  });
+
+  const [globalHoursForm, setGlobalHoursForm] = useState({
+    am_in: "",
+    am_out: "",
+    pm_in: "",
+    pm_out: ""
   });
 
   const API_BASE_URL = "";
@@ -63,11 +70,6 @@ export default function LocationManagement() {
     setHasUnsavedChanges(true);
   };
 
-  const handleCheckboxChange = (setter, data, field, e) => {
-    setter({ ...data, [field]: e.target.checked });
-    setHasUnsavedChanges(true);
-  };
-
   const closeUiModal = () => {
     setUiModal({ show: false, type: '', title: '', message: '', onConfirm: null });
   };
@@ -98,13 +100,41 @@ export default function LocationManagement() {
             closeLocationModal(true);
             setUiModal({ show: true, type: 'success', title: 'Success', message: 'Location updated successfully', onConfirm: () => closeUiModal() });
         } else {
-            setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "", apply_to_all: false });
+            setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "" });
             setHasUnsavedChanges(false);
             setIsLocationModalOpen(false);
             setUiModal({ show: true, type: 'success', title: 'Success', message: 'Location added successfully', onConfirm: () => closeUiModal() });
         }
       } else {
         setUiModal({ show: true, type: 'error', title: 'Error', message: result.error || "Failed to save location", onConfirm: () => closeUiModal() });
+      }
+    } catch (error) {
+      console.error(error);
+      setUiModal({ show: true, type: 'error', title: 'Error', message: 'Server error', onConfirm: () => closeUiModal() });
+    }
+  };
+
+  const handleGlobalHoursSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...globalHoursForm,
+        action_by: currentUser?.user_id || currentUser?.id
+      };
+
+      const res = await fetch(`${API_URL}/admin/update-global-hours`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+
+      if (res.ok) {
+        fetchLocations();
+        closeGlobalHoursModal(true);
+        setUiModal({ show: true, type: 'success', title: 'Success', message: 'Global hours updated successfully for all locations', onConfirm: () => closeUiModal() });
+      } else {
+        setUiModal({ show: true, type: 'error', title: 'Error', message: result.error || "Failed to update global hours", onConfirm: () => closeUiModal() });
       }
     } catch (error) {
       console.error(error);
@@ -120,8 +150,7 @@ export default function LocationManagement() {
       am_in: loc.am_in || "",
       am_out: loc.am_out || "",
       pm_in: loc.pm_in || "",
-      pm_out: loc.pm_out || "",
-      apply_to_all: false
+      pm_out: loc.pm_out || ""
     });
     setHasUnsavedChanges(false);
     setIsLocationModalOpen(true);
@@ -176,7 +205,32 @@ export default function LocationManagement() {
     setIsLocationModalOpen(false);
     setEditingLocation(null);
     setHasUnsavedChanges(false);
-    setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "", apply_to_all: false });
+    setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "" });
+  };
+
+  const attemptCloseGlobalHoursModal = () => {
+    if (hasUnsavedChanges) {
+        setUiModal({
+            show: true,
+            type: 'confirm',
+            title: 'Unsaved Changes',
+            message: 'You have unsaved changes. Are you sure you want to close?',
+            onConfirm: () => {
+                closeGlobalHoursModal(true);
+                closeUiModal();
+            }
+        });
+    } else {
+        closeGlobalHoursModal(true);
+    }
+  };
+
+  const closeGlobalHoursModal = (force = false) => {
+    if (!force && hasUnsavedChanges) return;
+
+    setIsGlobalHoursModalOpen(false);
+    setHasUnsavedChanges(false);
+    setGlobalHoursForm({ am_in: "", am_out: "", pm_in: "", pm_out: "" });
   };
 
   const reviewers = users.filter(u => u.role === 'reviewer');
@@ -197,9 +251,15 @@ export default function LocationManagement() {
                 <MapPin className="w-6 h-6 text-blue-600" />
                 Office Locations
             </h2>
-            <p className="text-gray-500 text-sm">Manage office locations and default working hours.</p>
+            <p className="text-gray-500 text-sm">Manage office locations and working hours.</p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => { setIsGlobalHoursModalOpen(true); setHasUnsavedChanges(false); }}
+            className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            <Clock className="w-4 h-4" /> Global Schedule
+          </button>
           <button
             onClick={() => { setIsLocationModalOpen(true); setHasUnsavedChanges(false); }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors"
@@ -260,6 +320,55 @@ export default function LocationManagement() {
         </div>
       </div>
 
+      {isGlobalHoursModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-5 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-200" />
+                <h3 className="font-bold text-lg">Global Schedule</h3>
+              </div>
+              <button onClick={attemptCloseGlobalHoursModal} className="text-white/70 hover:text-white transition-colors"><X className="w-5 h-5"/></button>
+            </div>
+
+            <div className="p-6">
+                <p className="text-sm text-gray-500 mb-5">
+                    Setting the global schedule will instantly update the standard working hours for <strong>all</strong> existing office locations.
+                </p>
+                <form onSubmit={handleGlobalHoursSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">AM IN</label>
+                            <input type="time" value={globalHoursForm.am_in} onChange={(e) => handleInputChange(setGlobalHoursForm, globalHoursForm, "am_in", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        </div>
+                        <div>
+                            <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">AM OUT</label>
+                            <input type="time" value={globalHoursForm.am_out} onChange={(e) => handleInputChange(setGlobalHoursForm, globalHoursForm, "am_out", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        </div>
+                        <div>
+                            <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">PM IN</label>
+                            <input type="time" value={globalHoursForm.pm_in} onChange={(e) => handleInputChange(setGlobalHoursForm, globalHoursForm, "pm_in", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        </div>
+                        <div>
+                            <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">PM OUT</label>
+                            <input type="time" value={globalHoursForm.pm_out} onChange={(e) => handleInputChange(setGlobalHoursForm, globalHoursForm, "pm_out", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-6 border-t border-gray-100">
+                      <button type="button" onClick={attemptCloseGlobalHoursModal} className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors">
+                          Cancel
+                      </button>
+                      <button type="submit" className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors">
+                          Apply to All
+                      </button>
+                    </div>
+                </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isLocationModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -296,38 +405,34 @@ export default function LocationManagement() {
                     </div>
 
                     <div className="pt-4 border-t border-gray-100">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">Standard Office Hours</label>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Local Office Hours Overrides</label>
+                        <p className="text-[10px] text-gray-400 mb-3">Set specific hours for this location (overrides the global schedule).</p>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">AM IN</label>
-                                <input type="time" value={locationForm.am_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_in", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                <input type="time" value={locationForm.am_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_in", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                             </div>
                             <div>
                                 <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">AM OUT</label>
-                                <input type="time" value={locationForm.am_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_out", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                <input type="time" value={locationForm.am_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_out", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                             </div>
                             <div>
                                 <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">PM IN</label>
-                                <input type="time" value={locationForm.pm_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_in", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                <input type="time" value={locationForm.pm_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_in", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                             </div>
                             <div>
                                 <label className="text-[10px] text-gray-400 font-semibold uppercase block mb-1">PM OUT</label>
-                                <input type="time" value={locationForm.pm_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_out", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                <input type="time" value={locationForm.pm_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_out", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                             </div>
                         </div>
                     </div>
-
-                    <label className="flex items-center gap-2 mt-4 cursor-pointer p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                        <input type="checkbox" checked={locationForm.apply_to_all} onChange={(e) => handleCheckboxChange(setLocationForm, locationForm, "apply_to_all", e)} className="w-4 h-4 text-blue-600 focus:ring-blue-500 rounded border-gray-300" />
-                        <span className="text-xs font-semibold text-blue-800">Apply this schedule to all existing locations</span>
-                    </label>
 
                     <div className="flex gap-3 pt-4 border-t border-gray-100">
                       <button type="button" onClick={attemptCloseLocationModal} className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors">
                           Cancel
                       </button>
                       <button type="submit" className={`flex-1 py-2.5 rounded-lg text-sm font-semibold text-white shadow-sm transition-colors ${editingLocation ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700"}`}>
-                          {editingLocation ? "Update" : "Add Location"}
+                          {editingLocation ? "Update Location" : "Add Location"}
                       </button>
                     </div>
                 </form>
