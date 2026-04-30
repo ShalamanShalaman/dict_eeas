@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider, createRoutesFromElements, Route, N
 import DashboardLayout from "./layouts/DashboardLayout";
 import Login from "./views/Login";
 import UserManagement from "./views/UserManagement";
+import LocationManagement from "./views/LocationManagement";
 import EmployeeDashboard from "./views/EmployeeDashboard";
 import ReviewerDashboard from "./views/ReviewerDashboard";
 import AdminDashboard from "./views/AdminDashboard";
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/archive" element={<Protected><ReviewerDashboard user={user} isArchiveView={true} /></Protected>} />
         <Route path="/signature" element={<Protected><ReviewerDashboard user={user} /></Protected>} />
         <Route path="/users" element={<Protected>{viewRole === "admin" ? <UserManagement /> : <Navigate to="/" replace />}</Protected>} />
+        <Route path="/locations" element={<Protected>{viewRole === "admin" ? <LocationManagement /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/templates" element={<Protected>{viewRole === "admin" ? <AdminDashboard /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/audits" element={<Protected>{viewRole === "admin" ? <SystemAudits /> : <Navigate to="/" replace />}</Protected>} />
         <Route path="/logs" element={<Navigate to="/audits" replace />} />
