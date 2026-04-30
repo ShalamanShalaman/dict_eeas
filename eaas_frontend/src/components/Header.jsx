@@ -1,35 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { User, Settings, Key, Bell, HelpCircle, MessageSquare, Clock, Home, BookOpen } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
+import { 
+  User, Settings, Key, Bell, HelpCircle, MessageSquare, 
+  Clock, Home, BookOpen, X, Send, Inbox, Trash2, 
+  CheckCheck, Mail, MailOpen, MessageCircle, ChevronRight, 
+  AlertCircle, CheckCircle 
+} from "lucide-react";
+import NotificationDropdown from "./notificationdropdown";
+import MessageDropdown from "./messagedropdown";
 
-const API_BASE_URL = "";
-
-const NotificationDropdown = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="absolute right-0 mt-2 w-64 bg-white shadow-lg rounded-xl border border-gray-100 p-4 z-[100]">
-      <div className="flex justify-between items-center mb-2">
-        <p className="text-sm font-semibold text-gray-800">Notifications</p>
-      </div>
-      <p className="text-xs text-gray-500">No new notifications.</p>
-    </div>
-  );
-};
-
-const MessageDropdown = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="absolute right-0 mt-2 w-64 bg-white shadow-lg rounded-xl border border-gray-100 p-4 z-[100]">
-      <div className="flex justify-between items-center mb-2">
-        <p className="text-sm font-semibold text-gray-800">Messages</p>
-      </div>
-      <p className="text-xs text-gray-500">No new messages.</p>
-    </div>
-  );
-};
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export default function Header({ role, setRole, user, onLogout }) {
-  
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
