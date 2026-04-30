@@ -235,6 +235,9 @@ export default function UploadAttendance({ user }) {
                         if (Array.isArray(dayData[f])) {
                             dayData[`${f}_options`] = [...dayData[f]];
                             dayData[f] = dayData[f].length > 0 ? dayData[f][0] : ""; 
+                        } else if (!dayData[f] && Array.isArray(dayData[`${f}_options`]) && dayData[`${f}_options`].length > 0) {
+                            // Ensure duplicate entries are auto-selected correctly even from saved JSON
+                            dayData[f] = dayData[`${f}_options`][0];
                         }
                     });
 
