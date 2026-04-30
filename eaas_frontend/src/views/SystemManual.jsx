@@ -29,7 +29,7 @@ const manualContent = [
   },
   {
     id: 'upload-attendance',
-    title: 'Attendance Processor',
+    title: 'Upload Attendance',
     icon: Upload,
     allowedRoles: ['employee', 'reviewer', 'admin'],
     sections: [
@@ -39,26 +39,34 @@ const manualContent = [
       },
       {
         heading: '2. PDF Date Format & Extraction',
-        content: 'Different biometric machines format dates differently. Before clicking "Extract PDF", select the correct PDF Date Format (DD/MM or MM/DD) to ensure the system reads the days and months correctly. Once set, drag your PDF into the dashed zone and click Extract.'
+        content: 'Some office biometrics may habe format dates configured differently. Before clicking "Extract PDF", select the correct PDF Date Format (DD/MM or MM/DD) to ensure the system reads the days and months correctly. Once set, drag your PDF into the dashed zone and click Extract.'
       },
       {
         heading: '3. Log Source & Month Selectors',
-        content: 'Because biometric PDFs often contain logs for multiple employees, the system extracts everyone into memory. Use the "Select Log Source" dropdown to search for and select your specific name. If your biometric data spans across multiple months, a "Select Month" dropdown will appear, allowing you to isolate the specific period you are filing for.'
+        content: 'Because biometric PDFs contain logs for multiple employees, the system extracts everyone into memory. Use the "Select Log Source" dropdown to search for and select your specific name. If your biometric data spans across multiple months, a "Select Month" dropdown will appear, allowing you to isolate the specific period you are filing for.'
       },
       {
-        heading: '4. DTR Table & Undertime Computation',
+        heading: '4. Top Editor Text Fields',
+        content: 'At the top of the editor are fields for employee name, position, office, approved by, approver title, period coverage, and DTR format. The text inputs are automatically filled based on the user’s account but can be edited manually. “Approved By” has a dropdown for selecting other existing reviewer accounts available to the user. Period coverage allows the user to select and print either a full month or a quincena (1–15 or 16–end of the month).'
+      },
+      {
+        heading: '5. DTR Templates',
+        content: 'The system provides two DTR formats: a standard format and an “organic” format. The organic format includes an additional column called “REMARKS,” which allows the user to select either “With Claim” or “No Claim” from a dropdown. Users may also enter other remarks by double-clicking a cell. Remarks can also be set in bulk using the “Batch Reasons” tool.'
+      },
+      {
+        heading: '6. DTR Table & Undertime Computation',
         content: 'The DTR table maps your raw logs to days 1-31. The system automatically cross-references your time logs against your designated Office Location Schedule to compute exact Undertime (Hours and Minutes). \n• Duplicate Scans: If you scanned multiple times for the same period (e.g., two Morning In logs), the system automatically selects the earliest time and highlights the cell in Amber. Click the cell to select a different scan, or double-click to type a manual override.'
       },
       {
-        heading: '5. Table Tools (Merging & Batching)',
-        content: '• Split/Merge Cells: Hover your mouse on the border between two time cells (e.g., AM OUT and PM IN). A merge icon will appear, allowing you to combine them for continuous shifts.\n• Batch Remarks: Click the checkboxes on the far-left side of the table rows. A floating tool will appear. You can apply remarks like "Work Suspension", "Holiday", or "Leaves" to all selected days simultaneously. Selecting "Weekend" requires exactly two consecutive days to be checked.'
+        heading: '7. Table Tools (Merging & Batching)',
+        content: '• Split/Merge Cells: Hover your mouse on the border between two time cells (e.g., AM OUT and PM IN). A merge icon will appear, allowing you to combine them for continuous shifts.\n• Batch Reasons: Click the checkboxes on the far-left side of the table rows. A floating tool will appear. You can apply reasons like "Work Suspension", "Holiday", or "Leaves" to all selected days simultaneously. Selecting "Weekend" requires exactly two consecutive days to be checked.'
       },
       {
-        heading: '6. Accomplishment Report (AR) Tab',
+        heading: '8. Accomplishment Report (AR) Tab',
         content: 'The AR tab dynamically syncs with your DTR. \n• Auto-Highlighting: Any day with a recorded time log is automatically highlighted in green.\n• Manual Inclusion: If you worked but have no biometric log, click the day number to manually include it in the report.\n• Task Formatting: In the text area, type a hyphen (-) or asterisk (*) followed by a space, and press Enter to automatically create a formatted bulleted list.'
       },
       {
-        heading: '7. DTR Adjustment Slip Tab',
+        heading: '9. DTR Adjustment Slip Tab',
         content: 'If your biometrics failed or you went on Official Business, switch to this tab. You can add specific rows for the missing dates/times, select the reason (Fingerprint issue, OB, Personal, or Other), and provide specific details. This generates a separate official Word document for your supervisor.'
       }
     ]

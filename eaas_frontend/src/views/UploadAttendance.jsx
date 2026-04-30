@@ -2287,7 +2287,7 @@ const InputCell = ({ day, field, value, options, onUpdate, isReadOnly }) => {
   );
 };
 
-const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReason, setBatchReason, customReason, setCustomReason, batchClaim, setBatchClaim, isWeekendValid, applyBatch, clearBatchRemarks, dtrFormat }, ref) => {
+const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReason, setBatchReason, customReason, setCustomReason, batchClaim, setBatchClaim, customClaim, setCustomClaim, isWeekendValid, applyBatch, clearBatchRemarks, dtrFormat }, ref) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const startPos = useRef({ x: 0, y: 0 });
@@ -2402,7 +2402,17 @@ const ToolContent = React.forwardRef(({ selectedDays, setSelectedDays, batchReas
                       <option value="">-- No Change --</option>
                       <option value="With Claim">With Claim</option>
                       <option value="No Claim">No Claim</option>
+                      <option value="Others">Others</option>
                   </select>
+                  
+                  {batchClaim === "Others" && (
+                      <input 
+                          placeholder="Type claim remark..."
+                          value={customClaim}
+                          onChange={(e) => setCustomClaim(e.target.value)}
+                          className="mt-2 text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-full"
+                      />
+                  )}
               </div>
           )}
 
@@ -2438,6 +2448,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, is
   const [batchReason, setBatchReason] = useState("Work Suspension");
   const [customReason, setCustomReason] = useState("");
   const [batchClaim, setBatchClaim] = useState("");
+  const [customClaim, setCustomClaim] = useState("");
   const tableRef = useRef(null);
 
   const [activeMergeDay, setActiveMergeDay] = useState(null);
@@ -2531,7 +2542,8 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, is
       }
 
       if (dtrFormat === 'organic' && batchClaim !== "") {
-          onBatchUpdate(Array.from(selectedDays), "claim_remark", batchClaim);
+          const claimToApply = batchClaim === "Others" ? customClaim : batchClaim;
+          onBatchUpdate(Array.from(selectedDays), "claim_remark", claimToApply);
       }
 
       setSelectedDays(new Set());
@@ -2561,6 +2573,7 @@ function DTRTable({ data, onUpdate, onBatchUpdate, periodFormat, setAppAlert, is
                 batchReason={batchReason} setBatchReason={setBatchReason}
                 customReason={customReason} setCustomReason={setCustomReason}
                 batchClaim={batchClaim} setBatchClaim={setBatchClaim}
+                customClaim={customClaim} setCustomClaim={setCustomClaim}
                 isWeekendValid={isWeekendValid} applyBatch={applyBatch} clearBatchRemarks={clearBatchRemarks}
                 dtrFormat={dtrFormat}
             />,
