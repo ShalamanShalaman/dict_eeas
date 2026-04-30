@@ -175,7 +175,7 @@ const manualContent = [
       },
       {
         heading: 'User Management',
-        content: 'Admins can Create, Edit, or Delete users. When creating an account, you must assign them a Role (Employee, Reviewer, Admin), an Office Location, and a Position. The system will automatically generate a highly secure 12-character temporary password, email it directly to the user, and force them to change it on their first login.'
+        content: 'Admins can Create, Edit, or Delete users. When creating an account, you must assign them a Role (Employee, Reviewer, Admin), an Office Location, and a Position. The system will automatically generate a highly secure 12-character temporary password, email it directly to the user, which they can change later.'
       }
     ]
   },
@@ -187,7 +187,7 @@ const manualContent = [
     sections: [
       {
         heading: 'Live Audit Trail',
-        content: 'The System Audits page records a permanent, unalterable log of every action taken in the system (Logins, Creations, Updates, Deletions, Document Submissions, Approvals). The table auto-refreshes every 5 seconds to show live activity.'
+        content: 'The System Audits page records a permanent, unalterable log of every action taken in the system (Logins, Creations, Updates, Deletions, Document Submissions, Approvals). The table requires manual reloading to update logs.'
       },
       {
         heading: 'Deep Inspection & Filtering',
