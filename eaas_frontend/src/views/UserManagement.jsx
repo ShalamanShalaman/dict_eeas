@@ -1,18 +1,15 @@
 import { useState, useEffect } from "react";
-import { Users, MapPin, Briefcase, Plus, X, Edit2, Trash2, AlertCircle, CheckCircle } from "lucide-react";
+import { Users, Plus, X, Edit2, Trash2, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
-  const [locations, setLocations] = useState([]);
+  const [locations, setLocations] = useState([]); // Kept for the user creation dropdown
   const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  
   const [editingUser, setEditingUser] = useState(null);
-  const [editingLocation, setEditingLocation] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,17 +29,8 @@ export default function UserManagement() {
     position_id: "" 
   });
 
-  const [locationForm, setLocationForm] = useState({
-    location: "",
-    reviewer_id: "",
-    am_in: "",
-    am_out: "",
-    pm_in: "",
-    pm_out: "",
-    apply_to_all: false
-  });
-
-  const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api`;
+  const API_BASE_URL = "";
+  const API_URL = `${API_BASE_URL}/api`;
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -89,11 +77,6 @@ export default function UserManagement() {
 
   const handleInputChange = (setter, data, field, value) => {
     setter({ ...data, [field]: value });
-    setHasUnsavedChanges(true);
-  };
-
-  const handleCheckboxChange = (setter, data, field, e) => {
-    setter({ ...data, [field]: e.target.checked });
     setHasUnsavedChanges(true);
   };
 
@@ -232,112 +215,6 @@ export default function UserManagement() {
     });
   };
 
-  const handleLocationSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const endpoint = editingLocation
-        ? `${API_URL}/admin/edit-location/${editingLocation.id}`
-        : `${API_URL}/admin/create-location`;
-      const method = editingLocation ? "PUT" : "POST";
-
-      const payload = {
-        ...locationForm,
-        action_by: currentUser?.user_id || currentUser?.id
-      };
-
-      const res = await fetch(endpoint, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-
-      if (res.ok) {
-        fetchLocations();
-        if (editingLocation) {
-            closeLocationModal(true);
-            setUiModal({ show: true, type: 'success', title: 'Success', message: 'Location updated successfully', onConfirm: () => closeUiModal() });
-        } else {
-            setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "", apply_to_all: false });
-            setHasUnsavedChanges(false);
-            setUiModal({ show: true, type: 'success', title: 'Success', message: 'Location added successfully', onConfirm: () => closeUiModal() });
-        }
-      } else {
-        setUiModal({ show: true, type: 'error', title: 'Error', message: result.error || "Failed to save location", onConfirm: () => closeUiModal() });
-      }
-    } catch (error) {
-      console.error(error);
-      setUiModal({ show: true, type: 'error', title: 'Error', message: 'Server error', onConfirm: () => closeUiModal() });
-    }
-  };
-
-  const handleEditLocation = (loc) => {
-    setEditingLocation(loc);
-    setLocationForm({ 
-      location: loc.location, 
-      reviewer_id: loc.reviewer_id || "",
-      am_in: loc.am_in || "",
-      am_out: loc.am_out || "",
-      pm_in: loc.pm_in || "",
-      pm_out: loc.pm_out || "",
-      apply_to_all: false
-    });
-    setHasUnsavedChanges(false);
-    setIsLocationModalOpen(true);
-  };
-
-  const handleDeleteLocation = (loc) => {
-    setUiModal({
-        show: true,
-        type: 'confirm',
-        title: 'Delete Location',
-        message: `Are you sure you want to delete "${loc.location}"?`,
-        onConfirm: async () => {
-            try {
-                const actionBy = currentUser?.user_id || currentUser?.id || '';
-                const res = await fetch(`${API_URL}/admin/delete-location/${loc.id}?action_by=${actionBy}`, {
-                    method: "DELETE"
-                });
-                if (res.ok) {
-                    fetchLocations();
-                    closeUiModal();
-                } else {
-                    setUiModal({ show: true, type: 'error', title: 'Error', message: 'Failed to delete location.', onConfirm: () => closeUiModal() });
-                }
-            } catch (error) {
-                console.error(error);
-                setUiModal({ show: true, type: 'error', title: 'Error', message: 'Server error.', onConfirm: () => closeUiModal() });
-            }
-        }
-    });
-  };
-
-  const attemptCloseLocationModal = () => {
-    if (hasUnsavedChanges) {
-        setUiModal({
-            show: true,
-            type: 'confirm',
-            title: 'Unsaved Changes',
-            message: 'You have unsaved changes. Are you sure you want to close?',
-            onConfirm: () => {
-                closeLocationModal(true);
-                closeUiModal();
-            }
-        });
-    } else {
-        closeLocationModal(true);
-    }
-  };
-
-  const closeLocationModal = (force = false) => {
-    if (!force && hasUnsavedChanges) return;
-
-    setIsLocationModalOpen(false);
-    setEditingLocation(null);
-    setHasUnsavedChanges(false);
-    setLocationForm({ location: "", reviewer_id: "", am_in: "", am_out: "", pm_in: "", pm_out: "", apply_to_all: false });
-  };
-
   const itemsPerPage = 10;
   const filteredUsers = users.filter((u) =>
     `${u.full_name} ${u.user_id} ${u.email}`.toLowerCase().includes(searchTerm.toLowerCase())
@@ -348,17 +225,15 @@ export default function UserManagement() {
     currentPage * itemsPerPage
   );
 
-  const reviewers = users.filter(u => u.role === 'reviewer');
-
   return (
     <div className="space-y-6 p-6 max-w-[1400px] mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                 <Users className="w-6 h-6 text-blue-600" />
-                Admin Settings
+                User Management
             </h2>
-            <p className="text-gray-500 text-sm">Manage system access, roles, and assignments.</p>
+            <p className="text-gray-500 text-sm">Manage system access, roles, and user assignments.</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -366,12 +241,6 @@ export default function UserManagement() {
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors"
           >
             <Plus className="w-4 h-4" /> Add User
-          </button>
-          <button
-            onClick={() => { setIsLocationModalOpen(true); setHasUnsavedChanges(false); }}
-            className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors"
-          >
-            <MapPin className="w-4 h-4" /> Locations
           </button>
         </div>
       </div>
@@ -401,13 +270,11 @@ export default function UserManagement() {
             </thead>
             <tbody className="divide-y divide-gray-100">
                 {loading ? (
-                <tr><td colSpan="7" className="text-center py-8 text-gray-500">Loading users...</td></tr>
+                <tr><td colSpan="6" className="text-center py-8 text-gray-500">Loading users...</td></tr>
                 ) : paginatedUsers.length === 0 ? (
-                <tr><td colSpan="7" className="text-center py-8 text-gray-500">No users found matching your search.</td></tr>
+                <tr><td colSpan="6" className="text-center py-8 text-gray-500">No users found matching your search.</td></tr>
                 ) : (
                 paginatedUsers.map((user) => {
-                    const loc = locations.find(l => l.id === user.office_location_id);
-                    
                     return (
                     <tr key={user.public_id} className="hover:bg-blue-50/50 transition-colors group">
                         <td className="px-6 py-3 font-mono text-gray-600">{user.user_id}</td>
@@ -424,7 +291,7 @@ export default function UserManagement() {
                             </span>
                         </td>
                         <td className="px-6 py-3 text-gray-600">{user.position_id || <span className="text-gray-300 italic">None</span>}</td>
-                        <td className="px-6 py-3 text-gray-600">{loc ? loc.location : <span className="text-gray-300 italic">None</span>}</td>
+                        <td className="px-6 py-3 text-gray-600">{user.office_name || <span className="text-gray-300 italic">None</span>}</td>
                         <td className="px-6 py-3 text-right space-x-2">
                             <button onClick={() => handleEditUser(user)} className="text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
                                 <Edit2 className="w-4 h-4 inline" />
@@ -567,110 +434,6 @@ export default function UserManagement() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {isLocationModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 text-white flex justify-between items-center">
-              <h3 className="font-bold">Manage Locations</h3>
-              <button onClick={attemptCloseLocationModal} className="text-white/70 hover:text-white"><X className="w-5 h-5"/></button>
-            </div>
-
-            <div className="p-5 max-h-[85vh] flex flex-col">
-                <form onSubmit={handleLocationSubmit} className="space-y-3 mb-6 border-b border-gray-100 pb-6">
-                    <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase">Office Name</label>
-                        <input
-                            required
-                            placeholder="e.g. Santiago City Field Office"
-                            value={locationForm.location}
-                            onChange={(e) => handleInputChange(setLocationForm, locationForm, "location", e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none mt-1"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase">Assigned Reviewer</label>
-                        <select
-                            value={locationForm.reviewer_id}
-                            onChange={(e) => handleInputChange(setLocationForm, locationForm, "reviewer_id", e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none mt-1"
-                        >
-                            <option value="">-- No Reviewer Assigned --</option>
-                            {reviewers.map(r => (
-                                <option key={r.id} value={r.id}>{r.full_name}</option>
-                            ))}
-                        </select>
-                        <p className="text-[10px] text-gray-400 mt-1">Only users with 'Reviewer' role appear here.</p>
-                    </div>
-
-                    <div className="pt-2 border-t border-gray-100">
-                        <label className="text-xs font-semibold text-gray-500 uppercase mb-2 block">Standard Office Hours</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="text-[10px] text-gray-400 font-semibold uppercase">AM IN</label>
-                                <input type="time" value={locationForm.am_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_in", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-gray-400 font-semibold uppercase">AM OUT</label>
-                                <input type="time" value={locationForm.am_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "am_out", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-gray-400 font-semibold uppercase">PM IN</label>
-                                <input type="time" value={locationForm.pm_in} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_in", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-gray-400 font-semibold uppercase">PM OUT</label>
-                                <input type="time" value={locationForm.pm_out} onChange={(e) => handleInputChange(setLocationForm, locationForm, "pm_out", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none" required />
-                            </div>
-                        </div>
-                    </div>
-
-                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
-                        <input type="checkbox" checked={locationForm.apply_to_all} onChange={(e) => handleCheckboxChange(setLocationForm, locationForm, "apply_to_all", e)} className="w-4 h-4 text-blue-600 focus:ring-blue-500 rounded border-gray-300" />
-                        <span className="text-xs font-semibold text-gray-700">Apply this schedule to all existing locations</span>
-                    </label>
-
-                    <button className={`w-full py-2 rounded-md text-sm font-semibold text-white shadow-sm transition-colors mt-2 ${editingLocation ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700"}`}>
-                        {editingLocation ? "Update Location" : "Add Location"}
-                    </button>
-                </form>
-
-                <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                    {locations.length === 0 && <p className="text-center text-xs text-gray-400 py-4">No locations added yet.</p>}
-                    {locations.map((loc) => {
-                        const revName = users.find(u => u.id === loc.reviewer_id)?.full_name || "Unassigned";
-                        
-                        const formatTime = (t) => {
-                            if(!t) return '';
-                            let [h, m] = t.split(':');
-                            let ampm = h >= 12 ? 'PM' : 'AM';
-                            h = h % 12 || 12;
-                            return `${h}:${m} ${ampm}`;
-                        };
-
-                        return (
-                            <div key={loc.id} className="group flex justify-between items-start p-3 bg-gray-50 border border-gray-100 rounded-lg hover:border-blue-200 transition-colors">
-                                <div>
-                                    <div className="font-medium text-sm text-gray-800">{loc.location}</div>
-                                    <div className="text-[10px] text-gray-500 font-mono mt-0.5">
-                                        {loc.am_in ? `${formatTime(loc.am_in)} - ${formatTime(loc.pm_out)}` : "No schedule set"}
-                                    </div>
-                                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                        <Briefcase className="w-3 h-3"/> {revName}
-                                    </div>
-                                </div>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleEditLocation(loc)} className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded"><Edit2 className="w-3 h-3"/></button>
-                                    <button onClick={() => handleDeleteLocation(loc)} className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3"/></button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
           </div>
         </div>
       )}

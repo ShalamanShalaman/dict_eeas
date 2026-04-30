@@ -15,7 +15,8 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  MapPin
 } from "lucide-react";
 
 let globalLogoutLock = false;
@@ -221,7 +222,8 @@ export default function Sidebar({ role, onLogout }) {
         id: 'admin',
         title: 'ADMINISTRATION',
         items: [
-          { label: "Admin Settings", icon: Users, path: "/users" },
+          { label: "User Management", icon: Users, path: "/users" },
+          { label: "Office Locations", icon: MapPin, path: "/locations" },
           { label: "System Audits", icon: Shield, path: "/audits" },
         ]
       });
@@ -372,7 +374,7 @@ export default function Sidebar({ role, onLogout }) {
         isProcessing={isLoggingOut} 
       />
 
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.1); border-radius: 10px; }
