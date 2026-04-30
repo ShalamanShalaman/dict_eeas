@@ -4,7 +4,10 @@ import subprocess
 import shutil
 import platform
 import tempfile
+import time
 from datetime import datetime
+
+CONVERSION_TIMEOUT = 30 
 
 try:
     from docx import Document as DocxDocument
@@ -51,14 +54,15 @@ def get_libreoffice_executable():
         return shutil.which('soffice')
 
     if platform.system() == 'Linux':
-        for p in ['/usr/bin/libreoffice', '/usr/bin/soffice']:
+        for p in ['/usr/bin/libreoffice', '/usr/bin/soffice', '/usr/local/bin/soffice']:
             if os.path.exists(p):
                 return p
 
     if platform.system() == 'Windows':
         common_paths = [
             r"C:\Program Files\LibreOffice\program\soffice.exe",
-            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+            os.path.join(os.environ.get('PROGRAMFILES', 'C:\\Program Files'), 'LibreOffice', 'program', 'soffice.exe')
         ]
         for p in common_paths:
             if os.path.exists(p):
@@ -71,32 +75,36 @@ def _convert_with_libreoffice(input_path, expected_pdf_path):
         return False
 
     out_dir = os.path.dirname(expected_pdf_path)
-
     profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
 
     try:
         env = os.environ.copy()
-        env['HOME'] = '/tmp'
-        
         if platform.system() == 'Linux':
-            env['PATH'] = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:' + env.get('PATH', '')
+            env['HOME'] = '/tmp'
+        
+        formatted_profile_path = profile_dir.replace("\\", "/")
+        
+        cmd = [
+            lo_exec,
+            f'-env:UserInstallation=file:///{formatted_profile_path}',
+            '--headless',
+            '--invisible',
+            '--nologo',
+            '--nodefault',
+            '--nofirststartwizard',
+            '--norestore',
+            '--convert-to', 'pdf',
+            input_path,
+            '--outdir', out_dir
+        ]
 
-        subprocess.run(
-            [
-                lo_exec,
-                f'-env:UserInstallation=file://{profile_dir}',
-                '--headless',
-                '--nologo',
-                '--nofirststartwizard',
-                '--norestore',
-                '--convert-to', 'pdf',
-                input_path,
-                '--outdir', out_dir
-            ],
+        result = subprocess.run(
+            cmd,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=env
+            env=env,
+            timeout=CONVERSION_TIMEOUT
         )
 
         input_basename = os.path.basename(input_path)
@@ -105,245 +113,160 @@ def _convert_with_libreoffice(input_path, expected_pdf_path):
 
         if os.path.exists(generated_pdf):
             if os.path.abspath(generated_pdf) != os.path.abspath(expected_pdf_path):
+                if os.path.exists(expected_pdf_path):
+                    os.remove(expected_pdf_path)
                 shutil.move(generated_pdf, expected_pdf_path)
             return True
         return False
-    except Exception:
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, Exception) as e:
+        print(f"LibreOffice conversion failed: {str(e)}")
         return False
     finally:
-        try:
-            shutil.rmtree(profile_dir)
-        except Exception:
-            pass
+        for i in range(3): 
+            try:
+                shutil.rmtree(profile_dir)
+                break
+            except Exception:
+                time.sleep(0.5)
 
 def convert_file_to_pdf(file_path, output_dir):
     if not REPORTLAB_AVAILABLE:
-        raise Exception("PDF generation library not available")
+        raise Exception("PDF generation library (ReportLab) not available")
 
     filename = os.path.basename(file_path)
     name_without_ext = os.path.splitext(filename)[0]
     output_path = os.path.join(output_dir, f"{name_without_ext}.pdf")
 
     os.makedirs(output_dir, exist_ok=True)
-
     ext = filename.lower().split('.')[-1]
 
-    if ext in ['docx', 'doc']:
-        return _convert_docx_to_pdf(file_path, output_path)
-    elif ext in ['xlsx', 'xls']:
-        return _convert_xlsx_to_pdf(file_path, output_path)
-    elif ext in ['png', 'jpg', 'jpeg']:
-        return _convert_image_to_pdf(file_path, output_path)
-    elif ext == 'txt':
-        return _convert_txt_to_pdf(file_path, output_path)
-    elif ext == 'pdf':
+    if ext == 'pdf':
         shutil.copy2(file_path, output_path)
         return output_path
-    else:
+
+    success_path = None
+    if ext in ['docx', 'doc']:
+        success_path = _convert_docx_to_pdf(file_path, output_path)
+    elif ext in ['xlsx', 'xls']:
+        success_path = _convert_xlsx_to_pdf(file_path, output_path)
+    elif ext in ['png', 'jpg', 'jpeg']:
+        success_path = _convert_image_to_pdf(file_path, output_path)
+    elif ext == 'txt':
+        success_path = _convert_txt_to_pdf(file_path, output_path)
+    
+    if not success_path:
         return _convert_generic_to_pdf(file_path, output_path)
+    
+    return success_path
 
 def _convert_docx_to_pdf(docx_path, pdf_path):
-    if DOCX2PDF_AVAILABLE and platform.system() == 'Windows':
+    if platform.system() == 'Windows' and WIN32_AVAILABLE:
         try:
-            import pythoncom
             pythoncom.CoInitialize()
+            word = win32com.client.DispatchEx("Word.Application")
+            word.Visible = False
+            word.DisplayAlerts = 0
+            
             try:
-                temp_dir = os.path.dirname(pdf_path)
-                docx2pdf_convert(docx_path, temp_dir)
-
-                input_filename = os.path.basename(docx_path)
-                name_without_ext = os.path.splitext(input_filename)[0]
-                generated_pdf = os.path.join(temp_dir, f"{name_without_ext}.pdf")
-
-                if os.path.exists(generated_pdf):
-                    shutil.move(generated_pdf, pdf_path)
+                abs_docx = os.path.abspath(docx_path)
+                abs_pdf = os.path.abspath(pdf_path)
+                
+                doc = word.Documents.Open(abs_docx, ReadOnly=True)
+                doc.SaveAs(abs_pdf, FileFormat=17)
+                doc.Close(0)
+                
+                if os.path.exists(pdf_path):
                     return pdf_path
             finally:
+                word.Quit()
                 pythoncom.CoUninitialize()
         except Exception as e:
-            error_msg = str(e).lower()
-            if "word" in error_msg or "com" in error_msg or "co_create_instance" in error_msg:
-                pass
+            print(f"MS Word COM conversion failed: {str(e)}. Falling back.")
 
     if _convert_with_libreoffice(docx_path, pdf_path):
         return pdf_path
 
-    ext = docx_path.lower().split('.')[-1]
-    if ext == 'doc':
-        return _convert_generic_to_pdf(docx_path, pdf_path)
-
-    if not DOCX_AVAILABLE:
-        raise Exception("python-docx not available for DOCX conversion")
-
-    doc = DocxDocument(docx_path)
-
-    pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter, leftMargin=0.5*inch, rightMargin=0.5*inch)
-    story = []
-    styles = getSampleStyleSheet()
-
-    for para in doc.paragraphs:
-        if para.text.strip():
-            style_name = para.style.name if para.style else 'Normal'
-
-            if 'Heading' in style_name:
-                level = 1 if '1' in style_name else 2 if '2' in style_name else 3
-                para_style = styles[f'Heading{level}']
-            else:
-                para_style = styles['Normal']
-
-            p = Paragraph(para.text, para_style)
-            story.append(p)
-            story.append(Spacer(1, 6))
-
-    for table in doc.tables:
-        table_data = []
-        for row in table.rows:
-            row_data = [cell.text for cell in row.cells]
-            table_data.append(row_data)
-
-        if table_data:
-            num_cols = len(table_data[0]) if table_data else 1
-            col_width = 7 * inch / num_cols if num_cols > 0 else 1
-            col_widths = [col_width] * num_cols
-
-            t = Table(table_data, colWidths=col_widths)
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('TOPPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ]))
-            story.append(t)
-
-        story.append(Spacer(1, 15))
-
-    pdf_doc.build(story)
-    return pdf_path
+    if DOCX_AVAILABLE and docx_path.lower().endswith('.docx'):
+        try:
+            doc = DocxDocument(docx_path)
+            pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+            story = []
+            styles = getSampleStyleSheet()
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    story.append(Paragraph(para.text, styles['Normal']))
+                    story.append(Spacer(1, 6))
+            pdf_doc.build(story)
+            return pdf_path
+        except Exception:
+            pass
+            
+    return None
 
 def _convert_xlsx_to_pdf(xlsx_path, pdf_path):
-    if WIN32_AVAILABLE and platform.system() == 'Windows':
+    if platform.system() == 'Windows' and WIN32_AVAILABLE:
         try:
-            import pythoncom
             pythoncom.CoInitialize()
-
-            excel = win32com.client.Dispatch("Excel.Application")
+            excel = win32com.client.DispatchEx("Excel.Application")
             excel.Visible = False
             excel.DisplayAlerts = False
-
+            
             try:
-                wb = excel.Workbooks.Open(xlsx_path)
-                wb.ExportAsFixedFormat(0, pdf_path)
-                wb.Close(SaveChanges=False)
-
+                abs_xlsx = os.path.abspath(xlsx_path)
+                abs_pdf = os.path.abspath(pdf_path)
+                
+                wb = excel.Workbooks.Open(abs_xlsx, ReadOnly=True)
+                wb.ExportAsFixedFormat(0, abs_pdf)
+                wb.Close(False)
+                
                 if os.path.exists(pdf_path):
                     return pdf_path
             finally:
                 excel.Quit()
                 pythoncom.CoUninitialize()
         except Exception as e:
-            pass
+            print(f"MS Excel COM conversion failed: {str(e)}. Falling back.")
 
     if _convert_with_libreoffice(xlsx_path, pdf_path):
         return pdf_path
 
-    if not XLSX_AVAILABLE:
-        raise Exception("openpyxl not available for Excel conversion")
-
-    wb = openpyxl.load_workbook(xlsx_path)
-
-    pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
-    story = []
-    styles = getSampleStyleSheet()
-
-    for sheet in wb.sheetnames:
-        ws = wb[sheet]
-
-        story.append(Paragraph(f"Sheet: {sheet}", styles['Heading2']))
-        story.append(Spacer(1, 10))
-
-        table_data = []
-        for row in ws.iter_rows(values_only=True):
-            row_data = [str(cell) if cell is not None else '' for cell in row]
-            if any(row_data):
-                table_data.append(row_data)
-
-        if table_data:
-            max_cols = 10
-            max_rows = 50
-
-            table_data = table_data[:max_rows]
-            table_data = [row[:max_cols] for row in table_data]
-
-            col_width = 7.5 * inch / min(len(table_data[0]) if table_data else 1, max_cols)
-
-            t = Table(table_data, colWidths=[col_width] * min(len(table_data[0]) if table_data else 1, max_cols))
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('TOPPADDING', (0, 0), (-1, 0), 8),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            story.append(t)
-
-        story.append(Spacer(1, 20))
-
-    pdf_doc.build(story)
-    return pdf_path
+    return None
 
 def _convert_image_to_pdf(image_path, pdf_path):
-    img = Image(image_path)
-
-    img.drawWidth = 6 * inch
-    img.drawHeight = 8 * inch
-
-    pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
-    story = []
-    story.append(img)
-
-    pdf_doc.build(story)
-    return pdf_path
+    try:
+        pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        story = []
+        img = Image(image_path)
+        img.drawWidth = 6.5 * inch
+        img.drawHeight = 9 * inch
+        story.append(img)
+        pdf_doc.build(story)
+        return pdf_path
+    except Exception:
+        return None
 
 def _convert_txt_to_pdf(txt_path, pdf_path):
-    with open(txt_path, 'r', encoding='utf-8') as f:
-        text = f.read()
-
-    pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
-    story = []
-    styles = getSampleStyleSheet()
-
-    for line in text.split('\n'):
-        if line.strip():
-            story.append(Paragraph(line, styles['Normal']))
-            story.append(Spacer(1, 6))
-
-    pdf_doc.build(story)
-    return pdf_path
+    try:
+        with open(txt_path, 'r', encoding='utf-8', errors='replace') as f:
+            text = f.read()
+        pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        story = []
+        styles = getSampleStyleSheet()
+        for line in text.split('\n'):
+            story.append(Paragraph(line or " ", styles['Normal']))
+        pdf_doc.build(story)
+        return pdf_path
+    except Exception:
+        return None
 
 def _convert_generic_to_pdf(file_path, pdf_path):
     pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
     story = []
     styles = getSampleStyleSheet()
-
     filename = os.path.basename(file_path)
     story.append(Paragraph(f"Attached File: {filename}", styles['Heading1']))
     story.append(Spacer(1, 20))
-    story.append(Paragraph("This file was attached but could not be converted to PDF directly.", styles['Normal']))
-    story.append(Paragraph(f"Original format: {os.path.splitext(filename)[1]}", styles['Normal']))
-
+    story.append(Paragraph("This file format could not be converted to PDF natively on this machine.", styles['Normal']))
     pdf_doc.build(story)
     return pdf_path
 
@@ -354,13 +277,11 @@ def merge_pdfs_to_single(file_paths, output_path):
 
         temp_dir = os.path.join(os.path.dirname(output_path), 'temp_conversions')
         os.makedirs(temp_dir, exist_ok=True)
-
         temp_files_to_cleanup = []
 
         for file_path in file_paths:
             if os.path.exists(file_path):
                 ext = file_path.lower().split('.')[-1]
-
                 if ext == 'pdf':
                     merger.append(file_path)
                 else:
@@ -371,24 +292,17 @@ def merge_pdfs_to_single(file_paths, output_path):
 
         with open(output_path, 'wb') as f:
             merger.write(f)
-
         merger.close()
 
         for temp_file in temp_files_to_cleanup:
-            try:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-            except Exception:
-                pass
-
-        try:
-            os.rmdir(temp_dir)
-        except Exception:
-            pass
+            try: os.remove(temp_file)
+            except: pass
+        try: os.rmdir(temp_dir)
+        except: pass
 
         return output_path
-    except ImportError:
-        if file_paths and os.path.exists(file_paths[0]):
+    except Exception as e:
+        if file_paths and file_paths[0].lower().endswith('.pdf'):
             shutil.copy2(file_paths[0], output_path)
             return output_path
-        raise Exception("PyPDF2 not available for PDF merging")
+        raise Exception(f"Merge failed: {str(e)}")
