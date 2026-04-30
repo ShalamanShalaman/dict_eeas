@@ -1,10 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { User, Settings, Key, Bell, HelpCircle, MessageSquare, Clock } from "lucide-react";
+import { User, Settings, Key, Bell, HelpCircle, MessageSquare, Clock, Home, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import NotificationDropdown from "./NotificationDropdown";
-import MessageDropdown from "./MessageDropdown";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = "";
+
+// Stub components for Canvas preview compilation
+const NotificationDropdown = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="absolute right-0 mt-2 w-64 bg-white shadow-lg rounded-xl border border-gray-100 p-4 z-[100]">
+      <div className="flex justify-between items-center mb-2">
+        <p className="text-sm font-semibold text-gray-800">Notifications</p>
+      </div>
+      <p className="text-xs text-gray-500">No new notifications.</p>
+    </div>
+  );
+};
+
+const MessageDropdown = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="absolute right-0 mt-2 w-64 bg-white shadow-lg rounded-xl border border-gray-100 p-4 z-[100]">
+      <div className="flex justify-between items-center mb-2">
+        <p className="text-sm font-semibold text-gray-800">Messages</p>
+      </div>
+      <p className="text-xs text-gray-500">No new messages.</p>
+    </div>
+  );
+};
 
 export default function Header({ role, setRole, user, onLogout }) {
   
@@ -145,6 +168,22 @@ export default function Header({ role, setRole, user, onLogout }) {
 
       <div className="flex items-center gap-2 md:gap-2.5">
 
+        <button
+          onClick={() => navigate('/')}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
+          title="Home Dashboard"
+        >
+          <Home size={20} />
+        </button>
+
+        <button
+          onClick={() => navigate('/manual')}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 hover:border-white/30"
+          title="System Manual"
+        >
+          <BookOpen size={20} />
+        </button>
+
         {(user?.role === 'employee' || user?.role === 'reviewer' || user?.role === 'admin') && (
           <div className="relative">
             <button
@@ -267,7 +306,10 @@ export default function Header({ role, setRole, user, onLogout }) {
                   </button>
                 )}
                 <button
-                  onClick={() => handleNavigate("account")}
+                  onClick={() => {
+                    setShowDropdown(false);
+                    navigate('/manual');
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50"
                 >
                   <HelpCircle size={16} />
