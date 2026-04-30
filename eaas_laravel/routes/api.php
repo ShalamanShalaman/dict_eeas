@@ -22,6 +22,7 @@ Route::prefix('admin')->group(function () {
     Route::get('/locations', [AdminController::class, 'getLocations']);
     Route::post('/create-location', [AdminController::class, 'createLocation']);
     Route::put('/edit-location/{loc_id}', [AdminController::class, 'editLocation']);
+    Route::post('/update-global-hours', [AdminController::class, 'updateGlobalHours']);
     Route::delete('/delete-location/{loc_id}', [AdminController::class, 'deleteLocation']);
     
     Route::get('/users', [AdminController::class, 'getUsers']);

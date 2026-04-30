@@ -162,6 +162,25 @@ class AdminController extends Controller
         return response()->json(['message' => 'Location updated', 'location' => $loc->toArray()]);
     }
 
+    public function updateGlobalHours(Request $request)
+    {
+        $am_in = $request->input('am_in');
+        $am_out = $request->input('am_out');
+        $pm_in = $request->input('pm_in');
+        $pm_out = $request->input('pm_out');
+
+        OfficeLocation::query()->update([
+            'am_in' => $am_in,
+            'am_out' => $am_out,
+            'pm_in' => $pm_in,
+            'pm_out' => $pm_out,
+        ]);
+
+        LogHelper::log($request->input('action_by') ?? $request->input('admin_id'), 'UPDATE', 'OfficeLocation', "Updated global office hours for all locations", null);
+
+        return response()->json(['message' => 'Global hours updated successfully']);
+    }
+
     public function deleteLocation(Request $request, $loc_id)
     {
         $loc = OfficeLocation::findOrFail($loc_id);
