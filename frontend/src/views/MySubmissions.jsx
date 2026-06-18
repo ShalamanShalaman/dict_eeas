@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const PDFViewerModal = ({ isOpen, onClose, documentId, title }) => {
   if (!isOpen) return null;
@@ -153,6 +154,7 @@ export default function MySubmissions({ user, onNavigate }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [viewPdfModal, setViewPdfModal] = useState({ isOpen: false, docId: null, title: '' });
+  const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, docId: null });
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -201,8 +203,13 @@ export default function MySubmissions({ user, onNavigate }) {
     return matchesFilter && matchesSearch;
   });
 
-  const handleDelete = async (docId) => {
-    if (!window.confirm('Are you sure you want to delete this document?')) return;
+  const handleDeleteClick = (docId) => {
+    setDeleteDialog({ isOpen: true, docId });
+  };
+
+  const handleConfirmDelete = async () => {
+    const docId = deleteDialog.docId;
+    setDeleteDialog({ isOpen: false, docId: null });
     
     try {
       const response = await fetch(`http://127.0.0.1:5000/api/document/${docId}?user_id=${user.user_id}`, {
@@ -401,7 +408,7 @@ export default function MySubmissions({ user, onNavigate }) {
                         </button>
                       )}
                       <button
-                        onClick={() => handleDelete(doc.id)}
+                        onClick={() => handleDeleteClick(doc.id)}
                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete"
                       >
@@ -421,6 +428,17 @@ export default function MySubmissions({ user, onNavigate }) {
         onClose={() => setViewPdfModal({ isOpen: false, docId: null, title: '' })}
         documentId={viewPdfModal.docId}
         title={viewPdfModal.title}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, docId: null })}
+        onConfirm={handleConfirmDelete}
+        title="Delete Document"
+        message="Are you sure you want to delete this document?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
       />
     </div>
   );
